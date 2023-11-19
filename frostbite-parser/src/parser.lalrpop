@@ -1,0 +1,39 @@
+use crate::ast::*;
+use alloc::boxed::Box;
+
+grammar;
+
+pub Expr: Expr<'input> = {
+    <lhs:AtomExpr> <operator:BinaryOperator> <rhs:Expr> => Expr::BinaryOperation {
+        lhs: Box::new(lhs),
+        operator,
+        rhs: Box::new(rhs)
+    },
+
+    AtomExpr => <>,
+}
+
+AtomExpr: Expr<'input> = {
+    <span_start:@L> <i:Int> <span_end:@R> => Expr::Int(span_start..span_end, i),
+    <span_start:@L> <f:Float> <span_end:@R> => Expr::Float(span_start..span_end, f),
+    <span_start:@L> <i:Ident> <span_end:@R> => Expr::Ident(span_start..span_end, i),
+    <span_start:@L> <s:String> <span_end:@R> => Expr::String(span_start..span_end, s),
+}
+
+Int: i32 = 
+    <int:r"[0-9]+"> => int.parse().unwrap();
+
+Float: f32 = 
+    <float:"[0-9].[0-9]+"> => float.parse().unwrap();
+
+Ident: &'input str = 
+    r"[a-zA-Z][a-zA-Z0-9]*" => <>;
+
+String: &'input str = r#"".*""# => <>;
+
+BinaryOperator: BinaryOperator = {
+    r"\+" => BinaryOperator::Add,
+    r"-" => BinaryOperator::Sub,
+    r"\*" => BinaryOperator::Mul,
+    r"\\" => BinaryOperator::Div
+}
