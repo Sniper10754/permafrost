@@ -5,6 +5,12 @@ extern crate alloc;
 use alloc::{borrow::Cow, vec::Vec};
 use core::ops::Range;
 
+pub trait IntoReport {
+    type Arguments;
+
+    fn into_report(self, arguments: Self::Arguments) -> Self;
+}
+
 pub struct Report {
     pub level: Level,
     pub span: Option<Range<usize>>,
