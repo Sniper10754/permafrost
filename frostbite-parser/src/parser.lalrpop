@@ -1,7 +1,13 @@
 use crate::ast::*;
+
 use alloc::boxed::Box;
 
 grammar;
+
+extern {
+    type Location = crate::ast::Span;
+    type Error = crate::error::Error;
+}
 
 pub Expr: Expr<'input> = {
     <lhs:AtomExpr> <operator:BinaryOperator> <rhs:Expr> => Expr::BinaryOperation {
@@ -14,14 +20,14 @@ pub Expr: Expr<'input> = {
 }
 
 AtomExpr: Expr<'input> = {
-    <span_start:@L> <i:Int> <span_end:@R> => Expr::Int(span_start..span_end, i),
-    <span_start:@L> <f:Float> <span_end:@R> => Expr::Float(span_start..span_end, f),
-    <span_start:@L> <i:Ident> <span_end:@R> => Expr::Ident(span_start..span_end, i),
-    <span_start:@L> <s:String> <span_end:@R> => Expr::String(span_start..span_end, s),
+    <span_start:@L> <int:Int> <span_end:@R> => Expr::Int(span_start..span_end, int),
+    <span_start:@L> <float:Float> <span_end:@R> => Expr::Float(span_start..span_end, float),
+    <span_start:@L> <ident:Ident> <span_end:@R> => Expr::Ident(span_start..span_end, ident),
+    <span_start:@L> <string:String> <span_end:@R> => Expr::String(span_start..span_end, string),
 }
 
 Int: i32 = 
-    <int:r"[0-9]+"> => int.parse().unwrap();
+    <start:@L> <int:r"[0-9]+"> <end:@R> => int.parse().unwrap();
 
 Float: f32 = 
     <float:"[0-9].[0-9]+"> => float.parse().unwrap();
@@ -36,4 +42,10 @@ BinaryOperator: BinaryOperator = {
     r"-" => BinaryOperator::Sub,
     r"\*" => BinaryOperator::Mul,
     r"\\" => BinaryOperator::Div
+}
+
+TypeAnnotation: TypeAnnotation = {
+    "int" => TypeAnnotation::Int,
+    "float" => TypeAnnotation::Float,
+    "str" => TypeAnnotation::String,
 }

@@ -8,7 +8,7 @@ use core::ops::Range;
 pub trait IntoReport {
     type Arguments;
 
-    fn into_report(self, arguments: Self::Arguments) -> Self;
+    fn into_report(self, arguments: Self::Arguments) -> Report;
 }
 
 pub struct Report {

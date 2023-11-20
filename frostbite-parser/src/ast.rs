@@ -18,11 +18,8 @@ pub enum Expr<'a> {
 
     Let {
         name: &'a str,
-        value: Box<Self>,
-    },
-
-    Assign {
-        
+        type_annotation: Option<TypeAnnotation>,
+        value: Option<Box<Self>>,
     },
 }
 
@@ -32,4 +29,11 @@ pub enum BinaryOperator {
     Sub,
     Mul,
     Div,
+}
+
+#[derive(Debug, PartialEq)]
+pub enum TypeAnnotation {
+    Int,
+    Float,
+    String,
 }

@@ -3,20 +3,13 @@
 extern crate alloc;
 
 pub mod ast;
+pub mod error;
 
 pub use frostbite_report_interface as report;
 
-mod __parser {
-    use lalrpop_util::lalrpop_mod;
+use lalrpop_util::lalrpop_mod;
 
-    lalrpop_mod!(parser);
-
-    pub use parser::*;
-}
-
-pub mod parser {
-    pub use super::__parser::ExprParser;
-}
+lalrpop_mod!(pub parser);
 
 #[cfg(test)]
 mod tests {
@@ -39,8 +32,8 @@ mod tests {
     #[test]
     fn test() {
         assert_eq!(
-            parse_expr!("1 + 2 + 3").unwrap(),
-            Expr::BinaryOperation {
+            parse_expr!("1 + 2 + 3"),
+            Ok(Expr::BinaryOperation {
                 lhs: boxed!(Expr::Int(0..1, 1)),
                 operator: BinaryOperator::Add,
                 rhs: boxed!(Expr::BinaryOperation {
@@ -48,7 +41,7 @@ mod tests {
                     operator: BinaryOperator::Add,
                     rhs: boxed!(Expr::Int(8..9, 3))
                 }),
-            }
+            })
         );
     }
 }
