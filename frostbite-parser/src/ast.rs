@@ -1,7 +1,12 @@
-use alloc::boxed::Box;
+use alloc::{boxed::Box, vec::Vec};
 use core::ops::Range;
 
 pub type Span = Range<usize>;
+
+#[derive(Debug, PartialEq)]
+pub struct Program<'a> {
+    pub exprs: Vec<Expr<'a>>,
+}
 
 #[derive(Debug, PartialEq)]
 pub enum Expr<'a> {
