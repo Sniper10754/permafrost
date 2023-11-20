@@ -9,6 +9,11 @@ extern {
     type Error = crate::error::Error;
 }
 
+pub Program: Program<'input> = 
+    <exprs:(<Expr> ";")*> => Program {
+        exprs
+    };
+
 pub Expr: Expr<'input> = {
     <lhs:AtomExpr> <operator:BinaryOperator> <rhs:Expr> => Expr::BinaryOperation {
         lhs: Box::new(lhs),
@@ -20,17 +25,17 @@ pub Expr: Expr<'input> = {
 }
 
 AtomExpr: Expr<'input> = {
-    <span_start:@L> <int:Int> <span_end:@R> => Expr::Int(span_start..span_end, int),
-    <span_start:@L> <float:Float> <span_end:@R> => Expr::Float(span_start..span_end, float),
-    <span_start:@L> <ident:Ident> <span_end:@R> => Expr::Ident(span_start..span_end, ident),
-    <span_start:@L> <string:String> <span_end:@R> => Expr::String(span_start..span_end, string),
+    <start:@L> <int:Int> <end:@R> => Expr::Int(start..end, int),
+    <start:@L> <float:Float> <end:@R> => Expr::Float(start..end, float),
+    <start:@L> <ident:Ident> <end:@R> => Expr::Ident(start..end, ident),
+    <start:@L> <string:String> <end:@R> => Expr::String(start..end, string),
 }
 
 Int: i32 = 
     <start:@L> <int:r"[0-9]+"> <end:@R> => int.parse().unwrap();
 
 Float: f32 = 
-    <float:"[0-9].[0-9]+"> => float.parse().unwrap();
+    <start:@L> <float:"[0-9].[0-9]+"> <end:@R> => float.parse().unwrap();
 
 Ident: &'input str = 
     r"[a-zA-Z][a-zA-Z0-9]*" => <>;

@@ -12,3 +12,4 @@ lalrpop = "0.20.0"
 [dependencies]
 lalrpop-util = { version = "0.20.0", features = ["lexer", "unicode"] }
 frostbite-report-interface = { path = "../frostbite-report-interface" }
+derive_more = "0.99.17"
