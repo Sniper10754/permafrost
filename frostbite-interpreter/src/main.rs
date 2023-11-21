@@ -61,7 +61,7 @@ struct StackFrame<'input> {
 impl<'input> Interpreter<'input> {
     fn run(mut self, program: &Program<'input>) {
         for expr in &program.exprs {
-            match self.eval_expr(&expr) {
+            match self.eval_expr(expr) {
                 Ok(value) => {
                     dbg!(value);
                 }
@@ -100,8 +100,8 @@ impl<'input> Interpreter<'input> {
 
                     (lhs, rhs) => Err(Report {
                         level: Level::Error,
-                        span: Some(expr.span()),
-                        title: format!("Incompatible operands").into(),
+                        location: Some(expr.span()),
+                        title: "Incompatible operands".into(),
                         description: Some(
                             format!(
                                 "`{:?}` and `{:?}` cannot be used with operand `{operator}`",
@@ -118,7 +118,7 @@ impl<'input> Interpreter<'input> {
                 if !matches!(&**lhs, Expr::Ident(..)) {
                     return Err(Report {
                         level: Level::Error,
-                        span: Some(lhs.span()),
+                        location: Some(lhs.span()),
                         title: "Cannot assign to static/immutable".into(),
                         description: Some(format!("Cannot assign {value:?} to {lhs:?}").into()),
                         infos: vec![],
@@ -132,8 +132,7 @@ impl<'input> Interpreter<'input> {
                         let stack_frame_maybe_contaning_var = self
                             .frames
                             .iter_mut()
-                            .filter(|frame| frame.stack.contains_key(ident))
-                            .next();
+                            .find(|frame| frame.stack.contains_key(ident));
 
                         if let Some(frame) = stack_frame_maybe_contaning_var {
                             frame.stack.insert(ident, value);
