@@ -4,26 +4,31 @@ extern crate alloc;
 
 pub mod ast;
 pub mod error;
+pub mod lexer;
 
-use ast::Program;
+use ast::{Expr, Program};
 pub use frostbite_report_interface as report;
-
-mod __internal {
-    use lalrpop_util::lalrpop_mod;
-
-    lalrpop_mod!(pub parser);
-}
+use lexer::TokenStream;
 
 /// A Backend-agnostic wrapper around lalrpop
-pub struct Parser(__internal::parser::ProgramParser);
+pub struct Parser<'input> {
+    token_stream: TokenStream<'input>,
+}
 
-impl<'input> Parser {
-    pub fn new() -> Self {
-        Self(__internal::parser::ProgramParser::new())
+impl<'input> Parser<'input> {
+    pub fn with_tokenstream(token_stream: TokenStream<'input>) -> Self {
+        Self { token_stream }
     }
 
-    pub fn parse(&self, input: &'input str) -> Result<Program<'input>, error::Error> {
-        self.0.parse(input).map_err(Into::into)
+    pub fn parse(&mut self) -> Option<Program<'input>> {
+        todo!()
+    }
+
+    pub fn parse_expr(&mut self) -> Option<Expr<'input>> {
+        match self.token_stream.next() {
+            Some(_) => todo!(),
+            None => todo!(),
+        }
     }
 }
 
@@ -37,7 +42,7 @@ mod tests {
 
     macro_rules! parse_expr {
         ($text_to_parse:expr) => {
-            super::Parser::new().parse($text_to_parse)
+            super::Parser::new($text_to_parse).parse()
         };
     }
 

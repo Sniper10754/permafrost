@@ -1,47 +1,54 @@
-use alloc::{string::String, vec::Vec};
-use lalrpop_util::ParseError;
+use alloc::{borrow::Cow, vec, vec::Vec};
+use frostbite_report_interface::{Info, IntoReport, Level, Location, Report};
 
 use crate::ast::Span;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Error {
     InvalidToken {
-        location: usize,
+        location: Span,
     },
     UnrecognizedEof {
         location: usize,
-        expected: Vec<String>,
-    },
-    UnrecognizedToken {
-        token: Span,
-        expected: Vec<String>,
-    },
-    ExtraToken {
-        token: Span,
+        expected: Vec<Cow<'static, str>>,
     },
     NumberTooBig {
         span: Span,
     },
 }
 
-impl<L: Into<usize>, T> From<ParseError<L, T, Self>> for Error {
-    fn from(value: ParseError<L, T, Self>) -> Self {
-        match value {
-            ParseError::InvalidToken { location } => Error::InvalidToken {
-                location: location.into(),
-            },
-            ParseError::UnrecognizedEof { location, expected } => Error::UnrecognizedEof {
-                location: location.into(),
-                expected,
-            },
-            ParseError::UnrecognizedToken { token, expected } => Error::UnrecognizedToken {
-                token: (token.0.into())..(token.2.into()),
-                expected,
-            },
-            ParseError::ExtraToken { token } => Error::ExtraToken {
-                token: (token.0.into())..(token.2.into()),
-            },
-            ParseError::User { error } => error,
+impl IntoReport for Error {
+    type Arguments = ();
+
+    fn into_report(self, arguments: Self::Arguments) -> frostbite_report_interface::Report {
+        match self {
+            Error::InvalidToken { location } => Report::new(
+                Level::Error,
+                Some(location),
+                "Invalid Token",
+                Some("Detected an invalid token"),
+                vec![],
+                vec![],
+            ),
+            Error::UnrecognizedEof { location, expected } => Report::new(
+                Level::Error,
+                Some(location),
+                "Unexpected EOF",
+                None::<&str>,
+                vec![],
+                vec![],
+            ),
+            Error::NumberTooBig { span } => Report::new(
+                Level::Error,
+                Some(span),
+                "Number is too big",
+                Some("Number is too big to lex"),
+                vec![Info::new(
+                    const_format::formatcp!("Maximum limit is {}", i32::MAX),
+                    None::<Location>,
+                )],
+                vec![],
+            ),
         }
     }
 }
