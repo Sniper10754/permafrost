@@ -5,7 +5,6 @@ use alloc::boxed::Box;
 grammar;
 
 extern {
-    type Location = crate::ast::Span;
     type Error = crate::error::Error;
 }
 
@@ -29,6 +28,8 @@ AtomExpr: Expr<'input> = {
     <start:@L> <float:Float> <end:@R> => Expr::Float(start..end, float),
     <start:@L> <ident:Ident> <end:@R> => Expr::Ident(start..end, ident),
     <start:@L> <string:String> <end:@R> => Expr::String(start..end, string),
+
+    "(" <expr:Expr> ")" => expr,
 }
 
 Int: i32 = 

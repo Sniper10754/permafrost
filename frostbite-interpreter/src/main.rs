@@ -1,21 +1,15 @@
 use std::{
-    borrow::Cow,
-    collections::{BTreeMap, HashMap},
-    env::args,
-    error::Error,
-    fs,
-    path::PathBuf,
-    process,
+    borrow::Cow, collections::BTreeMap, env::args, error::Error, fs, path::PathBuf, process,
 };
 
 use frostbite_parser::{
     ast::{
         BinaryOperator::{Add, Div, Mul, Sub},
-        Expr, Program, Span, Spannable,
+        Expr, Program, Spannable,
     },
     Parser,
 };
-use frostbite_report_interface::{Help, Level, Report};
+use frostbite_report_interface::{Level, Report};
 
 fn main() -> Result<(), Box<dyn Error>> {
     let mut args = args();
@@ -68,7 +62,9 @@ impl<'input> Interpreter<'input> {
     fn run(mut self, program: &Program<'input>) {
         for expr in &program.exprs {
             match self.eval_expr(&expr) {
-                Ok(_) => (),
+                Ok(value) => {
+                    dbg!(value);
+                }
                 Err(err) => {
                     println!("{err:?}");
 
