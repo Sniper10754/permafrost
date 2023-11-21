@@ -13,11 +13,25 @@ use ast::{Expr, Program};
 use error::Error;
 use lexer::{Token, TokenStream};
 
-macro_rules! consume {
-    ($token:ty) => {
-        match self.token_stream.next() {
-            Some(pattern @ (span, $ty)) => pattern,
-            None =>
+macro_rules! consume_token {
+    (parser: $parser:expr, token: $token:ident, description: $token_description:expr) => {
+        match $parser.token_stream.next() {
+            Some(pattern @ (_, Token::$token)) => Some(pattern),
+            Some((span, _)) => {
+                $parser.errors.push(Error::UnrecognizedToken {
+                    location: span,
+                    expected: $token_description,
+                });
+
+                None
+            }
+            None => {
+                $parser.errors.push(Error::UnrecognizedEof {
+                    expected: &[$token_description],
+                });
+
+                None
+            }
         }
     };
 }
@@ -37,7 +51,9 @@ impl<'input> Parser<'input> {
     }
 
     pub fn parse(&mut self) -> Option<Program<'input>> {
-        todo!()
+        let exprs = vec![];
+
+        Some(Program { exprs })
     }
 
     pub fn parse_expr(&mut self) -> Option<Expr<'input>> {
@@ -47,15 +63,23 @@ impl<'input> Parser<'input> {
             Some((span, Token::Ident(value))) => Some(Expr::Ident(span, value)),
             Some((span, Token::String(value))) => Some(Expr::String(span, value)),
 
-            Some((span, Token::LParen)) => {
+            Some((_, Token::LParen)) => {
                 let expr = self.parse_expr()?;
 
-                
+                consume_token!(
+                    parser: self,
+                    token: LParen,
+                    description: ")"
+                )?;
+
+                Some(expr)
             }
 
-            Some((span, token)) => {
-                self.errors
-                    .push(Error::UnrecognizedToken { location: span });
+            Some((span, _)) => {
+                self.errors.push(Error::UnrecognizedToken {
+                    location: span,
+                    expected: "Expression",
+                });
 
                 None
             }

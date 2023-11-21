@@ -39,7 +39,7 @@ pub enum Token<'input> {
     #[regex("-?[0-9]+", helpers::parse_number::<i32>)]
     Int(i32),
 
-    #[regex("(-?[0-9]+)?.[0-9]+", helpers::parse_number::<f32>)]
+    #[regex(r#"(-?[0-9]+)?.[0-9]+"#, helpers::parse_number::<f32>)]
     Float(f32),
 
     #[regex("[a-zA-Z][a-zA-Z0-9]*")]
