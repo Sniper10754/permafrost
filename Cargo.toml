@@ -8,5 +8,9 @@ members = ["frostbite-*"]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
+# Utility crates commonly used
+[workspace.dependencies]
+derive_more = "0.99.17"
+
 [lints.clippy]
 rust_2018_idioms = "forbid"

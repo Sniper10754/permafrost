@@ -11,7 +11,7 @@ lalrpop = "0.20.0"
 
 [dependencies]
 frostbite-report-interface = { path = "../frostbite-report-interface" }
-derive_more = "0.99.17"
+derive_more = { workspace = true }
 const_format = "0.2.32"
 logos = { version = "0.13.0", default-features = false, features = [
     "export_derive",

@@ -5,16 +5,9 @@ use crate::ast::Span;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Error {
-    InvalidToken {
-        location: Span,
-    },
-    UnrecognizedEof {
-        location: usize,
-        expected: Vec<Cow<'static, str>>,
-    },
-    NumberTooBig {
-        span: Span,
-    },
+    InvalidToken { location: Span },
+    UnrecognizedEof { expected: &'static [&'static str] },
+    NumberTooBig { span: Span },
 }
 
 impl IntoReport for Error {
@@ -30,9 +23,9 @@ impl IntoReport for Error {
                 vec![],
                 vec![],
             ),
-            Error::UnrecognizedEof { location, expected } => Report::new(
+            Error::UnrecognizedEof { expected } => Report::new(
                 Level::Error,
-                Some(location),
+                None::<Location>,
                 "Unexpected EOF",
                 None::<&str>,
                 vec![],

@@ -6,18 +6,25 @@ pub mod ast;
 pub mod error;
 pub mod lexer;
 
+use alloc::vec;
+use alloc::vec::Vec;
+
 use ast::{Expr, Program};
-pub use frostbite_report_interface as report;
-use lexer::TokenStream;
+use error::Error;
+use lexer::{Token, TokenStream};
 
 /// A Backend-agnostic wrapper around lalrpop
 pub struct Parser<'input> {
     token_stream: TokenStream<'input>,
+    errors: Vec<Error>,
 }
 
 impl<'input> Parser<'input> {
     pub fn with_tokenstream(token_stream: TokenStream<'input>) -> Self {
-        Self { token_stream }
+        Self {
+            token_stream,
+            errors: vec![],
+        }
     }
 
     pub fn parse(&mut self) -> Option<Program<'input>> {
@@ -26,8 +33,18 @@ impl<'input> Parser<'input> {
 
     pub fn parse_expr(&mut self) -> Option<Expr<'input>> {
         match self.token_stream.next() {
-            Some(_) => todo!(),
-            None => todo!(),
+            Some((span, Token::Int(value))) => Some(Expr::Int(span, value)),
+            Some((span, Token::Float(value))) => Some(Expr::Float(span, value)),
+            Some((span, Token::Ident(value))) => Some(Expr::Ident(span, value)),
+            Some((span, Token::String(value))) => Some(Expr::String(span, value)),
+
+            None => {
+                self.errors.push(Error::UnrecognizedEof {
+                    expected: &["an expression"],
+                });
+
+                None
+            } // Handle cases where the token doesn't match any expected pattern or there are no more tokens
         }
     }
 }
@@ -36,13 +53,13 @@ impl<'input> Parser<'input> {
 mod tests {
     use alloc::vec;
 
-    use crate::ast::{BinaryOperator, Expr, Program};
+    use crate::ast::{tokens::BinaryOperator, Expr, Program};
 
     extern crate std;
 
     macro_rules! parse_expr {
         ($text_to_parse:expr) => {
-            super::Parser::new($text_to_parse).parse()
+            crate::Parser::with_tokenstream(crate::lexer::tokenize($text_to_parse).unwrap()).parse()
         };
     }
 
@@ -56,7 +73,7 @@ mod tests {
     fn test_parser_operation() {
         assert_eq!(
             parse_expr!("1 + 2 + 3"),
-            Ok(Program {
+            Some(Program {
                 exprs: vec![Expr::BinaryOperation {
                     lhs: boxed!(Expr::Int(0..1, 1)),
                     operator: BinaryOperator::Add,

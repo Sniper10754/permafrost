@@ -1,8 +1,35 @@
 use alloc::{boxed::Box, vec::Vec};
 use core::ops::Range;
-use derive_more::*;
+
+use self::tokens::BinaryOperator;
 
 pub type Span = Range<usize>;
+
+pub mod tokens {
+    use derive_more::*;
+
+    #[derive(Debug, Clone, Copy, PartialEq, Display)]
+    pub enum BinaryOperator {
+        #[display(fmt = "+")]
+        Add,
+        #[display(fmt = "-")]
+        Sub,
+        #[display(fmt = "*")]
+        Mul,
+        #[display(fmt = "/")]
+        Div,
+    }
+
+    #[derive(Debug, Clone, Copy, PartialEq, Display)]
+    pub enum TypeAnnotation {
+        #[display(fmt = "int")]
+        Int,
+        #[display(fmt = "float")]
+        Float,
+        #[display(fmt = "str")]
+        String,
+    }
+}
 
 pub trait Spannable {
     fn span(&self) -> Span;
@@ -47,26 +74,4 @@ pub enum Expr<'a> {
         lhs: Box<Expr<'a>>,
         value: Box<Self>,
     },
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Display)]
-pub enum BinaryOperator {
-    #[display(fmt = "+")]
-    Add,
-    #[display(fmt = "-")]
-    Sub,
-    #[display(fmt = "*")]
-    Mul,
-    #[display(fmt = "/")]
-    Div,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Display)]
-pub enum TypeAnnotation {
-    #[display(fmt = "int")]
-    Int,
-    #[display(fmt = "float")]
-    Float,
-    #[display(fmt = "str")]
-    String,
 }

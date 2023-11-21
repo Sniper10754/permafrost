@@ -1,8 +1,6 @@
 use std::{borrow::Cow, collections::BTreeMap};
 
-use derive_more::*;
-
-use frostbite_parser::ast::{Expr, Program, Spannable};
+use frostbite_parser::ast::{tokens::BinaryOperator, Expr, Program, Spannable};
 use frostbite_report_interface::{Level, Report};
 
 use crate::rt_value::RuntimeValue;
@@ -12,8 +10,7 @@ pub struct Interpreter<'input> {
     frames: Vec<StackFrame<'input>>,
 }
 
-#[derive(Debug, Display, Clone)]
-#[display(fmt = "{}: {:?}", name, stack)]
+#[derive(Debug, Clone)]
 struct StackFrame<'input> {
     name: Cow<'input, str>,
     stack: BTreeMap<&'input str, RuntimeValue<'input>>,
@@ -22,7 +19,7 @@ struct StackFrame<'input> {
 impl<'input> Interpreter<'input> {
     pub fn run(mut self, program: &Program<'input>) {
         for expr in &program.exprs {
-            match self.eval_expr(&expr) {
+            match self.eval_expr(expr) {
                 Ok(value) => {
                     println!(" -> {value}");
                 }
@@ -35,7 +32,10 @@ impl<'input> Interpreter<'input> {
         }
     }
 
-    fn eval_expr<'a>(&mut self, expr: &'a Expr<'input>) -> Result<RuntimeValue<'input>, Report> {
+    fn eval_expr<'a>(
+        &mut self,
+        expr: &'a Expr<'input>,
+    ) -> Result<RuntimeValue<'input>, Box<Report>> {
         match expr {
             Expr::Int(_, int) => Ok(RuntimeValue::Int(*int)),
             Expr::Float(_, float) => Ok(RuntimeValue::Float(*float)),
@@ -47,22 +47,22 @@ impl<'input> Interpreter<'input> {
 
                 match (lhs, rhs) {
                     (RuntimeValue::Int(lhs), RuntimeValue::Int(rhs)) => match operator {
-                        Add => Ok(RuntimeValue::Int(lhs + rhs)),
-                        Sub => Ok(RuntimeValue::Int(lhs - rhs)),
-                        Mul => Ok(RuntimeValue::Int(lhs * rhs)),
-                        Div => Ok(RuntimeValue::Int(lhs / rhs)),
+                        BinaryOperator::Add => Ok(RuntimeValue::Int(lhs + rhs)),
+                        BinaryOperator::Sub => Ok(RuntimeValue::Int(lhs - rhs)),
+                        BinaryOperator::Mul => Ok(RuntimeValue::Int(lhs * rhs)),
+                        BinaryOperator::Div => Ok(RuntimeValue::Int(lhs / rhs)),
                     },
                     (RuntimeValue::Float(lhs), RuntimeValue::Float(rhs)) => match operator {
-                        Add => Ok(RuntimeValue::Float(lhs + rhs)),
-                        Sub => Ok(RuntimeValue::Float(lhs - rhs)),
-                        Mul => Ok(RuntimeValue::Float(lhs * rhs)),
-                        Div => Ok(RuntimeValue::Float(lhs / rhs)),
+                        BinaryOperator::Add => Ok(RuntimeValue::Float(lhs + rhs)),
+                        BinaryOperator::Sub => Ok(RuntimeValue::Float(lhs - rhs)),
+                        BinaryOperator::Mul => Ok(RuntimeValue::Float(lhs * rhs)),
+                        BinaryOperator::Div => Ok(RuntimeValue::Float(lhs / rhs)),
                     },
 
                     (lhs, rhs) => Err(Report {
                         level: Level::Error,
-                        span: Some(expr.span()),
-                        title: format!("Incompatible operands").into(),
+                        location: Some(expr.span().into()),
+                        title: "Incompatible operands".into(),
                         description: Some(
                             format!(
                                 "`{:?}` and `{:?}` cannot be used with operand `{operator}`",
@@ -72,19 +72,21 @@ impl<'input> Interpreter<'input> {
                         ),
                         infos: vec![],
                         helps: vec![],
-                    }),
+                    }
+                    .into()),
                 }
             }
             Expr::Assign { lhs, value } => {
                 if !matches!(&**lhs, Expr::Ident(..)) {
                     return Err(Report {
                         level: Level::Error,
-                        span: Some(lhs.span()),
+                        location: Some(lhs.span().into()),
                         title: "Cannot assign to static/immutable".into(),
                         description: Some(format!("Cannot assign {value:?} to {lhs:?}").into()),
                         infos: vec![],
                         helps: vec![],
-                    });
+                    }
+                    .into());
                 }
                 match &**lhs {
                     Expr::Ident(_, ident) => {
@@ -93,8 +95,7 @@ impl<'input> Interpreter<'input> {
                         let stack_frame_maybe_contaning_var = self
                             .frames
                             .iter_mut()
-                            .filter(|frame| frame.stack.contains_key(ident))
-                            .next();
+                            .find(|frame| frame.stack.contains_key(ident));
 
                         if let Some(frame) = stack_frame_maybe_contaning_var {
                             frame.stack.insert(ident, value);
