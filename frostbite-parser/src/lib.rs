@@ -13,6 +13,15 @@ use ast::{Expr, Program};
 use error::Error;
 use lexer::{Token, TokenStream};
 
+macro_rules! consume {
+    ($token:ty) => {
+        match self.token_stream.next() {
+            Some(pattern @ (span, $ty)) => pattern,
+            None =>
+        }
+    };
+}
+
 /// A Backend-agnostic wrapper around lalrpop
 pub struct Parser<'input> {
     token_stream: TokenStream<'input>,
@@ -37,6 +46,19 @@ impl<'input> Parser<'input> {
             Some((span, Token::Float(value))) => Some(Expr::Float(span, value)),
             Some((span, Token::Ident(value))) => Some(Expr::Ident(span, value)),
             Some((span, Token::String(value))) => Some(Expr::String(span, value)),
+
+            Some((span, Token::LParen)) => {
+                let expr = self.parse_expr()?;
+
+                
+            }
+
+            Some((span, token)) => {
+                self.errors
+                    .push(Error::UnrecognizedToken { location: span });
+
+                None
+            }
 
             None => {
                 self.errors.push(Error::UnrecognizedEof {

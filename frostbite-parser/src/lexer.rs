@@ -47,6 +47,11 @@ pub enum Token<'input> {
 
     #[regex(r#"".*""#)]
     String(&'input str),
+
+    #[token("(")]
+    LParen,
+    #[token(")")]
+    RParen,
 }
 
 pub struct TokenStream<'input> {

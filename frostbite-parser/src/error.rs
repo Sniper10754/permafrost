@@ -5,7 +5,7 @@ use crate::ast::Span;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Error {
-    InvalidToken { location: Span },
+    UnrecognizedToken { location: Span },
     UnrecognizedEof { expected: &'static [&'static str] },
     NumberTooBig { span: Span },
 }
@@ -15,7 +15,7 @@ impl IntoReport for Error {
 
     fn into_report(self, arguments: Self::Arguments) -> frostbite_report_interface::Report {
         match self {
-            Error::InvalidToken { location } => Report::new(
+            Error::UnrecognizedToken { location } => Report::new(
                 Level::Error,
                 Some(location),
                 "Invalid Token",
