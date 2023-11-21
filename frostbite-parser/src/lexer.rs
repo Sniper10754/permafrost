@@ -52,6 +52,18 @@ pub enum Token<'input> {
     LParen,
     #[token(")")]
     RParen,
+
+    #[token("=")]
+    Eq,
+
+    #[token("+")]
+    Add,
+    #[token("-")]
+    Sub,
+    #[token("*")]
+    Mul,
+    #[token("/")]
+    Div,
 }
 
 pub struct TokenStream<'input> {

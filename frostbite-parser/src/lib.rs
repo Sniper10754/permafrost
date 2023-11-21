@@ -6,10 +6,10 @@ pub mod ast;
 pub mod error;
 pub mod lexer;
 
-use alloc::vec;
 use alloc::vec::Vec;
+use alloc::{boxed::Box, vec};
 
-use ast::{Expr, Program};
+use ast::{tokens, Expr, Program};
 use error::Error;
 use lexer::{Token, TokenStream};
 
@@ -57,6 +57,31 @@ impl<'input> Parser<'input> {
     }
 
     pub fn parse_expr(&mut self) -> Option<Expr<'input>> {
+        let mut expression = self.parse_atom_expr()?;
+
+        match self.token_stream.peek() {
+            Some((operator_span, Token::Add | Token::Sub | Token::Mul | Token::Div)) => 
+
+            Some((eq_span, Token::Eq)) => {
+                let eq_token = tokens::Eq(eq_span.clone());
+
+                self.token_stream.next();
+
+                let rhs = self.parse_expr()?;
+
+                expression = Expr::Assign {
+                    lhs: Box::new(expression),
+                    eq_token,
+                    value: Box::new(rhs),
+                }
+            }
+            _ => (),
+        }
+
+        Some(expression)
+    }
+
+    fn parse_atom_expr(&mut self) -> Option<Expr<'input>> {
         match self.token_stream.next() {
             Some((span, Token::Int(value))) => Some(Expr::Int(span, value)),
             Some((span, Token::Float(value))) => Some(Expr::Float(span, value)),
@@ -64,7 +89,7 @@ impl<'input> Parser<'input> {
             Some((span, Token::String(value))) => Some(Expr::String(span, value)),
 
             Some((_, Token::LParen)) => {
-                let expr = self.parse_expr()?;
+                let expr = self.parse_atom_expr()?;
 
                 consume_token!(
                     parser: self,
@@ -90,7 +115,7 @@ impl<'input> Parser<'input> {
                 });
 
                 None
-            } // Handle cases where the token doesn't match any expected pattern or there are no more tokens
+            }
         }
     }
 }
@@ -103,9 +128,9 @@ mod tests {
 
     extern crate std;
 
-    macro_rules! parse_expr {
+    macro_rules! parser {
         ($text_to_parse:expr) => {
-            crate::Parser::with_tokenstream(crate::lexer::tokenize($text_to_parse).unwrap()).parse()
+            crate::Parser::with_tokenstream(crate::lexer::tokenize($text_to_parse).unwrap())
         };
     }
 
@@ -117,8 +142,10 @@ mod tests {
 
     #[test]
     fn test_parser_operation() {
+        let mut parser = parser!("1 + 2 + 3;");
+
         assert_eq!(
-            parse_expr!("1 + 2 + 3"),
+            parser.parse(),
             Some(Program {
                 exprs: vec![Expr::BinaryOperation {
                     lhs: boxed!(Expr::Int(0..1, 1)),
@@ -131,5 +158,7 @@ mod tests {
                 }]
             })
         );
+
+        assert!(parser.errors.is_empty());
     }
 }

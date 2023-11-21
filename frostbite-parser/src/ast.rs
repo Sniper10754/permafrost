@@ -8,6 +8,8 @@ pub type Span = Range<usize>;
 pub mod tokens {
     use derive_more::*;
 
+    use super::{Span, Spannable};
+
     #[derive(Debug, Clone, Copy, PartialEq, Display)]
     pub enum BinaryOperator {
         #[display(fmt = "+")]
@@ -28,6 +30,15 @@ pub mod tokens {
         Float,
         #[display(fmt = "str")]
         String,
+    }
+
+    #[derive(Debug, Clone, PartialEq)]
+    pub struct Eq(pub Span);
+
+    impl Spannable for Eq {
+        fn span(&self) -> Span {
+            self.0.clone()
+        }
     }
 }
 
@@ -52,7 +63,11 @@ impl<'a> Spannable for Expr<'a> {
                 operator: _,
                 rhs,
             } => (lhs.span().start)..(rhs.span().end),
-            Expr::Assign { lhs, value } => (lhs.span().start)..(value.span().end),
+            Expr::Assign {
+                lhs,
+                eq_token: _,
+                value,
+            } => (lhs.span().start)..(value.span().end),
         }
     }
 }
@@ -72,6 +87,7 @@ pub enum Expr<'a> {
 
     Assign {
         lhs: Box<Expr<'a>>,
+        eq_token: tokens::Eq,
         value: Box<Self>,
     },
 }
