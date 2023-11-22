@@ -1,7 +1,7 @@
 use alloc::{boxed::Box, vec::Vec};
 use core::ops::Range;
 
-use self::tokens::BinaryOperator;
+use self::tokens::Operator;
 
 pub type Span = Range<usize>;
 
@@ -10,8 +10,18 @@ pub mod tokens {
 
     use super::{Span, Spannable};
 
+    #[derive(Debug, Clone, PartialEq, Display)]
+    #[display(fmt = "{_1}")]
+    pub struct Operator(pub Span, pub OperatorKind);
+
+    impl Spannable for Operator {
+        fn span(&self) -> Span {
+            self.0.clone()
+        }
+    }
+
     #[derive(Debug, Clone, Copy, PartialEq, Display)]
-    pub enum BinaryOperator {
+    pub enum OperatorKind {
         #[display(fmt = "+")]
         Add,
         #[display(fmt = "-")]
@@ -81,7 +91,7 @@ pub enum Expr<'a> {
 
     BinaryOperation {
         lhs: Box<Self>,
-        operator: BinaryOperator,
+        operator: Operator,
         rhs: Box<Self>,
     },
 

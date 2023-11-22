@@ -4,18 +4,35 @@ use alloc::{collections::VecDeque, vec::Vec};
 use frostbite_report_interface::Location;
 use logos::Logos;
 
+use crate::ast::tokens::OperatorKind;
+
 mod helpers {
     use logos::Lexer;
     use num_traits::Num;
+
+    use crate::ast::tokens::OperatorKind;
 
     use super::{LexerError, Token};
 
     pub fn parse_number<'input, N: Num>(
         lexer: &Lexer<'input, Token<'input>>,
     ) -> Result<N, LexerError> {
-        N::from_str_radix(lexer.slice(), 10).map_err(|_| LexerError::NumberTooBig {
+        let slice = lexer.slice();
+
+        N::from_str_radix(slice, 10).map_err(|_| LexerError::NumberTooBig {
             location: lexer.span().into(),
         })
+    }
+
+    pub fn parse_operator<'input>(lexer: &Lexer<'input, Token<'input>>) -> OperatorKind {
+        match lexer.slice() {
+            "+" => OperatorKind::Add,
+            "-" => OperatorKind::Sub,
+            "*" => OperatorKind::Mul,
+            "/" => OperatorKind::Div,
+
+            _ => unreachable!("Caller must guarantee that the current slice of text is a operator"),
+        }
     }
 }
 
@@ -33,13 +50,13 @@ pub enum LexerError {
 }
 
 #[derive(Logos, Debug, PartialEq)]
-#[logos(skip r"[ \t\n\f]+")]
 #[logos(error = LexerError)]
+#[logos(skip r"[\t\n\r ]+")]
 pub enum Token<'input> {
     #[regex("-?[0-9]+", helpers::parse_number::<i32>)]
     Int(i32),
 
-    #[regex(r#"(-?[0-9]+)?.[0-9]+"#, helpers::parse_number::<f32>)]
+    #[regex(r#"(-?[0-9]+)?\.[0-9]+"#, helpers::parse_number::<f32>)]
     Float(f32),
 
     #[regex("[a-zA-Z][a-zA-Z0-9]*")]
@@ -50,20 +67,18 @@ pub enum Token<'input> {
 
     #[token("(")]
     LParen,
+
     #[token(")")]
     RParen,
 
     #[token("=")]
     Eq,
 
-    #[token("+")]
-    Add,
-    #[token("-")]
-    Sub,
-    #[token("*")]
-    Mul,
-    #[token("/")]
-    Div,
+    #[regex(r#"[\+\-\*\\]"#, helpers::parse_operator)]
+    BinaryOperator(OperatorKind),
+
+    #[token(";")]
+    Semicolon,
 }
 
 pub struct TokenStream<'input> {

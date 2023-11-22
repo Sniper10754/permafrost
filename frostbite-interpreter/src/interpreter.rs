@@ -1,6 +1,6 @@
 use std::{borrow::Cow, collections::BTreeMap};
 
-use frostbite_parser::ast::{tokens::BinaryOperator, Expr, Program, Spannable};
+use frostbite_parser::ast::{tokens::OperatorKind, Expr, Program, Spannable};
 use frostbite_report_interface::{Level, Report};
 
 use crate::rt_value::RuntimeValue;
@@ -46,17 +46,17 @@ impl<'input> Interpreter<'input> {
                 let rhs = self.eval_expr(rhs)?;
 
                 match (lhs, rhs) {
-                    (RuntimeValue::Int(lhs), RuntimeValue::Int(rhs)) => match operator {
-                        BinaryOperator::Add => Ok(RuntimeValue::Int(lhs + rhs)),
-                        BinaryOperator::Sub => Ok(RuntimeValue::Int(lhs - rhs)),
-                        BinaryOperator::Mul => Ok(RuntimeValue::Int(lhs * rhs)),
-                        BinaryOperator::Div => Ok(RuntimeValue::Int(lhs / rhs)),
+                    (RuntimeValue::Int(lhs), RuntimeValue::Int(rhs)) => match operator.1 {
+                        OperatorKind::Add => Ok(RuntimeValue::Int(lhs + rhs)),
+                        OperatorKind::Sub => Ok(RuntimeValue::Int(lhs - rhs)),
+                        OperatorKind::Mul => Ok(RuntimeValue::Int(lhs * rhs)),
+                        OperatorKind::Div => Ok(RuntimeValue::Int(lhs / rhs)),
                     },
-                    (RuntimeValue::Float(lhs), RuntimeValue::Float(rhs)) => match operator {
-                        BinaryOperator::Add => Ok(RuntimeValue::Float(lhs + rhs)),
-                        BinaryOperator::Sub => Ok(RuntimeValue::Float(lhs - rhs)),
-                        BinaryOperator::Mul => Ok(RuntimeValue::Float(lhs * rhs)),
-                        BinaryOperator::Div => Ok(RuntimeValue::Float(lhs / rhs)),
+                    (RuntimeValue::Float(lhs), RuntimeValue::Float(rhs)) => match operator.1 {
+                        OperatorKind::Add => Ok(RuntimeValue::Float(lhs + rhs)),
+                        OperatorKind::Sub => Ok(RuntimeValue::Float(lhs - rhs)),
+                        OperatorKind::Mul => Ok(RuntimeValue::Float(lhs * rhs)),
+                        OperatorKind::Div => Ok(RuntimeValue::Float(lhs / rhs)),
                     },
 
                     (lhs, rhs) => Err(Report {
@@ -76,11 +76,15 @@ impl<'input> Interpreter<'input> {
                     .into()),
                 }
             }
-            Expr::Assign { lhs, value } => {
+            Expr::Assign {
+                lhs,
+                eq_token,
+                value,
+            } => {
                 if !matches!(&**lhs, Expr::Ident(..)) {
                     return Err(Report {
                         level: Level::Error,
-                        location: Some(lhs.span().into()),
+                        location: Some(eq_token.span().into()),
                         title: "Cannot assign to static/immutable".into(),
                         description: Some(format!("Cannot assign {value:?} to {lhs:?}").into()),
                         infos: vec![],

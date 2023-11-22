@@ -9,6 +9,7 @@ pub mod lexer;
 use alloc::vec::Vec;
 use alloc::{boxed::Box, vec};
 
+use ast::tokens::Operator;
 use ast::{tokens, Expr, Program};
 use error::Error;
 use lexer::{Token, TokenStream};
@@ -51,7 +52,16 @@ impl<'input> Parser<'input> {
     }
 
     pub fn parse(&mut self) -> Option<Program<'input>> {
-        let exprs = vec![];
+        let mut exprs = vec![];
+
+        while self.token_stream.peek().is_some() {
+            match self.parse_expr() {
+                Some(expr) => exprs.push(expr),
+                None => {
+                    // recover
+                }
+            }
+        }
 
         Some(Program { exprs })
     }
@@ -60,7 +70,19 @@ impl<'input> Parser<'input> {
         let mut expression = self.parse_atom_expr()?;
 
         match self.token_stream.peek() {
-            Some((operator_span, Token::Add | Token::Sub | Token::Mul | Token::Div)) => 
+            Some((op_span, Token::BinaryOperator(operator))) => {
+                let operator = Operator(op_span.clone(), *operator);
+
+                self.token_stream.next();
+
+                let rhs = self.parse_expr()?;
+
+                expression = Expr::BinaryOperation {
+                    lhs: Box::new(expression),
+                    operator,
+                    rhs: Box::new(rhs),
+                }
+            }
 
             Some((eq_span, Token::Eq)) => {
                 let eq_token = tokens::Eq(eq_span.clone());
@@ -124,7 +146,10 @@ impl<'input> Parser<'input> {
 mod tests {
     use alloc::vec;
 
-    use crate::ast::{tokens::BinaryOperator, Expr, Program};
+    use crate::ast::{
+        tokens::{Operator, OperatorKind},
+        Expr, Program,
+    };
 
     extern crate std;
 
@@ -149,10 +174,10 @@ mod tests {
             Some(Program {
                 exprs: vec![Expr::BinaryOperation {
                     lhs: boxed!(Expr::Int(0..1, 1)),
-                    operator: BinaryOperator::Add,
+                    operator: Operator(0..0, OperatorKind::Add),
                     rhs: boxed!(Expr::BinaryOperation {
                         lhs: boxed!(Expr::Int(4..5, 2)),
-                        operator: BinaryOperator::Add,
+                        operator: Operator(0..0, OperatorKind::Add),
                         rhs: boxed!(Expr::Int(8..9, 3))
                     }),
                 }]
