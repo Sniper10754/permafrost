@@ -1,5 +1,7 @@
 #![no_std]
 
+pub mod utils;
+
 extern crate alloc;
 
 use alloc::{borrow::Cow, vec::Vec};

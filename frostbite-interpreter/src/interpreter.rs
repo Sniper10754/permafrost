@@ -10,12 +10,6 @@ pub struct Interpreter<'input> {
     frames: Vec<StackFrame<'input>>,
 }
 
-#[derive(Debug, Clone)]
-struct StackFrame<'input> {
-    name: Cow<'input, str>,
-    stack: BTreeMap<&'input str, RuntimeValue<'input>>,
-}
-
 impl<'input> Interpreter<'input> {
     pub fn run(mut self, program: &Program<'input>) {
         for expr in &program.exprs {
@@ -113,6 +107,13 @@ impl<'input> Interpreter<'input> {
 
                 Ok(RuntimeValue::Unit)
             }
+            Expr::Poisoned => unreachable!("How have we gotten here?"),
         }
     }
+}
+
+#[derive(Debug, Clone)]
+pub struct StackFrame<'input> {
+    name: Cow<'input, str>,
+    stack: BTreeMap<&'input str, RuntimeValue<'input>>,
 }

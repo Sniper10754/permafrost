@@ -1,6 +1,6 @@
 use core::ops::Range;
 
-use alloc::{collections::VecDeque, vec::Vec};
+use alloc::{collections::VecDeque, vec, vec::Vec};
 use frostbite_report_interface::Location;
 use logos::Logos;
 
@@ -98,8 +98,52 @@ impl<'input> TokenStream<'input> {
         }
     }
 
+    pub fn skip_token(&mut self) -> Option<SpannedToken<'input>> {
+        self.next()
+    }
+
+    pub fn skip_tokens(
+        stream: &mut TokenStream<'input>,
+        count: usize,
+    ) -> Vec<SpannedToken<'input>> {
+        let mut taken_tokens = vec![];
+
+        for _ in 0..count {
+            match stream.next() {
+                Some(token) => taken_tokens.push(token),
+                None => break,
+            }
+        }
+
+        taken_tokens
+    }
+
     pub fn peek(&self) -> Option<&SpannedToken<'_>> {
         self.tokens.front()
+    }
+
+    pub fn take_while<P>(
+        stream: &mut TokenStream<'input>,
+        predicate: P,
+    ) -> Vec<SpannedToken<'input>>
+    where
+        P: Fn(&SpannedToken<'input>) -> bool,
+    {
+        let mut taken_tokens = vec![];
+
+        for token in stream.by_ref() {
+            if predicate(&token) {
+                taken_tokens.push(token);
+
+                break;
+            } else {
+                taken_tokens.push(token);
+
+                continue;
+            }
+        }
+
+        taken_tokens
     }
 }
 

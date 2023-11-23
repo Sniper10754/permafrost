@@ -78,6 +78,8 @@ impl<'a> Spannable for Expr<'a> {
                 eq_token: _,
                 value,
             } => (lhs.span().start)..(value.span().end),
+
+            Expr::Poisoned => Span::default(),
         }
     }
 }
@@ -100,4 +102,6 @@ pub enum Expr<'a> {
         eq_token: tokens::Eq,
         value: Box<Self>,
     },
+
+    Poisoned,
 }

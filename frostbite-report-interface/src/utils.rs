@@ -1,5 +1,6 @@
-use frostbite_report_interface::Location;
+use crate::Location;
 
+#[non_exhaustive]
 pub enum SourceKind<'input> {
     Span(&'input str),
     Line(&'input str),
@@ -19,7 +20,7 @@ pub fn get_source_from_location(source: &str, location: Location) -> SourceKind<
                 }
             }
 
-            SourceKind::Line(source.lines().nth(line_number).unwrap())
+            SourceKind::Line(source.lines().nth(line_number - 1).unwrap())
         }
         // Return the span,
         Location::Span(span) => SourceKind::Span(&source[span]),

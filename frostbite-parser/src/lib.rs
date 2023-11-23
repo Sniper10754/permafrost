@@ -14,27 +14,30 @@ use ast::{tokens, Expr, Program};
 use error::Error;
 use lexer::{Token, TokenStream};
 
-macro_rules! consume_token {
-    (parser: $parser:expr, token: $token:ident, description: $token_description:expr) => {
-        match $parser.token_stream.next() {
-            Some(pattern @ (_, Token::$token)) => Some(pattern),
-            Some((span, _)) => {
-                $parser.errors.push(Error::UnrecognizedToken {
-                    location: span,
-                    expected: $token_description,
-                });
+mod utils {
+    #[macro_export]
+    macro_rules! consume_token {
+        (parser: $parser:expr, token: $token:ident, description: $token_description:expr) => {
+            match $parser.token_stream.next() {
+                Some(pattern @ (_, Token::$token)) => Some(pattern),
+                Some((span, _)) => {
+                    $parser.errors.push(Error::UnrecognizedToken {
+                        location: span,
+                        expected: $token_description,
+                    });
 
-                None
-            }
-            None => {
-                $parser.errors.push(Error::UnrecognizedEof {
-                    expected: &[$token_description],
-                });
+                    None
+                }
+                None => {
+                    $parser.errors.push(Error::UnrecognizedEof {
+                        expected: &[$token_description],
+                    });
 
-                None
+                    None
+                }
             }
-        }
-    };
+        };
+    }
 }
 
 /// A Backend-agnostic wrapper around lalrpop
@@ -56,9 +59,21 @@ impl<'input> Parser<'input> {
 
         while self.token_stream.peek().is_some() {
             match self.parse_expr() {
-                Some(expr) => exprs.push(expr),
+                Some(expr) => {
+                    exprs.push(expr);
+
+                    consume_token!(
+                        parser: self,
+                        token: Semicolon,
+                        description: "semicolon"
+                    )?;
+                }
                 None => {
                     // recover
+
+                    TokenStream::take_while(&mut self.token_stream, |(_, token)| {
+                        matches!(token, Token::Semicolon)
+                    });
                 }
             }
         }
@@ -73,7 +88,7 @@ impl<'input> Parser<'input> {
             Some((op_span, Token::BinaryOperator(operator))) => {
                 let operator = Operator(op_span.clone(), *operator);
 
-                self.token_stream.next();
+                self.token_stream.skip_token();
 
                 let rhs = self.parse_expr()?;
 
@@ -87,7 +102,7 @@ impl<'input> Parser<'input> {
             Some((eq_span, Token::Eq)) => {
                 let eq_token = tokens::Eq(eq_span.clone());
 
-                self.token_stream.next();
+                self.token_stream.skip_token();
 
                 let rhs = self.parse_expr()?;
 
@@ -144,6 +159,8 @@ impl<'input> Parser<'input> {
 
 #[cfg(test)]
 mod tests {
+    use std::dbg;
+
     use alloc::vec;
 
     use crate::ast::{
@@ -174,10 +191,10 @@ mod tests {
             Some(Program {
                 exprs: vec![Expr::BinaryOperation {
                     lhs: boxed!(Expr::Int(0..1, 1)),
-                    operator: Operator(0..0, OperatorKind::Add),
+                    operator: Operator(2..3, OperatorKind::Add),
                     rhs: boxed!(Expr::BinaryOperation {
                         lhs: boxed!(Expr::Int(4..5, 2)),
-                        operator: Operator(0..0, OperatorKind::Add),
+                        operator: Operator(6..7, OperatorKind::Add),
                         rhs: boxed!(Expr::Int(8..9, 3))
                     }),
                 }]
