@@ -159,7 +159,6 @@ impl<'input> Parser<'input> {
 
 #[cfg(test)]
 mod tests {
-    use std::dbg;
 
     use alloc::vec;
 

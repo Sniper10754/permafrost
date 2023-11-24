@@ -3,7 +3,7 @@ use std::{borrow::Cow, collections::BTreeMap};
 use frostbite_parser::ast::{tokens::OperatorKind, Expr, Program, Spannable};
 use frostbite_report_interface::{Level, Report};
 
-use crate::rt_value::RuntimeValue;
+use crate::{arithmetic::do_binary_operation, error::InterpreterError, rt_value::RuntimeValue};
 
 #[derive(Debug, Clone, Default)]
 pub struct Interpreter<'input> {
@@ -29,7 +29,7 @@ impl<'input> Interpreter<'input> {
     fn eval_expr<'a>(
         &mut self,
         expr: &'a Expr<'input>,
-    ) -> Result<RuntimeValue<'input>, Box<Report>> {
+    ) -> Result<RuntimeValue<'input>, InterpreterError> {
         match expr {
             Expr::Int(_, int) => Ok(RuntimeValue::Int(*int)),
             Expr::Float(_, float) => Ok(RuntimeValue::Float(*float)),
@@ -40,18 +40,16 @@ impl<'input> Interpreter<'input> {
                 let rhs = self.eval_expr(rhs)?;
 
                 match (lhs, rhs) {
-                    (RuntimeValue::Int(lhs), RuntimeValue::Int(rhs)) => match operator.1 {
-                        OperatorKind::Add => Ok(RuntimeValue::Int(lhs + rhs)),
-                        OperatorKind::Sub => Ok(RuntimeValue::Int(lhs - rhs)),
-                        OperatorKind::Mul => Ok(RuntimeValue::Int(lhs * rhs)),
-                        OperatorKind::Div => Ok(RuntimeValue::Int(lhs / rhs)),
-                    },
-                    (RuntimeValue::Float(lhs), RuntimeValue::Float(rhs)) => match operator.1 {
-                        OperatorKind::Add => Ok(RuntimeValue::Float(lhs + rhs)),
-                        OperatorKind::Sub => Ok(RuntimeValue::Float(lhs - rhs)),
-                        OperatorKind::Mul => Ok(RuntimeValue::Float(lhs * rhs)),
-                        OperatorKind::Div => Ok(RuntimeValue::Float(lhs / rhs)),
-                    },
+                    (RuntimeValue::Int(lhs), RuntimeValue::Int(rhs)) => {
+                        do_binary_operation(lhs, rhs, operator.1)
+                            .map(RuntimeValue::Int)
+                            .map_err(|_| InterpreterError::Panic)
+                    }
+                    (RuntimeValue::Float(lhs), RuntimeValue::Float(rhs)) => {
+                        do_binary_operation(lhs, rhs, operator.1)
+                            .map(RuntimeValue::Float)
+                            .map_err(|_| InterpreterError::Panic)
+                    }
 
                     (lhs, rhs) => Err(Report {
                         level: Level::Error,
