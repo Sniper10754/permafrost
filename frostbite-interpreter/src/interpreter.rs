@@ -1,9 +1,12 @@
 use std::{borrow::Cow, collections::BTreeMap};
 
-use frostbite_parser::ast::{tokens::OperatorKind, Expr, Program, Spannable};
+use const_format::formatcp;
+use frostbite_parser::ast::{Expr, Program, Spannable};
 use frostbite_report_interface::{Level, Report};
 
-use crate::{arithmetic::do_binary_operation, error::InterpreterError, rt_value::RuntimeValue};
+use crate::{
+    arithmetic::checked_binary_operation, error::InterpreterError, rt_value::RuntimeValue,
+};
 
 #[derive(Debug, Clone, Default)]
 pub struct Interpreter<'input> {
@@ -40,32 +43,31 @@ impl<'input> Interpreter<'input> {
                 let rhs = self.eval_expr(rhs)?;
 
                 match (lhs, rhs) {
-                    (RuntimeValue::Int(lhs), RuntimeValue::Int(rhs)) => {
-                        do_binary_operation(lhs, rhs, operator.1)
-                            .map(RuntimeValue::Int)
-                            .map_err(|_| InterpreterError::Panic)
-                    }
-                    (RuntimeValue::Float(lhs), RuntimeValue::Float(rhs)) => {
-                        do_binary_operation(lhs, rhs, operator.1)
-                            .map(RuntimeValue::Float)
-                            .map_err(|_| InterpreterError::Panic)
-                    }
+                    (
+                        lhs @ (RuntimeValue::Float(..) | RuntimeValue::Int(..)),
+                        rhs @ (RuntimeValue::Float(..) | RuntimeValue::Int(..)),
+                    ) => checked_binary_operation(lhs, rhs, operator.1).map_err(|_| {
+                        InterpreterError::Panic(Report::new(
+                            Level::Error,
+                            Some(expr.span()),
+                            "Operation overflowed",
+                            Some(formatcp!("The limit for an integer is {}", i32::MAX)),
+                            [],
+                            [],
+                        ))
+                    }),
 
-                    (lhs, rhs) => Err(Report {
-                        level: Level::Error,
-                        location: Some(expr.span().into()),
-                        title: "Incompatible operands".into(),
-                        description: Some(
-                            format!(
-                                "`{:?}` and `{:?}` cannot be used with operand `{operator}`",
-                                lhs, rhs
-                            )
-                            .into(),
-                        ),
-                        infos: vec![],
-                        helps: vec![],
-                    }
-                    .into()),
+                    (lhs, rhs) => Err(InterpreterError::Panic(Report::new(
+                        Level::Error,
+                        Some(expr.span()),
+                        "Incompatible operands",
+                        Some(format!(
+                            "`{:?}` and `{:?}` cannot be used with operand `{operator}`",
+                            lhs, rhs
+                        )),
+                        [],
+                        [],
+                    ))),
                 }
             }
             Expr::Assign {
@@ -74,15 +76,14 @@ impl<'input> Interpreter<'input> {
                 value,
             } => {
                 if !matches!(&**lhs, Expr::Ident(..)) {
-                    return Err(Report {
-                        level: Level::Error,
-                        location: Some(eq_token.span().into()),
-                        title: "Cannot assign to static/immutable".into(),
-                        description: Some(format!("Cannot assign {value:?} to {lhs:?}").into()),
-                        infos: vec![],
-                        helps: vec![],
-                    }
-                    .into());
+                    return Err(InterpreterError::Panic(Report::new(
+                        Level::Error,
+                        Some(eq_token.span()),
+                        "Cannot assign to static/immutable",
+                        Some(format!("Cannot assign {value:?} to {lhs:?}")),
+                        [],
+                        [],
+                    )));
                 }
                 match &**lhs {
                     Expr::Ident(_, ident) => {
@@ -100,7 +101,7 @@ impl<'input> Interpreter<'input> {
                         }
                     }
 
-                    _ => todo!(),
+                    _ => unreachable!(),
                 }
 
                 Ok(RuntimeValue::Unit)

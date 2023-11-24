@@ -1,20 +1,21 @@
+use derive_more::*;
 use frostbite_report_interface::{Level, Location, Report};
 
-#[derive(Debug)]
+#[derive(Debug, From)]
 pub enum InterpreterError {
-    Panic,
+    Panic(Report),
 }
 
 impl From<InterpreterError> for Report {
     fn from(value: InterpreterError) -> Self {
         match value {
-            InterpreterError::Panic => Report::new(
+            InterpreterError::Panic(report) => Report::new(
                 Level::Error,
-                None::<Location>,
+                report.location,
                 "Application panicked",
-                Some("An unrecoverable error has happened"),
-                [],
-                [],
+                Some(report.title),
+                report.infos,
+                report.helps,
             ),
         }
     }

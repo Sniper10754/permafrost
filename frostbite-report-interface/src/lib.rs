@@ -2,10 +2,15 @@
 
 pub mod utils;
 
+mod print;
+mod print_backend;
+
 extern crate alloc;
 
 use alloc::{borrow::Cow, vec::Vec};
 use core::ops::Range;
+
+use derive_more::*;
 
 pub trait IntoReport {
     type Arguments;
@@ -73,28 +78,25 @@ impl Help {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Display, Clone, Copy, PartialEq)]
 pub enum Level {
     Error,
     Warn,
     Info,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, From, PartialEq)]
 pub enum Location {
     /// Location in the file, not LINE
     Location(usize),
     Span(Range<usize>),
 }
 
-impl From<Range<usize>> for Location {
-    fn from(span: Range<usize>) -> Self {
-        Self::Span(span)
-    }
-}
-
-impl From<usize> for Location {
-    fn from(location: usize) -> Self {
-        Self::Location(location)
+impl Location {
+    pub fn start(&self) -> usize {
+        match self {
+            Location::Location(start) => *start,
+            Location::Span(span) => span.start,
+        }
     }
 }

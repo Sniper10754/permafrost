@@ -1,7 +1,7 @@
-mod interpreter;
-mod rt_value;
 mod arithmetic;
 mod error;
+mod interpreter;
+mod rt_value;
 
 use std::{env::args, error::Error, fs, path::PathBuf, process};
 

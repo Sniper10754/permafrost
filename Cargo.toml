@@ -9,8 +9,12 @@ members = ["frostbite-*"]
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 # Utility crates commonly used
+
 [workspace.dependencies]
 derive_more = "0.99.17"
+
+[workspace.dependencies.const_format]
+version = "0.2.32"
 
 [workspace.dependencies.num-traits]
 version = "0.2.17"
