@@ -3,9 +3,11 @@ mod error;
 mod interpreter;
 mod rt_value;
 
-use std::{env::args, error::Error, fs, path::PathBuf, process};
+use std::{env::args, error::Error, fs, io::stdout, path::PathBuf, process};
 
+use error::InterpreterError;
 use frostbite_parser::{lexer, Parser};
+use frostbite_report_interface::print_backend::DefaultBackend;
 
 fn main() -> Result<(), Box<dyn Error>> {
     let mut args = args();
@@ -16,8 +18,8 @@ fn main() -> Result<(), Box<dyn Error>> {
         process::exit(1);
     }
 
-    let path = PathBuf::from(args.nth(1).unwrap());
-    let input = fs::read_to_string(path)?;
+    let path = PathBuf::from(args.nth(1).expect("Unreachable: checked earlier"));
+    let input = fs::read_to_string(&path)?;
 
     let token_stream = lexer::tokenize(&input).expect("Prototyping");
     let ast = Parser::with_tokenstream(token_stream).parse();
@@ -29,7 +31,23 @@ fn main() -> Result<(), Box<dyn Error>> {
         }
     };
 
-    interpreter::Interpreter::default().run(&ast);
+    match interpreter::Interpreter::default().run(&ast) {
+        Ok(_) => (),
+        Err(err) => match err {
+            InterpreterError::Panic(report) => {
+                let mut buf = String::new();
+
+                frostbite_report_interface::print::ReportPrinter::new().print::<_, DefaultBackend>(
+                    &mut buf,
+                    Some(path.display().to_string()),
+                    input,
+                    &report,
+                );
+
+                println!("{buf}")
+            }
+        },
+    };
 
     Ok(())
 }

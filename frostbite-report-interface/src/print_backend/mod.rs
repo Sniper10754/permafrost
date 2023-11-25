@@ -2,21 +2,19 @@ mod custom;
 
 use core::fmt::Write;
 
-use crate::Report;
+use alloc::fmt;
+
+use crate::{print::PrintError, Report};
 
 use self::custom::CustomBackend;
 
-pub trait PrintBackend {
-    type Error;
+pub type DefaultBackend = CustomBackend;
 
-    fn write_report_to(
-        destination: &mut dyn Write,
+pub trait PrintBackend {
+    fn write_report_to<W: Write>(
+        destination: &mut W,
         source_id: Option<&str>,
         source: &str,
         report: &Report,
-    ) -> Result<(), Self::Error>;
-}
-
-pub fn default_backend() -> impl PrintBackend {
-    CustomBackend
+    ) -> Result<(), PrintError>;
 }

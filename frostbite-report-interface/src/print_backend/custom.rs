@@ -1,13 +1,13 @@
-use core::fmt;
+use core::fmt::{self, Write};
 
-use crate::utils::get_line_from_location;
+use crate::{print::PrintError, utils::get_line_from_location};
 
 use super::PrintBackend;
 
 pub struct CustomBackend;
 
-fn write_line_from_line_number(
-    destination: &mut dyn fmt::Write,
+fn write_line_from_line_number<W: Write>(
+    mut destination: &mut W,
     line: usize,
     source: &str,
 ) -> Result<(), fmt::Error> {
@@ -20,14 +20,12 @@ fn write_line_from_line_number(
 }
 
 impl PrintBackend for CustomBackend {
-    type Error = fmt::Error;
-
-    fn write_report_to(
-        destination: &mut dyn fmt::Write,
+    fn write_report_to<W: Write>(
+        destination: &mut W,
         source_id: Option<&str>,
         source: &str,
         report: &crate::Report,
-    ) -> Result<(), Self::Error> {
+    ) -> Result<(), PrintError> {
         writeln!(destination, "{}: {}", report.level, report.title)?;
 
         if let Some(location) = &report.location {
@@ -54,7 +52,7 @@ impl PrintBackend for CustomBackend {
 
         for help in report.helps.iter() {
             writeln!(destination, "Help: {}", help.info)?;
-   
+
             if let Some(location) = &help.location {
                 write_line_from_line_number(destination, location.start(), source)?;
             }

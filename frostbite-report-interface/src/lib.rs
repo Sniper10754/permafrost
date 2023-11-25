@@ -2,8 +2,8 @@
 
 pub mod utils;
 
-mod print;
-mod print_backend;
+pub mod print;
+pub mod print_backend;
 
 extern crate alloc;
 
@@ -87,15 +87,17 @@ pub enum Level {
 
 #[derive(Debug, Clone, From, PartialEq)]
 pub enum Location {
-    /// Location in the file, not LINE
-    Location(usize),
+    /// A column in the file, may be placed anywhere
+    Column(usize),
+    /// a span, consisting of a start column and an end column
     Span(Range<usize>),
 }
 
 impl Location {
+    /// Returns
     pub fn start(&self) -> usize {
         match self {
-            Location::Location(start) => *start,
+            Location::Column(start) => *start,
             Location::Span(span) => span.start,
         }
     }

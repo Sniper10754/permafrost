@@ -171,7 +171,10 @@ mod tests {
 
     macro_rules! parser {
         ($text_to_parse:expr) => {
-            crate::Parser::with_tokenstream(crate::lexer::tokenize($text_to_parse).unwrap())
+            crate::Parser::with_tokenstream(
+                crate::lexer::tokenize($text_to_parse)
+                    .expect(alloc::format!("Failed to tokenize `{}`", { $text_to_parse }).as_str()),
+            )
         };
     }
 

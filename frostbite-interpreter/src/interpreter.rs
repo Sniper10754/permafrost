@@ -14,19 +14,12 @@ pub struct Interpreter<'input> {
 }
 
 impl<'input> Interpreter<'input> {
-    pub fn run(mut self, program: &Program<'input>) {
+    pub fn run(mut self, program: &Program<'input>) -> Result<(), InterpreterError> {
         for expr in &program.exprs {
-            match self.eval_expr(expr) {
-                Ok(value) => {
-                    println!(" -> {value}");
-                }
-                Err(err) => {
-                    println!("{err:?}");
-
-                    break;
-                }
-            }
+            self.eval_expr(expr)?;
         }
+
+        Ok(())
     }
 
     fn eval_expr<'a>(
@@ -97,7 +90,7 @@ impl<'input> Interpreter<'input> {
                         if let Some(frame) = stack_frame_maybe_contaning_var {
                             frame.stack.insert(ident, value);
                         } else {
-                            self.frames.first_mut().unwrap().stack.insert(ident, value);
+                            self.frames.first_mut().expect("Theres always at least a stack frame in the stack (the global one)").stack.insert(ident, value);
                         }
                     }
 
