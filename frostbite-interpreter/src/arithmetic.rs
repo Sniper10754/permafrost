@@ -3,18 +3,35 @@ use frostbite_parser::ast::tokens::OperatorKind;
 
 use crate::rt_value::RuntimeValue;
 
+#[derive(Debug, Clone, Copy, Display)]
+pub enum OperationError {
+    Overflow,
+    DivisionByZero,
+}
+
 pub fn checked_binary_operation<'a>(
     lhs: RuntimeValue<'a>,
     rhs: RuntimeValue<'a>,
     operator_kind: OperatorKind,
-) -> Result<RuntimeValue<'a>, OverflowError> {
+) -> Result<RuntimeValue<'a>, OperationError> {
+    if let OperatorKind::Div = operator_kind {
+        match &rhs {
+            RuntimeValue::Int(0) => return Err(OperationError::DivisionByZero),
+            RuntimeValue::Float(float) if *float == 0.0 => {
+                return Err(OperationError::DivisionByZero)
+            }
+
+            _ => (),
+        }
+    }
+
     match (lhs, rhs, operator_kind) {
         #[rustfmt::skip]
         (RuntimeValue::Int(lhs), RuntimeValue::Int(rhs), op) => match op {
-            OperatorKind::Add => i32::checked_add(lhs, rhs).map(RuntimeValue::Int).ok_or(OverflowError),
-            OperatorKind::Sub => i32::checked_sub(lhs, rhs).map(RuntimeValue::Int).ok_or(OverflowError),
-            OperatorKind::Mul => i32::checked_mul(lhs, rhs).map(RuntimeValue::Int).ok_or(OverflowError),
-            OperatorKind::Div => i32::checked_div(lhs, rhs).map(RuntimeValue::Int).ok_or(OverflowError),
+            OperatorKind::Add => i32::checked_add(lhs, rhs).map(RuntimeValue::Int).ok_or(OperationError::Overflow),
+            OperatorKind::Sub => i32::checked_sub(lhs, rhs).map(RuntimeValue::Int).ok_or(OperationError::Overflow),
+            OperatorKind::Mul => i32::checked_mul(lhs, rhs).map(RuntimeValue::Int).ok_or(OperationError::Overflow),
+            OperatorKind::Div => i32::checked_div(lhs, rhs).map(RuntimeValue::Int).ok_or(OperationError::Overflow),
         },
 
         #[rustfmt::skip]
@@ -44,6 +61,3 @@ pub fn checked_binary_operation<'a>(
         _ => unreachable!(),
     }
 }
-
-#[derive(Debug, Clone, Copy, Display)]
-pub struct OverflowError;

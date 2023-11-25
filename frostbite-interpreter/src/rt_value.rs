@@ -1,6 +1,6 @@
 use derive_more::*;
 
-#[derive(Debug, Display, Clone)]
+#[derive(Debug, Display, Unwrap, From, Clone)]
 pub enum RuntimeValue<'input> {
     #[display(fmt = "{_0}")]
     Int(i32),

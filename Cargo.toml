@@ -22,7 +22,6 @@ default-features = false
 features = ["libm"]
 
 [workspace.lints.clippy]
-perf = "warn"
 
 [workspace.lints.rust]
 rust_2018_idioms = "forbid"

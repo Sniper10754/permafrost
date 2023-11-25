@@ -1,21 +1,29 @@
 mod arithmetic;
 mod error;
 mod interpreter;
+mod repl;
 mod rt_value;
 
-use std::{env::args, error::Error, fs, path::PathBuf, process};
+use repl::repl;
+
+use std::{env::args, error::Error, fs, path::PathBuf};
 
 use error::InterpreterError;
+
 use frostbite_parser::{lexer, Parser};
 use frostbite_report_interface::print_backend::DefaultBackend;
+
+enum CliArgsCommand {
+    Run { path: PathBuf },
+}
 
 fn main() -> Result<(), Box<dyn Error>> {
     let mut args = args();
 
     if args.len() != 2 {
-        println!("usage: frostbite-interpreter [PATH]");
+        repl()?;
 
-        process::exit(1);
+        return Ok(());
     }
 
     let path = PathBuf::from(args.nth(1).expect("Unreachable: checked earlier"));
