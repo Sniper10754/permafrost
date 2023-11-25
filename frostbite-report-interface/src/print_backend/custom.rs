@@ -1,13 +1,13 @@
 use core::fmt::{self, Write};
 
-use crate::{print::PrintError, utils::get_line_from_location};
+use crate::{print::PrintingError, utils::get_line_from_location};
 
 use super::PrintBackend;
 
 pub struct CustomBackend;
 
 fn write_line_from_line_number<W: Write>(
-    mut destination: &mut W,
+    destination: &mut W,
     line: usize,
     source: &str,
 ) -> Result<(), fmt::Error> {
@@ -25,7 +25,7 @@ impl PrintBackend for CustomBackend {
         source_id: Option<&str>,
         source: &str,
         report: &crate::Report,
-    ) -> Result<(), PrintError> {
+    ) -> Result<(), PrintingError> {
         writeln!(destination, "{}: {}", report.level, report.title)?;
 
         if let Some(location) = &report.location {

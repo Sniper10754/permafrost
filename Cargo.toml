@@ -21,5 +21,9 @@ version = "0.2.17"
 default-features = false
 features = ["libm"]
 
-[lints.clippy]
+[workspace.lints.clippy]
+perf = "warn"
+
+[workspace.lints.rust]
 rust_2018_idioms = "forbid"
+unsafe_code = "forbid"

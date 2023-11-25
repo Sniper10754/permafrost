@@ -1,6 +1,8 @@
 use std::{borrow::Cow, collections::BTreeMap};
 
 use const_format::formatcp;
+use derive_more::*;
+
 use frostbite_parser::ast::{Expr, Program, Spannable};
 use frostbite_report_interface::{Level, Report};
 
@@ -40,27 +42,33 @@ impl<'input> Interpreter<'input> {
                         lhs @ (RuntimeValue::Float(..) | RuntimeValue::Int(..)),
                         rhs @ (RuntimeValue::Float(..) | RuntimeValue::Int(..)),
                     ) => checked_binary_operation(lhs, rhs, operator.1).map_err(|_| {
-                        InterpreterError::Panic(Report::new(
-                            Level::Error,
-                            Some(expr.span()),
-                            "Operation overflowed",
-                            Some(formatcp!("The limit for an integer is {}", i32::MAX)),
-                            [],
-                            [],
-                        ))
+                        InterpreterError::Panic(
+                            Report::new(
+                                Level::Error,
+                                Some(expr.span()),
+                                "Operation overflowed",
+                                Some(formatcp!("The limit for an integer is {}", i32::MAX)),
+                                [],
+                                [],
+                            )
+                            .into(),
+                        )
                     }),
 
-                    (lhs, rhs) => Err(InterpreterError::Panic(Report::new(
-                        Level::Error,
-                        Some(expr.span()),
-                        "Incompatible operands",
-                        Some(format!(
-                            "`{:?}` and `{:?}` cannot be used with operand `{operator}`",
-                            lhs, rhs
-                        )),
-                        [],
-                        [],
-                    ))),
+                    (lhs, rhs) => Err(InterpreterError::Panic(
+                        Report::new(
+                            Level::Error,
+                            Some(expr.span()),
+                            "Incompatible operands",
+                            Some(format!(
+                                "`{:?}` and `{:?}` cannot be used with operand `{operator}`",
+                                lhs, rhs
+                            )),
+                            [],
+                            [],
+                        )
+                        .into(),
+                    )),
                 }
             }
             Expr::Assign {
@@ -69,14 +77,17 @@ impl<'input> Interpreter<'input> {
                 value,
             } => {
                 if !matches!(&**lhs, Expr::Ident(..)) {
-                    return Err(InterpreterError::Panic(Report::new(
-                        Level::Error,
-                        Some(eq_token.span()),
-                        "Cannot assign to static/immutable",
-                        Some(format!("Cannot assign {value:?} to {lhs:?}")),
-                        [],
-                        [],
-                    )));
+                    return Err(InterpreterError::Panic(
+                        Report::new(
+                            Level::Error,
+                            Some(eq_token.span()),
+                            "Cannot assign to static/immutable",
+                            Some(format!("Cannot assign {value:?} to {lhs:?}")),
+                            [],
+                            [],
+                        )
+                        .into(),
+                    ));
                 }
                 match &**lhs {
                     Expr::Ident(_, ident) => {
@@ -104,7 +115,8 @@ impl<'input> Interpreter<'input> {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Display, Clone)]
+#[display(fmt = "{}: {:?}", name, stack)]
 pub struct StackFrame<'input> {
     name: Cow<'input, str>,
     stack: BTreeMap<&'input str, RuntimeValue<'input>>,

@@ -3,7 +3,7 @@ mod error;
 mod interpreter;
 mod rt_value;
 
-use std::{env::args, error::Error, fs, io::stdout, path::PathBuf, process};
+use std::{env::args, error::Error, fs, path::PathBuf, process};
 
 use error::InterpreterError;
 use frostbite_parser::{lexer, Parser};
@@ -37,12 +37,8 @@ fn main() -> Result<(), Box<dyn Error>> {
             InterpreterError::Panic(report) => {
                 let mut buf = String::new();
 
-                frostbite_report_interface::print::ReportPrinter::new().print::<_, DefaultBackend>(
-                    &mut buf,
-                    Some(path.display().to_string()),
-                    input,
-                    &report,
-                );
+                frostbite_report_interface::print::ReportPrinter::new()
+                    .print::<_, DefaultBackend>(&mut buf, Some(path.display()), input, &report)?;
 
                 println!("{buf}")
             }

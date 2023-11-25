@@ -1,12 +1,8 @@
 mod custom;
 
+use crate::{print::PrintingError, print_backend::custom::CustomBackend, Report};
+
 use core::fmt::Write;
-
-use alloc::fmt;
-
-use crate::{print::PrintError, Report};
-
-use self::custom::CustomBackend;
 
 pub type DefaultBackend = CustomBackend;
 
@@ -16,5 +12,5 @@ pub trait PrintBackend {
         source_id: Option<&str>,
         source: &str,
         report: &Report,
-    ) -> Result<(), PrintError>;
+    ) -> Result<(), PrintingError>;
 }

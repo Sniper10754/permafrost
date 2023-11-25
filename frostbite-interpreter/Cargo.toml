@@ -10,4 +10,9 @@ derive_more = { workspace = true }
 const_format = { workspace = true }
 
 frostbite-parser = { path = "../frostbite-parser" }
-frostbite-report-interface = { path = "../frostbite-report-interface" }
+frostbite-report-interface = { path = "../frostbite-report-interface", features = [
+    "std",
+] }
+
+[lints]
+workspace = true

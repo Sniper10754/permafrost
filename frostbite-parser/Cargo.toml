@@ -19,3 +19,6 @@ frostbite-report-interface = { path = "../frostbite-report-interface" }
 logos = { version = "0.13.0", default-features = false, features = [
     "export_derive",
 ] }
+
+[lints]
+workspace = true

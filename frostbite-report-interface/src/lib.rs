@@ -1,11 +1,10 @@
-#![no_std]
+#![cfg_attr(not(feature = "std"), no_std)]
 
-pub mod utils;
+extern crate alloc;
 
 pub mod print;
 pub mod print_backend;
-
-extern crate alloc;
+pub mod utils;
 
 use alloc::{borrow::Cow, vec::Vec};
 use core::ops::Range;

@@ -38,7 +38,7 @@ pub fn checked_binary_operation<'a>(
             OperatorKind::Add => Ok(RuntimeValue::Float(lhs + rhs)),
             OperatorKind::Sub => Ok(RuntimeValue::Float(lhs - rhs)),
             OperatorKind::Mul => Ok(RuntimeValue::Float(lhs * rhs)),
-            OperatorKind::Div => Ok(RuntimeValue::Float(lhs / rhs)),            
+            OperatorKind::Div => Ok(RuntimeValue::Float(lhs / rhs)),
         },
 
         _ => unreachable!(),
