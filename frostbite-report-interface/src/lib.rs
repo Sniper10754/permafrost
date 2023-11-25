@@ -7,7 +7,8 @@ pub mod print_backend;
 pub mod utils;
 
 use alloc::{borrow::Cow, vec::Vec};
-use core::ops::Range;
+use core::{fmt::Display, ops::Range};
+use print::ReportPrinter;
 
 use derive_more::*;
 

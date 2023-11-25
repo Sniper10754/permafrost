@@ -1,5 +1,6 @@
 use alloc::{boxed::Box, vec::Vec};
 use core::ops::Range;
+use frostbite_report_interface::Location;
 
 use self::tokens::Operator;
 

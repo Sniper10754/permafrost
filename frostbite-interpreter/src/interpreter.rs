@@ -1,22 +1,56 @@
-use std::{borrow::Cow, collections::BTreeMap};
+use std::{
+    borrow::Cow,
+    collections::{BTreeMap, HashMap},
+};
 
 use const_format::formatcp;
 use derive_more::*;
 
-use frostbite_parser::ast::{Expr, Program, Spannable};
+use frostbite_parser::{
+    ast::{Expr, Program, Spannable},
+    lexer, Parser,
+};
 use frostbite_report_interface::{Level, Report};
 
 use crate::{
-    arithmetic::checked_binary_operation, error::InterpreterError, rt_value::RuntimeValue,
+    arithmetic::{checked_binary_operation, OperationError},
+    error::InterpreterError,
+    rt_value::RuntimeValue,
 };
 
 #[derive(Debug, Clone, Default)]
+pub struct Threads<'input>(Vec<Thread<'input>>);
+
+#[derive(Debug, Clone)]
+pub struct Thread<'input>(HashMap<&'static str, StackFrame<'input>>);
+
+#[derive(Debug, Clone, Default)]
 pub struct Interpreter<'input> {
-    frames: Vec<StackFrame<'input>>,
+    threads: Threads<'input>,
 }
 
 impl<'input> Interpreter<'input> {
-    pub fn run(mut self, program: &Program<'input>) -> Result<(), InterpreterError> {
+    pub fn run_source_in_thread(
+        &self,
+        thread: Thread<'input>,
+        input: impl AsRef<str>,
+    ) -> Result<(), InterpreterError> {
+        let token_stream = lexer::tokenize(input.as_ref()).expect("Prototyping");
+        let ast = Parser::with_tokenstream(token_stream).parse();
+
+        let ast = match ast {
+            Some(ast) => ast,
+            None => {
+                todo!()
+            }
+        };
+
+        Interpreter::default().run_ast_in_thread(&ast)?;
+
+        Ok(())
+    }
+
+    pub fn run_ast_in_thread(mut self, program: &Program<'input>) -> Result<(), InterpreterError> {
         for expr in &program.exprs {
             self.eval_expr(expr)?;
         }
@@ -41,22 +75,32 @@ impl<'input> Interpreter<'input> {
                     (
                         lhs @ (RuntimeValue::Float(..) | RuntimeValue::Int(..)),
                         rhs @ (RuntimeValue::Float(..) | RuntimeValue::Int(..)),
-                    ) => checked_binary_operation(lhs, rhs, operator.1).map_err(|_| {
-                        InterpreterError::Panic(
-                            Report::new(
+                    ) => checked_binary_operation(lhs, rhs, operator.1).map_err(|error| {
+                        InterpreterError::Runtime {
+                            report: Report::new(
                                 Level::Error,
                                 Some(expr.span()),
-                                "Operation overflowed",
-                                Some(formatcp!("The limit for an integer is {}", i32::MAX)),
+                                match error {
+                                    OperationError::Overflow => "Operation overflowed",
+                                    OperationError::DivisionByZero => "Tried to divide by zero",
+                                },
+                                Some(match error {
+                                    OperationError::Overflow => {
+                                        formatcp!("Maximum limit for numbers is {}", i32::MAX)
+                                    }
+                                    OperationError::DivisionByZero => {
+                                        "The right hand side of the expression was 0"
+                                    }
+                                }),
                                 [],
                                 [],
                             )
                             .into(),
-                        )
+                        }
                     }),
 
-                    (lhs, rhs) => Err(InterpreterError::Panic(
-                        Report::new(
+                    (lhs, rhs) => Err(InterpreterError::Runtime {
+                        report: Report::new(
                             Level::Error,
                             Some(expr.span()),
                             "Incompatible operands",
@@ -68,7 +112,7 @@ impl<'input> Interpreter<'input> {
                             [],
                         )
                         .into(),
-                    )),
+                    }),
                 }
             }
             Expr::Assign {
@@ -77,8 +121,8 @@ impl<'input> Interpreter<'input> {
                 value,
             } => {
                 if !matches!(&**lhs, Expr::Ident(..)) {
-                    return Err(InterpreterError::Panic(
-                        Report::new(
+                    return Err(InterpreterError::Runtime {
+                        report: Report::new(
                             Level::Error,
                             Some(eq_token.span()),
                             "Cannot assign to static/immutable",
@@ -87,7 +131,7 @@ impl<'input> Interpreter<'input> {
                             [],
                         )
                         .into(),
-                    ));
+                    });
                 }
                 match &**lhs {
                     Expr::Ident(_, ident) => {

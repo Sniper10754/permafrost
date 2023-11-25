@@ -4,54 +4,86 @@ mod interpreter;
 mod repl;
 mod rt_value;
 
-use repl::repl;
+use interpreter::Interpreter;
 
-use std::{env::args, error::Error, fs, path::PathBuf};
+use std::{
+    error::Error,
+    fs,
+    io::{stdin, stdout, Read},
+    path::PathBuf,
+    process,
+};
 
 use error::InterpreterError;
 
-use frostbite_parser::{lexer, Parser};
-use frostbite_report_interface::print_backend::DefaultBackend;
+use frostbite_report_interface::{print::ReportPrinter, print_backend::DefaultBackend};
 
-enum CliArgsCommand {
-    Run { path: PathBuf },
+#[derive(Debug, clap::Parser)]
+struct CliArgs {
+    #[command(subcommand)]
+    subcommand: CliSubommand,
+}
+
+#[derive(Debug, Clone, clap::Subcommand)]
+enum CliSubommand {
+    #[command(about = "Run a file")]
+    Run {
+        #[arg(help = "File to run")]
+        path: PathBuf,
+    },
+    #[command(about = "Evaluate a string passed either from stdin or from the command line")]
+    Evaluate {
+        #[arg(help = "String to evaluate")]
+        string: Option<String>,
+    },
+    #[command(about = "Start a REPL")]
+    Repl,
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
-    let mut args = args();
+    let args: CliArgs = clap::Parser::parse();
 
-    if args.len() != 2 {
-        repl()?;
+    match args.subcommand {
+        CliSubommand::Run { path } => {
+            let interpreter = Interpreter::default();
 
-        return Ok(());
-    }
+            let source = fs::read_to_string(&path)?;
 
-    let path = PathBuf::from(args.nth(1).expect("Unreachable: checked earlier"));
-    let input = fs::read_to_string(&path)?;
+            let result = interpreter.run_source_in_thread(&source);
 
-    let token_stream = lexer::tokenize(&input).expect("Prototyping");
-    let ast = Parser::with_tokenstream(token_stream).parse();
+            let mut buf = String::new();
 
-    let ast = match ast {
-        Some(ast) => ast,
-        None => {
-            todo!()
-        }
-    };
+            if let Err(error) = result {
+                match error {
+                    InterpreterError::Runtime { report } => {
+                        ReportPrinter::new(&mut buf)
+                            .print::<DefaultBackend>(Some(path.display()), &source, &report)
+                            .unwrap();
+                    }
+                    InterpreterError::Io(error) => {
+                        println!("IO Error: {error}");
+                    }
+                }
 
-    match interpreter::Interpreter::default().run(&ast) {
-        Ok(_) => (),
-        Err(err) => match err {
-            InterpreterError::Panic(report) => {
-                let mut buf = String::new();
-
-                frostbite_report_interface::print::ReportPrinter::new()
-                    .print::<_, DefaultBackend>(&mut buf, Some(path.display()), input, &report)?;
-
-                println!("{buf}")
+                process::exit(1);
             }
-        },
-    };
+
+            println!("{buf}");
+        }
+        CliSubommand::Evaluate { string } => {
+            let string = match string {
+                Some(string) => string,
+                None => {
+                    let mut buf = String::new();
+
+                    stdin().lock().read_to_string(&mut buf)?;
+
+                    buf
+                }
+            };
+        }
+        CliSubommand::Repl => todo!(),
+    }
 
     Ok(())
 }

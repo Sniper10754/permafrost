@@ -1,6 +1,6 @@
-use core::fmt::Display;
+use core::fmt::{self, Display};
 
-use alloc::{fmt, string::ToString};
+use alloc::string::ToString;
 use derive_more::*;
 
 use crate::{print_backend::PrintBackend, Report};
@@ -14,25 +14,23 @@ pub enum PrintingError {
     Fmt(core::fmt::Error),
 }
 
-#[derive(Debug, Default, Display)]
-pub struct ReportPrinter;
+pub struct ReportPrinter<'output, O: fmt::Write>(&'output mut O);
 
-impl ReportPrinter {
-    pub fn new() -> Self {
-        Self
+impl<'output, O: fmt::Write> ReportPrinter<'output, O> {
+    pub fn new(output: &'output mut O) -> Self {
+        Self(output)
     }
 
     /// # Errors
     /// May return error if the backend fails writing the report
-    pub fn print<W: fmt::Write, B: PrintBackend>(
+    pub fn print<B: PrintBackend>(
         self,
-        destination: &mut W,
         source_id: Option<impl Display + ToString>,
         source: impl AsRef<str>,
         report: &Report,
     ) -> Result<(), PrintingError> {
         B::write_report_to(
-            destination,
+            self.0,
             source_id.map(|string| string.to_string()).as_deref(),
             source.as_ref(),
             report,
