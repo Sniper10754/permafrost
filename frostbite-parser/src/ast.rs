@@ -1,8 +1,11 @@
 use alloc::{boxed::Box, vec::Vec};
 use core::ops::Range;
-use frostbite_report_interface::Location;
 
-use self::tokens::Operator;
+use derive_more::*;
+
+use self::tokens::{
+    Arrow, Eq, FunctionToken, LeftParenthesisToken, Operator, RightParenthesisToken, TypeAnnotation,
+};
 
 pub type Span = Range<usize>;
 
@@ -10,6 +13,19 @@ pub mod tokens {
     use derive_more::*;
 
     use super::{Span, Spannable};
+
+    macro_rules! token {
+        ($name:ident) => {
+            #[derive(Debug, Clone, PartialEq)]
+            pub struct $name(pub crate::ast::Span);
+
+            impl Spannable for $name {
+                fn span(&self) -> crate::ast::Span {
+                    self.0.clone()
+                }
+            }
+        };
+    }
 
     #[derive(Debug, Clone, PartialEq, Display)]
     #[display(fmt = "{_1}")]
@@ -34,27 +50,48 @@ pub mod tokens {
     }
 
     #[derive(Debug, Clone, Copy, PartialEq, Display)]
-    pub enum TypeAnnotation {
+    pub enum TypeAnnotation<'a> {
         #[display(fmt = "int")]
         Int,
         #[display(fmt = "float")]
         Float,
         #[display(fmt = "str")]
         String,
+
+        Other(&'a str),
     }
 
-    #[derive(Debug, Clone, PartialEq)]
-    pub struct Eq(pub Span);
-
-    impl Spannable for Eq {
-        fn span(&self) -> Span {
-            self.0.clone()
-        }
-    }
+    token!(Eq);
+    token!(FunctionToken);
+    token!(LeftParenthesisToken);
+    token!(RightParenthesisToken);
+    token!(Arrow);
 }
 
 pub trait Spannable {
     fn span(&self) -> Span;
+}
+
+#[derive(Debug, Clone, PartialEq, From)]
+pub struct Spanned<T>(pub Span, pub T);
+
+impl<T> Spanned<T> {
+    pub fn new(span: Span, t: T) -> Self {
+        Self(span, t)
+    }
+
+    pub fn map<U, F>(self, f: F) -> Spanned<U>
+    where
+        F: FnOnce(T) -> U,
+    {
+        Spanned(self.0, f(self.1))
+    }
+}
+
+impl<T> Spannable for Spanned<T> {
+    fn span(&self) -> Span {
+        self.0.clone()
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -80,6 +117,7 @@ impl<'a> Spannable for Expr<'a> {
                 value,
             } => (lhs.span().start)..(value.span().end),
 
+            Expr::Function { fn_token, body, .. } => (fn_token.span().start)..(body.span().end),
             Expr::Poisoned => Span::default(),
         }
     }
@@ -104,5 +142,23 @@ pub enum Expr<'a> {
         value: Box<Self>,
     },
 
+    Function {
+        fn_token: FunctionToken,
+        name: Spanned<&'a str>,
+        lpt: LeftParenthesisToken,
+        arguments: Vec<Argument<'a>>,
+        rpt: RightParenthesisToken,
+        return_type_token: Option<Arrow>,
+        return_type_annotation: Option<Spanned<TypeAnnotation<'a>>>,
+        equals: Eq,
+        body: Box<Expr<'a>>,
+    },
+
     Poisoned,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct Argument<'a> {
+    pub name: Spanned<&'a str>,
+    pub type_annotation: Spanned<TypeAnnotation<'a>>,
 }

@@ -46,10 +46,10 @@ pub enum LexerError {
     },
 
     #[default]
-    Default,
+    UnknownToken,
 }
 
-#[derive(Logos, Debug, PartialEq)]
+#[derive(Logos, Debug, Clone, PartialEq)]
 #[logos(error = LexerError)]
 #[logos(skip r"[\t\n\r ]+")]
 pub enum Token<'input> {
@@ -74,8 +74,20 @@ pub enum Token<'input> {
     #[token("=")]
     Eq,
 
+    #[token("function")]
+    Fn,
+
+    #[token("->")]
+    Arrow,
+
+    #[token(",")]
+    Comma,
+
     #[regex(r#"[\+\-\*\\]"#, helpers::parse_operator)]
     BinaryOperator(OperatorKind),
+
+    #[token(":")]
+    Colon,
 
     #[token(";")]
     Semicolon,

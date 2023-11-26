@@ -7,8 +7,7 @@ pub mod print_backend;
 pub mod utils;
 
 use alloc::{borrow::Cow, vec::Vec};
-use core::{fmt::Display, ops::Range};
-use print::ReportPrinter;
+use core::ops::Range;
 
 use derive_more::*;
 
@@ -39,9 +38,9 @@ impl Report {
     ) -> Self {
         Self {
             level,
-            location: location.map(|it| it.into()),
+            location: location.map(Into::into),
             title: title.into(),
-            description: description.map(|it| it.into()),
+            description: description.map(Into::into),
             infos: infos.into_iter().collect(),
             helps: helps.into_iter().collect(),
         }
