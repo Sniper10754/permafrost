@@ -62,6 +62,11 @@ impl<'input> Parser<'input> {
     pub fn parse(&mut self) -> Option<Program<'input>> {
         let mut exprs = vec![];
 
+        #[allow(unused_extern_crates)]
+        extern crate std;
+
+        use std::dbg;
+
         while self.token_stream.peek().is_some() {
             match self.parse_expr() {
                 Some(expr) => {
@@ -136,8 +141,6 @@ impl<'input> Parser<'input> {
                             self.token_stream.skip_token();
                         }
                         Some((_, Token::RParen)) => {
-                            self.token_stream.skip_token();
-
                             rpt = consume_token!(
                                 parser: self,
                                 token: Token::RParen,
@@ -340,8 +343,9 @@ impl<'input> Parser<'input> {
 
 #[cfg(test)]
 mod tests {
+    extern crate std;
 
-    use alloc::{boxed::Box, vec};
+    use std::{prelude::rust_2021::*, vec};
 
     use crate::ast::{
         tokens::{
@@ -482,14 +486,20 @@ mod tests {
 
     #[test]
     fn test_parser_call() {
-        let mut parser = parser!("bilo(a, b, c)");
+        let mut parser = parser!("bilo(a)");
 
-        let ast = parser.parse();
-
-        dbg!(&parser);
+        let ast = parser.parse_expr();
 
         assert!(parser.errors().is_empty());
 
-        assert_eq!(ast, None);
+        assert_eq!(
+            ast,
+            Some(Expr::Call {
+                callee: Box::new(Expr::Ident(0..4, "bilo")),
+                lpt: LeftParenthesisToken(4..5),
+                arguments: vec![Expr::Ident(5..6, "a")],
+                rpt: RightParenthesisToken(6..7)
+            })
+        );
     }
 }

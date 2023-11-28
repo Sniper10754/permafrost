@@ -132,7 +132,7 @@ impl<'input> TokenStream<'input> {
     }
 
     pub fn peek(&self) -> Option<&SpannedToken<'_>> {
-        dbg!(self.tokens.front())
+        self.tokens.front()
     }
 
     pub fn take_while<P>(
