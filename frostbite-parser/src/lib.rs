@@ -65,8 +65,6 @@ impl<'input> Parser<'input> {
         #[allow(unused_extern_crates)]
         extern crate std;
 
-        use std::dbg;
-
         while self.token_stream.peek().is_some() {
             match self.parse_expr() {
                 Some(expr) => {
@@ -343,7 +341,6 @@ impl<'input> Parser<'input> {
 
 #[cfg(test)]
 mod tests {
-    extern crate std;
 
     use std::{prelude::rust_2021::*, vec};
 

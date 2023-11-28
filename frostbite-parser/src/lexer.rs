@@ -93,7 +93,7 @@ pub enum Token<'input> {
     Semicolon,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct TokenStream<'input> {
     tokens: VecDeque<SpannedToken<'input>>,
 }
