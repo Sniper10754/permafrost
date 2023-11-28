@@ -1,4 +1,4 @@
-use core::fmt::{self, Write};
+use core::{fmt, fmt::Write};
 
 use crate::{print::PrintingError, utils::get_line_from_location};
 

@@ -1,18 +1,18 @@
-#![no_std]
+#![cfg_attr(not(feature = "std"), no_std)]
 
 extern crate alloc;
+
+use alloc::{boxed::Box, vec, vec::Vec};
 
 pub mod ast;
 pub mod error;
 pub mod lexer;
 
-use alloc::vec::Vec;
-use alloc::{boxed::Box, vec};
-
-use ast::tokens::{
-    Arrow, Eq, LeftParenthesisToken, Operator, RightParenthesisToken, TypeAnnotation,
+use ast::{
+    tokens,
+    tokens::{Arrow, Eq, LeftParenthesisToken, Operator, RightParenthesisToken, TypeAnnotation},
+    Argument, Expr, Program, Spanned,
 };
-use ast::{tokens, Argument, Expr, Program, Spanned};
 use error::Error;
 use lexer::{Token, TokenStream};
 
@@ -45,6 +45,7 @@ mod utils {
 }
 
 /// A Backend-agnostic wrapper around lalrpop
+#[derive(Debug)]
 pub struct Parser<'input> {
     token_stream: TokenStream<'input>,
     errors: Vec<Error>,
@@ -116,6 +117,54 @@ impl<'input> Parser<'input> {
                     value: Box::new(rhs),
                 }
             }
+
+            Some((_, Token::LParen)) => {
+                let lpt = consume_token!(
+                    parser: self,
+                    token: Token::LParen,
+                    description: "Left pharentesis"
+                )?
+                .0
+                .into();
+
+                let mut arguments = vec![];
+                let rpt;
+
+                loop {
+                    match self.token_stream.peek() {
+                        Some((_, Token::Comma)) => {
+                            self.token_stream.skip_token();
+                        }
+                        Some((_, Token::RParen)) => {
+                            self.token_stream.skip_token();
+
+                            rpt = consume_token!(
+                                parser: self,
+                                token: Token::RParen,
+                                description: "Right pharentesis"
+                            )?
+                            .0
+                            .into();
+
+                            break;
+                        }
+                        Some((_, _)) => {
+                            arguments.push(self.parse_expr()?);
+                        }
+                        None => self.errors.push(Error::UnrecognizedEof {
+                            expected: &["a comma", "an argument"],
+                        }),
+                    }
+                }
+
+                expression = Expr::Call {
+                    callee: Box::new(expression),
+                    lpt,
+                    arguments,
+                    rpt,
+                }
+            }
+
             _ => (),
         }
 
@@ -292,7 +341,7 @@ impl<'input> Parser<'input> {
 #[cfg(test)]
 mod tests {
 
-    use alloc::vec;
+    use alloc::{boxed::Box, vec};
 
     use crate::ast::{
         tokens::{
@@ -301,8 +350,6 @@ mod tests {
         },
         Argument, Expr, Program, Spanned,
     };
-
-    extern crate std;
 
     macro_rules! parser {
         ($text_to_parse:expr) => {
@@ -315,7 +362,7 @@ mod tests {
 
     macro_rules! boxed {
         ($value:expr) => {
-            std::boxed::Box::new($value)
+            Box::new($value)
         };
     }
 
@@ -373,12 +420,12 @@ mod tests {
                     arguments: vec![
                         Argument {
                             name: Spanned(14..15, "x"),
-                            type_annotation: Spanned(17..20, TypeAnnotation::Int)
+                            type_annotation: Spanned(17..20, TypeAnnotation::Int),
                         },
                         Argument {
                             name: Spanned(22..23, "y"),
-                            type_annotation: Spanned(25..28, TypeAnnotation::Int)
-                        }
+                            type_annotation: Spanned(25..28, TypeAnnotation::Int),
+                        },
                     ],
                     rpt: RightParenthesisToken(28..29),
                     return_type_token: None,
@@ -388,7 +435,7 @@ mod tests {
                         lhs: boxed!(Expr::Ident(32..33, "x")),
                         operator: Operator(34..35, OperatorKind::Add),
                         rhs: boxed!(Expr::Ident(36..37, "y"))
-                    })
+                    }),
                 }]
             })
         );
@@ -410,26 +457,39 @@ mod tests {
                     arguments: vec![
                         Argument {
                             name: Spanned(14..15, "x"),
-                            type_annotation: Spanned(17..20, TypeAnnotation::Int)
+                            type_annotation: Spanned(17..20, TypeAnnotation::Int),
                         },
                         Argument {
                             name: Spanned(22..23, "y"),
-                            type_annotation: Spanned(25..28, TypeAnnotation::Int)
-                        }
+                            type_annotation: Spanned(25..28, TypeAnnotation::Int),
+                        },
                     ],
                     rpt: RightParenthesisToken(28..29),
                     return_type_token: Some(Arrow(30..32)),
                     return_type_annotation: Some(Spanned(33..36, TypeAnnotation::Int)),
-                    equals: Eq(30..31),
+                    equals: Eq(37..38),
                     body: boxed!(Expr::BinaryOperation {
-                        lhs: boxed!(Expr::Ident(32..33, "x")),
-                        operator: Operator(34..35, OperatorKind::Add),
-                        rhs: boxed!(Expr::Ident(36..37, "y"))
-                    })
+                        lhs: boxed!(Expr::Ident(39..40, "x")),
+                        operator: Operator(41..42, OperatorKind::Add),
+                        rhs: boxed!(Expr::Ident(43..44, "y"))
+                    }),
                 }]
             })
         );
 
         assert!(parser.errors().is_empty());
+    }
+
+    #[test]
+    fn test_parser_call() {
+        let mut parser = parser!("bilo(a, b, c)");
+
+        let ast = parser.parse();
+
+        dbg!(&parser);
+
+        assert!(parser.errors().is_empty());
+
+        assert_eq!(ast, None);
     }
 }

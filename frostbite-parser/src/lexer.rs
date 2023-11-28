@@ -1,6 +1,6 @@
+use alloc::{collections::VecDeque, vec, vec::Vec};
 use core::ops::Range;
 
-use alloc::{collections::VecDeque, vec, vec::Vec};
 use frostbite_report_interface::Location;
 use logos::Logos;
 
@@ -93,6 +93,7 @@ pub enum Token<'input> {
     Semicolon,
 }
 
+#[derive(Debug)]
 pub struct TokenStream<'input> {
     tokens: VecDeque<SpannedToken<'input>>,
 }
@@ -131,7 +132,7 @@ impl<'input> TokenStream<'input> {
     }
 
     pub fn peek(&self) -> Option<&SpannedToken<'_>> {
-        self.tokens.front()
+        dbg!(self.tokens.front())
     }
 
     pub fn take_while<P>(

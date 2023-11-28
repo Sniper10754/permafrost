@@ -12,6 +12,7 @@ members = ["frostbite-*"]
 
 [workspace.dependencies]
 derive_more = "0.99.17"
+cfg-if = "1.0"
 
 [workspace.dependencies.const_format]
 version = "0.2.32"

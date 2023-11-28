@@ -7,6 +7,7 @@ edition = "2021"
 
 [dependencies]
 derive_more = { workspace = true }
+cfg-if = { workspace = true }
 
 [features]
 std = []

@@ -1,8 +1,8 @@
 mod custom;
 
-use crate::{print::PrintingError, print_backend::custom::CustomBackend, Report};
-
 use core::fmt::Write;
+
+use crate::{print::PrintingError, print_backend::custom::CustomBackend, Report};
 
 pub type DefaultBackend = CustomBackend;
 

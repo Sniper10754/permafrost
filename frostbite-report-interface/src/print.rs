@@ -1,16 +1,12 @@
+use alloc::string::ToString;
 use core::fmt::{self, Display};
 
-use alloc::string::ToString;
 use derive_more::*;
 
 use crate::{print_backend::PrintBackend, Report};
 
 #[derive(Debug, Display, From)]
-#[cfg_attr(feature = "std", derive(Error))]
 pub enum PrintingError {
-    #[cfg(feature = "std")]
-    Io(std::io::Error),
-
     Fmt(core::fmt::Error),
 }
 

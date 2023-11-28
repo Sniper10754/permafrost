@@ -24,6 +24,12 @@ pub mod tokens {
                     self.0.clone()
                 }
             }
+
+            impl From<Span> for $name {
+                fn from(span: Span) -> Self {
+                    Self(span)
+                }
+            }
         };
     }
 
@@ -119,6 +125,12 @@ impl<'a> Spannable for Expr<'a> {
 
             Expr::Function { fn_token, body, .. } => (fn_token.span().start)..(body.span().end),
             Expr::Poisoned => Span::default(),
+            Expr::Call {
+                callee,
+                arguments: _,
+                lpt: _,
+                rpt,
+            } => (callee.span().start)..(rpt.span().end),
         }
     }
 }
@@ -152,6 +164,13 @@ pub enum Expr<'a> {
         return_type_annotation: Option<Spanned<TypeAnnotation<'a>>>,
         equals: Eq,
         body: Box<Expr<'a>>,
+    },
+
+    Call {
+        callee: Box<Self>,
+        lpt: LeftParenthesisToken,
+        arguments: Vec<Expr<'a>>,
+        rpt: RightParenthesisToken,
     },
 
     Poisoned,
