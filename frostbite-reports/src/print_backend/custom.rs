@@ -4,7 +4,7 @@ use crate::{print::PrintingError, utils::get_line_from_location};
 
 use super::PrintBackend;
 
-pub struct CustomBackend;
+pub struct CustomPrintBackend;
 
 fn write_line_from_line_number<W: Write>(
     destination: &mut W,
@@ -19,7 +19,7 @@ fn write_line_from_line_number<W: Write>(
     Ok(())
 }
 
-impl PrintBackend for CustomBackend {
+impl PrintBackend for CustomPrintBackend {
     fn write_report_to<W: Write>(
         destination: &mut W,
         source_id: Option<&str>,

@@ -57,7 +57,7 @@ impl Info {
     pub fn new(info: impl Into<Cow<'static, str>>, location: Option<impl Into<Location>>) -> Self {
         Self {
             info: info.into(),
-            location: location.map(|it| it.into()),
+            location: location.map(Into::into),
         }
     }
 }
@@ -72,7 +72,7 @@ impl Help {
     pub fn new(info: impl Into<Cow<'static, str>>, location: Option<impl Into<Location>>) -> Self {
         Self {
             info: info.into(),
-            location: location.map(|it| it.into()),
+            location: location.map(Into::into),
         }
     }
 }
@@ -88,6 +88,7 @@ pub enum Level {
 pub enum Location {
     /// A column in the file, may be placed anywhere
     Column(usize),
+
     /// a span, consisting of a start column and an end column
     Span(Range<usize>),
 }

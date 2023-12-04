@@ -1,7 +1,7 @@
 use alloc::{collections::VecDeque, vec, vec::Vec};
 use core::ops::Range;
 
-use frostbite_report_interface::Location;
+use frostbite_reports::{IntoReport, Level, Location, Report};
 use logos::Logos;
 
 use crate::ast::tokens::OperatorKind;
@@ -47,6 +47,35 @@ pub enum LexerError {
 
     #[default]
     UnknownToken,
+}
+
+impl IntoReport for LexerError {
+    type Arguments = ();
+
+    fn into_report(self, _: Self::Arguments) -> frostbite_reports::Report {
+        let mut location = None;
+        let title;
+        let description;
+
+        match self {
+            LexerError::NumberTooBig {
+                location: num_location,
+            } => {
+                location = num_location.into();
+
+                title = "Number too big";
+
+                description = "Number can't be lexed because is too big";
+            }
+            LexerError::UnknownToken => {
+                title = "Unknown token";
+
+                description = "Token was not recognized";
+            }
+        }
+
+        Report::new(Level::Error, location, title, Some(description), [], [])
+    }
 }
 
 #[derive(Logos, Debug, Clone, PartialEq)]
@@ -131,7 +160,12 @@ impl<'input> TokenStream<'input> {
         taken_tokens
     }
 
-    pub fn peek(&self) -> Option<&SpannedToken<'_>> {
+    #[allow(clippy::should_implement_trait)]
+    pub fn next(&mut self) -> Option<SpannedToken<'input>> {
+        self.tokens.pop_front()
+    }
+
+    pub fn peek(&self) -> Option<&SpannedToken<'input>> {
         self.tokens.front()
     }
 
@@ -144,7 +178,7 @@ impl<'input> TokenStream<'input> {
     {
         let mut taken_tokens = vec![];
 
-        for token in stream.by_ref() {
+        while let Some(token) = stream.next() {
             if predicate(&token) {
                 taken_tokens.push(token);
 
@@ -160,24 +194,21 @@ impl<'input> TokenStream<'input> {
     }
 }
 
-impl<'input> Iterator for TokenStream<'input> {
-    type Item = SpannedToken<'input>;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        self.tokens.pop_front()
-    }
-}
-
-pub fn tokenize(input: &str) -> Result<TokenStream<'_>, LexerError> {
+pub fn tokenize(input: &str) -> Result<TokenStream<'_>, Vec<LexerError>> {
     let lexer = Token::lexer(input).spanned();
     let mut tokens = Vec::new();
+    let mut errors = vec![];
 
     for (token, span) in lexer {
         match token {
             Ok(t) => tokens.push((span, t)),
-            Err(e) => return Err(e),
+            Err(e) => errors.push(e),
         }
     }
 
-    Ok(TokenStream::with_vec_deque(tokens))
+    if errors.is_empty() {
+        Ok(TokenStream::with_vec_deque(tokens))
+    } else {
+        Err(errors)
+    }
 }

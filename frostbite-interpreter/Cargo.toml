@@ -1,25 +1,16 @@
 [package]
-name = "frostbite-parser"
-
+name = "frostbite-interpreter"
 version.workspace = true
 edition.workspace = true
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+clap = { version = "4.4.10", features = ["derive"] }
 derive_more = { workspace = true }
-num-traits = { workspace = true }
-const_format = { workspace = true }
-cfg-if = { workspace = true }
 
+frostbite-parser = { path = "../frostbite-parser" }
 frostbite-reports = { path = "../frostbite-reports" }
-
-logos = { version = "0.13.0", default-features = false, features = [
-    "export_derive",
-] }
 
 [lints]
 workspace = true
-
-[features]
-std = []

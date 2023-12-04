@@ -1,5 +1,5 @@
 use alloc::{format, vec};
-use frostbite_report_interface::{Help, Info, IntoReport, Level, Location, Report};
+use frostbite_reports::{Help, Info, IntoReport, Level, Location, Report};
 
 use crate::ast::Span;
 
@@ -20,7 +20,7 @@ pub enum Error {
 impl IntoReport for Error {
     type Arguments = ();
 
-    fn into_report(self, _: Self::Arguments) -> frostbite_report_interface::Report {
+    fn into_report(self, _: Self::Arguments) -> frostbite_reports::Report {
         match self {
             Error::UnrecognizedToken { location, expected } => Report::new(
                 Level::Error,

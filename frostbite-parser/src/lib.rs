@@ -59,22 +59,25 @@ impl<'input> Parser<'input> {
         }
     }
 
-    pub fn parse(&mut self) -> Option<Program<'input>> {
+    pub fn parse(mut self) -> Result<Program<'input>, Vec<Error>> {
         let mut exprs = vec![];
-
-        #[allow(unused_extern_crates)]
-        extern crate std;
 
         while self.token_stream.peek().is_some() {
             match self.parse_expr() {
                 Some(expr) => {
                     exprs.push(expr);
 
-                    consume_token!(
+                    if consume_token!(
                         parser: self,
                         token: Token::Semicolon,
                         description: "semicolon"
-                    )?;
+                    )
+                    .is_none()
+                    {
+                        TokenStream::take_while(&mut self.token_stream, |(_, token)| {
+                            matches!(token, Token::Semicolon)
+                        });
+                    }
                 }
                 None => {
                     // recover
@@ -86,7 +89,11 @@ impl<'input> Parser<'input> {
             }
         }
 
-        Some(Program { exprs })
+        if self.errors.is_empty() {
+            Ok(Program { exprs })
+        } else {
+            Err(self.errors)
+        }
     }
 
     pub fn parse_expr(&mut self) -> Option<Expr<'input>> {
@@ -261,7 +268,7 @@ impl<'input> Parser<'input> {
 
                 let (return_type_token, return_type_annotation) =
                     if let Some((span, Token::Arrow)) = self.token_stream.peek().cloned() {
-                        self.token_stream.next();
+                        self.token_stream.skip_token();
 
                         let return_type_annotation = self.parse_type_annotation()?;
 
@@ -333,16 +340,14 @@ impl<'input> Parser<'input> {
             }
         }
     }
-
-    pub fn errors(&self) -> &[Error] {
-        self.errors.as_ref()
-    }
 }
 
 #[cfg(test)]
 mod tests {
+    #[allow(unused_extern_crates)]
+    extern crate std;
 
-    use std::{prelude::rust_2021::*, vec};
+    use std::{boxed::Box, vec};
 
     use crate::ast::{
         tokens::{
@@ -369,11 +374,11 @@ mod tests {
 
     #[test]
     fn test_parser_operation() {
-        let mut parser = parser!("1 + 2 + 3;");
+        let parser = parser!("1 + 2 + 3;");
 
         assert_eq!(
             parser.parse(),
-            Some(Program {
+            Ok(Program {
                 exprs: vec![Expr::BinaryOperation {
                     lhs: boxed!(Expr::Int(0..1, 1)),
                     operator: Operator(2..3, OperatorKind::Add),
@@ -385,17 +390,15 @@ mod tests {
                 }]
             })
         );
-
-        assert!(parser.errors.is_empty());
     }
 
     #[test]
     fn test_parser_assign() {
-        let mut parser = parser!("a = 1;");
+        let parser = parser!("a = 1;");
 
         assert_eq!(
             parser.parse(),
-            Some(Program {
+            Ok(Program {
                 exprs: vec![Expr::Assign {
                     lhs: boxed!(Expr::Ident(0..1, "a")),
                     eq_token: Eq(2..3),
@@ -403,17 +406,15 @@ mod tests {
                 }]
             })
         );
-
-        assert!(parser.errors.is_empty());
     }
 
     #[test]
     fn test_parser_function() {
-        let mut parser = parser!("function test(x: int, y: int) = x + y;");
+        let parser = parser!("function test(x: int, y: int) = x + y;");
 
         assert_eq!(
             parser.parse(),
-            Some(Program {
+            Ok(Program {
                 exprs: vec![Expr::Function {
                     fn_token: FunctionToken(0..8),
                     name: Spanned(9..13, "test"),
@@ -440,17 +441,15 @@ mod tests {
                 }]
             })
         );
-
-        assert!(parser.errors().is_empty());
     }
 
     #[test]
     fn test_parser_function_with_return() {
-        let mut parser = parser!("function test(x: int, y: int) -> int = x + y;");
+        let parser = parser!("function test(x: int, y: int) -> int = x + y;");
 
         assert_eq!(
             parser.parse(),
-            Some(Program {
+            Ok(Program {
                 exprs: vec![Expr::Function {
                     fn_token: FunctionToken(0..8),
                     name: Spanned(9..13, "test"),
@@ -477,8 +476,6 @@ mod tests {
                 }]
             })
         );
-
-        assert!(parser.errors().is_empty());
     }
 
     #[test]
@@ -486,8 +483,6 @@ mod tests {
         let mut parser = parser!("bilo(a)");
 
         let ast = parser.parse_expr();
-
-        assert!(parser.errors().is_empty());
 
         assert_eq!(
             ast,

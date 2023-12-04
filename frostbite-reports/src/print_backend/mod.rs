@@ -2,9 +2,9 @@ mod custom;
 
 use core::fmt::Write;
 
-use crate::{print::PrintingError, print_backend::custom::CustomBackend, Report};
+use crate::{print::PrintingError, print_backend::custom::CustomPrintBackend, Report};
 
-pub type DefaultBackend = CustomBackend;
+pub type DefaultPrintBackend = CustomPrintBackend;
 
 pub trait PrintBackend {
     fn write_report_to<W: Write>(
