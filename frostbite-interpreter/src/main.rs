@@ -1,3 +1,5 @@
+#![feature(fmt_internals)]
+
 use std::{error::Error, fs, process::exit};
 
 use clap::Parser;
@@ -9,6 +11,7 @@ mod cli;
 mod error;
 mod helper;
 mod interpreter;
+mod intrinsics;
 
 fn main() -> Result<(), Box<dyn Error>> {
     let args = cli::CliArgs::parse();
@@ -29,6 +32,8 @@ fn main() -> Result<(), Box<dyn Error>> {
             };
 
             let mut interpreter = Interpreter::new();
+
+            intrinsics::insert_intrinsics(&mut interpreter);
 
             let interpretation_result = interpreter.eval_program(&ast);
 

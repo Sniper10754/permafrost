@@ -28,4 +28,6 @@ pub fn print_report(source_id: Option<impl Display + ToString>, source: &str, re
     ReportPrinter::new(&mut buf)
         .print::<DefaultPrintBackend>(source_id, source, report)
         .unwrap();
+
+    println!("{buf}")
 }

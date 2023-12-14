@@ -27,16 +27,16 @@ impl IntoReport for Error {
                 Some(location),
                 "Invalid Token",
                 Some("Token in wrong place"),
-                vec![Info::new(format!("Expected {expected}"), None::<Location>)],
-                vec![],
+                [Info::new(format!("Expected {expected}"), None::<Location>)],
+                [],
             ),
             Error::UnrecognizedEof { expected } => Report::new(
                 Level::Error,
                 None::<Location>,
                 "Unexpected EOF",
                 None::<&str>,
-                vec![],
-                vec![Help::new(
+                [],
+                [Help::new(
                     format!("Expected one of: {}", expected.join(", ")),
                     None::<Location>,
                 )],
@@ -46,11 +46,11 @@ impl IntoReport for Error {
                 Some(span),
                 "Number is too big",
                 Some("Number is too big to lex"),
-                vec![Info::new(
+                [Info::new(
                     const_format::formatcp!("Maximum limit is {}", i32::MAX),
                     None::<Location>,
                 )],
-                vec![],
+                [],
             ),
         }
     }

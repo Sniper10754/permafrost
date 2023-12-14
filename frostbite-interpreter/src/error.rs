@@ -8,8 +8,8 @@ pub enum InterpretationError<'ast> {
     CannotAssignTo { at: Span },
     InvalidOperands { at: Span },
     DivisionByZero { at: Span },
-    CannotCallNonFunction { at: Span },
-    CannotCallNonFunc { at: Span },
+    CannotCallNonFunctionIdent { at: Span },
+    CannotCallNonFunctionValue { at: Span },
 }
 
 impl<'ast> IntoReport for InterpretationError<'ast> {
@@ -45,13 +45,13 @@ impl<'ast> IntoReport for InterpretationError<'ast> {
                 title = "Division by zero";
                 description = Some("The right part of the expression evaluated to 0".into())
             }
-            InterpretationError::CannotCallNonFunction { at } => {
+            InterpretationError::CannotCallNonFunctionIdent { at } => {
                 location = at;
 
                 title = "Cannot call expression";
                 description = Some("You can only call identifiers".into())
             }
-            InterpretationError::CannotCallNonFunc { at } => {
+            InterpretationError::CannotCallNonFunctionValue { at } => {
                 location = at;
 
                 title = "Cannot call values which arent functions";

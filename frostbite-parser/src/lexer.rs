@@ -112,7 +112,7 @@ pub enum Token<'input> {
     #[token(",")]
     Comma,
 
-    #[regex(r#"[\+\-\*\\]"#, helpers::parse_operator)]
+    #[regex(r#"[\+\-\*/]"#, helpers::parse_operator)]
     BinaryOperator(OperatorKind),
 
     #[token(":")]

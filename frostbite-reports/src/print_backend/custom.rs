@@ -31,7 +31,7 @@ impl PrintBackend for CustomPrintBackend {
         if let Some(location) = &report.location {
             writeln!(
                 destination,
-                "\t---> {}:{}:{}",
+                "  ---> {}:{}:{}",
                 source_id.unwrap_or("Unknown"),
                 get_line_from_location(source, location.start()),
                 location.start()
