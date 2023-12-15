@@ -241,10 +241,13 @@ impl<'ast> Runtime<'ast> {
     }
 }
 
-fn find_symbol_from_stack_frames<'ast, 'stack_frame>(
+fn find_symbol_from_stack_frames<'ast, 'stack_frame, I>(
     symbol: &'ast str,
-    stack_frames: impl IntoIterator<Item = &'stack_frame mut StackFrame<'ast>>,
-) -> Option<(&'stack_frame mut StackFrame<'ast>, Shared<Value<'ast>>)> {
+    stack_frames: I,
+) -> Option<(&'stack_frame mut StackFrame<'ast>, Shared<Value<'ast>>)>
+where
+    I: IntoIterator<Item = &'stack_frame mut StackFrame<'ast>>,
+{
     let stack_frame = stack_frames
         .into_iter()
         .find(|stack_frame| stack_frame.symbols.contains_key(symbol))?;
