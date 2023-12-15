@@ -64,6 +64,9 @@ pub mod tokens {
         #[display(fmt = "str")]
         String,
 
+        #[display(fmt = "not specified")]
+        NotSpecified,
+
         Other(&'a str),
     }
 

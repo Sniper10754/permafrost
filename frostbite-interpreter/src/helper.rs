@@ -2,7 +2,8 @@ use std::fmt::Display;
 
 use frostbite_parser::{ast::Program, lexer::tokenize, Parser};
 use frostbite_reports::{
-    print::ReportPrinter, print_backend::DefaultPrintBackend, IntoReport, Report,
+    print::{DefaultPrintBackend, ReportPrinter},
+    IntoReport, Report,
 };
 
 pub fn lex_and_parse(content: &str) -> Result<Program<'_>, Vec<Report>> {

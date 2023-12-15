@@ -23,8 +23,8 @@ mod utils {
     macro_rules! consume_token {
         (parser: $parser:expr, token: $token:pat, description: $token_description:expr) => {
             match $parser.token_stream.next() {
-                Some(pattern @ (_, $token)) => Some(pattern),
-                Some((span, _)) => {
+                Some(pattern @ Spanned(_, $token)) => Some(pattern),
+                Some(Spanned(span, _)) => {
                     $parser.errors.push(Error::UnrecognizedToken {
                         location: span,
                         expected: $token_description,
@@ -74,7 +74,7 @@ impl<'input> Parser<'input> {
                     )
                     .is_none()
                     {
-                        TokenStream::take_while(&mut self.token_stream, |(_, token)| {
+                        TokenStream::take_while(&mut self.token_stream, |Spanned(_, token)| {
                             matches!(token, Token::Semicolon)
                         });
                     }
@@ -82,7 +82,7 @@ impl<'input> Parser<'input> {
                 None => {
                     // recover
 
-                    TokenStream::take_while(&mut self.token_stream, |(_, token)| {
+                    TokenStream::take_while(&mut self.token_stream, |Spanned(_, token)| {
                         matches!(token, Token::Semicolon)
                     });
                 }
@@ -100,7 +100,7 @@ impl<'input> Parser<'input> {
         let mut expression = self.parse_atom_expr()?;
 
         match self.token_stream.peek() {
-            Some((op_span, Token::BinaryOperator(operator))) => {
+            Some(Spanned(op_span, Token::BinaryOperator(operator))) => {
                 let operator = Operator(op_span.clone(), *operator);
 
                 self.token_stream.skip_token();
@@ -114,7 +114,7 @@ impl<'input> Parser<'input> {
                 }
             }
 
-            Some((eq_span, Token::Eq)) => {
+            Some(Spanned(eq_span, Token::Eq)) => {
                 let eq_token = tokens::Eq(eq_span.clone());
 
                 self.token_stream.skip_token();
@@ -128,7 +128,7 @@ impl<'input> Parser<'input> {
                 }
             }
 
-            Some((_, Token::LParen)) => {
+            Some(Spanned(_, Token::LParen)) => {
                 let lpt = consume_token!(
                     parser: self,
                     token: Token::LParen,
@@ -142,10 +142,10 @@ impl<'input> Parser<'input> {
 
                 loop {
                     match self.token_stream.peek() {
-                        Some((_, Token::Comma)) => {
+                        Some(Spanned(_, Token::Comma)) => {
                             self.token_stream.skip_token();
                         }
-                        Some((_, Token::RParen)) => {
+                        Some(Spanned(_, Token::RParen)) => {
                             rpt = consume_token!(
                                 parser: self,
                                 token: Token::RParen,
@@ -156,7 +156,7 @@ impl<'input> Parser<'input> {
 
                             break;
                         }
-                        Some((_, _)) => {
+                        Some(Spanned(_, _)) => {
                             arguments.push(self.parse_expr()?);
                         }
                         None => self.errors.push(Error::UnrecognizedEof {
@@ -181,12 +181,12 @@ impl<'input> Parser<'input> {
 
     fn parse_atom_expr(&mut self) -> Option<Expr<'input>> {
         match self.token_stream.next() {
-            Some((span, Token::Int(value))) => Some(Expr::Int(span, value)),
-            Some((span, Token::Float(value))) => Some(Expr::Float(span, value)),
-            Some((span, Token::Ident(value))) => Some(Expr::Ident(span, value)),
-            Some((span, Token::String(value))) => Some(Expr::String(span, value)),
+            Some(Spanned(span, Token::Int(value))) => Some(Expr::Int(span, value)),
+            Some(Spanned(span, Token::Float(value))) => Some(Expr::Float(span, value)),
+            Some(Spanned(span, Token::Ident(value))) => Some(Expr::Ident(span, value)),
+            Some(Spanned(span, Token::String(value))) => Some(Expr::String(span, value)),
 
-            Some((_, Token::LParen)) => {
+            Some(Spanned(_, Token::LParen)) => {
                 let expr = self.parse_atom_expr()?;
 
                 consume_token!(
@@ -198,14 +198,14 @@ impl<'input> Parser<'input> {
                 Some(expr)
             }
 
-            Some((fn_token_span, Token::Fn)) => {
+            Some(Spanned(fn_token_span, Token::Fn)) => {
                 let fn_token = FunctionToken(fn_token_span);
 
-                let name = Spanned::from(consume_token!(
+                let name = consume_token!(
                     parser: self,
                     token: Token::Ident(_),
                     description: "Function Identifier"
-                )?)
+                )?
                 .map(|token| {
                     let Token::Ident(name) = token else {
                         unreachable!();
@@ -214,7 +214,7 @@ impl<'input> Parser<'input> {
                     name
                 });
 
-                let (left_paren_span, _) = consume_token!(
+                let Spanned(left_paren_span, _) = consume_token!(
                     parser: self,
                     token: Token::LParen,
                     description: "left parenthesis"
@@ -226,29 +226,33 @@ impl<'input> Parser<'input> {
 
                 loop {
                     match self.token_stream.next() {
-                        Some((name_span, Token::Ident(name))) => {
+                        Some(Spanned(name_span, Token::Ident(name))) => {
                             let name = Spanned(name_span, name);
 
-                            consume_token!(
-                                parser: self,
-                                token: Token::Colon,
-                                description: "a colon"
-                            )?;
+                            let mut type_annotation =
+                                Spanned(name.0.clone(), TypeAnnotation::NotSpecified);
 
-                            let type_annotation = self.parse_type_annotation()?;
+                            if matches!(self.token_stream.peek(), Some(Spanned(_, Token::Colon))) {
+                                consume_token!(
+                                    parser: self,
+                                    token: Token::Colon,
+                                    description: "a colon"
+                                )?;
 
+                                type_annotation = self.parse_type_annotation()?;
+                            }
                             arguments.push(Argument {
                                 name,
                                 type_annotation,
                             });
                         }
-                        Some((rps, Token::RParen)) => {
+                        Some(Spanned(rps, Token::RParen)) => {
                             right_paren_span = rps;
 
                             break;
                         }
-                        Some((_, Token::Comma)) => continue,
-                        Some((span, _)) => {
+                        Some(Spanned(_, Token::Comma)) => continue,
+                        Some(Spanned(span, _)) => {
                             self.errors.push(Error::UnrecognizedToken {
                                 location: span,
                                 expected: "an identifier",
@@ -267,7 +271,7 @@ impl<'input> Parser<'input> {
                 }
 
                 let (return_type_token, return_type_annotation) =
-                    if let Some((span, Token::Arrow)) = self.token_stream.peek().cloned() {
+                    if let Some(Spanned(span, Token::Arrow)) = self.token_stream.peek().cloned() {
                         self.token_stream.skip_token();
 
                         let return_type_annotation = self.parse_type_annotation()?;
@@ -277,7 +281,7 @@ impl<'input> Parser<'input> {
                         (None, None)
                     };
 
-                let (equals_span, _) = consume_token!(
+                let Spanned(equals_span, _) = consume_token!(
                     parser: self,
                     token: Token::Eq,
                     description: "equals sign"
@@ -298,7 +302,7 @@ impl<'input> Parser<'input> {
                 })
             }
 
-            Some((span, _)) => {
+            Some(Spanned(span, _)) => {
                 self.errors.push(Error::UnrecognizedToken {
                     location: span,
                     expected: "Expression",
@@ -319,11 +323,15 @@ impl<'input> Parser<'input> {
 
     fn parse_type_annotation(&mut self) -> Option<Spanned<TypeAnnotation<'input>>> {
         match self.token_stream.next() {
-            Some((span, Token::Ident("int"))) => Some(Spanned(span, TypeAnnotation::Int)),
-            Some((span, Token::Ident("float"))) => Some(Spanned(span, TypeAnnotation::Float)),
-            Some((span, Token::Ident("str"))) => Some(Spanned(span, TypeAnnotation::String)),
-            Some((span, Token::Ident(other))) => Some(Spanned(span, TypeAnnotation::Other(other))),
-            Some((span, _)) => {
+            Some(Spanned(span, Token::Ident("int"))) => Some(Spanned(span, TypeAnnotation::Int)),
+            Some(Spanned(span, Token::Ident("float"))) => {
+                Some(Spanned(span, TypeAnnotation::Float))
+            }
+            Some(Spanned(span, Token::Ident("str"))) => Some(Spanned(span, TypeAnnotation::String)),
+            Some(Spanned(span, Token::Ident(other))) => {
+                Some(Spanned(span, TypeAnnotation::Other(other)))
+            }
+            Some(Spanned(span, _)) => {
                 self.errors.push(Error::UnrecognizedToken {
                     location: span,
                     expected: "A type",

@@ -1,10 +1,9 @@
 use alloc::{collections::VecDeque, vec, vec::Vec};
-use core::ops::Range;
 
-use frostbite_reports::{IntoReport, Level, Location, Report};
-use logos::Logos;
+use frostbite_reports::{IntoReport, Level, Report};
+use logos::{Logos, Span};
 
-use crate::ast::tokens::OperatorKind;
+use crate::ast::{tokens::OperatorKind, Spanned};
 
 mod helpers {
     use logos::Lexer;
@@ -19,9 +18,7 @@ mod helpers {
     ) -> Result<N, LexerError> {
         let slice = lexer.slice();
 
-        N::from_str_radix(slice, 10).map_err(|_| LexerError::NumberTooBig {
-            location: lexer.span().into(),
-        })
+        N::from_str_radix(slice, 10).map_err(|_| LexerError::NumberTooBig { span: lexer.span() })
     }
 
     pub fn parse_operator<'input>(lexer: &Lexer<'input, Token<'input>>) -> OperatorKind {
@@ -36,42 +33,46 @@ mod helpers {
     }
 }
 
-pub type Spanned<T> = (Range<usize>, T);
 pub type SpannedToken<'a> = Spanned<Token<'a>>;
 
 #[derive(Debug, PartialEq, Clone, Default)]
 pub enum LexerError {
     NumberTooBig {
-        location: Location,
+        span: Span,
+    },
+
+    UnknownToken {
+        span: Span,
     },
 
     #[default]
-    UnknownToken,
+    GenericLexerError,
 }
 
 impl IntoReport for LexerError {
     type Arguments = ();
 
     fn into_report(self, _: Self::Arguments) -> frostbite_reports::Report {
-        let mut location = None;
+        let location;
         let title;
         let description;
 
         match self {
-            LexerError::NumberTooBig {
-                location: num_location,
-            } => {
-                location = num_location.into();
+            LexerError::NumberTooBig { span } => {
+                location = span;
 
                 title = "Number too big";
 
                 description = "Number can't be lexed because is too big";
             }
-            LexerError::UnknownToken => {
+            LexerError::UnknownToken { span } => {
+                location = span;
+
                 title = "Unknown token";
 
                 description = "Token was not recognized";
             }
+            LexerError::GenericLexerError => unreachable!(),
         }
 
         Report::new(Level::Error, location, title, Some(description), [], [])
@@ -88,10 +89,10 @@ pub enum Token<'input> {
     #[regex(r#"(-?[0-9]+)?\.[0-9]+"#, helpers::parse_number::<f32>)]
     Float(f32),
 
-    #[regex("[a-zA-Z][a-zA-Z0-9]*")]
+    #[regex("[a-zA-Z]([a-zA-Z0-9]|_)*")]
     Ident(&'input str),
 
-    #[regex(r#"".*""#)]
+    #[regex(r#""(\\[\\"]|[^"])*""#)]
     String(&'input str),
 
     #[token("(")]
@@ -105,6 +106,9 @@ pub enum Token<'input> {
 
     #[token("function")]
     Fn,
+
+    #[token("import")]
+    Import,
 
     #[token("->")]
     Arrow,
@@ -185,8 +189,6 @@ impl<'input> TokenStream<'input> {
                 break;
             } else {
                 taken_tokens.push(token);
-
-                continue;
             }
         }
 
@@ -201,8 +203,12 @@ pub fn tokenize(input: &str) -> Result<TokenStream<'_>, Vec<LexerError>> {
 
     for (token, span) in lexer {
         match token {
-            Ok(t) => tokens.push((span, t)),
-            Err(e) => errors.push(e),
+            Ok(t) => tokens.push((span, t).into()),
+            Err(e) => errors.push(match e {
+                LexerError::GenericLexerError => LexerError::UnknownToken { span },
+
+                error => error,
+            }),
         }
     }
 

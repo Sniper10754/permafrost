@@ -1,6 +1,6 @@
 use std::{collections::HashMap, rc::Rc};
 
-use frostbite_parser::ast::{tokens::OperatorKind, Expr, Program, Span, Spannable};
+use frostbite_parser::ast::{tokens::OperatorKind, Expr, Program, Span, Spannable, Spanned};
 
 use derive_more::*;
 
@@ -14,7 +14,7 @@ pub struct Interpreter<'ast> {
 impl<'ast> Interpreter<'ast> {
     pub fn new() -> Self {
         Self {
-            stack_frames: vec![],
+            stack_frames: vec![StackFrame::default()],
             intrinsic_functions: HashMap::new(),
         }
     }
@@ -70,7 +70,7 @@ impl<'ast> Interpreter<'ast> {
                             },
                         )?;
 
-                    stack_frame.variables.insert(ident, value);
+                    stack_frame.symbols.insert(ident, value);
 
                     Ok(Value::Nothing.into())
                 }
@@ -79,15 +79,29 @@ impl<'ast> Interpreter<'ast> {
             },
             Expr::Function {
                 fn_token: _,
-                name: _,
+                name: Spanned(_, name),
                 lpt: _,
-                arguments: _,
+                arguments,
                 rpt: _,
                 return_type_token: _,
                 return_type_annotation: _,
                 equals: _,
-                body: _,
-            } => todo!(),
+                body,
+            } => {
+                self.stack_frames.first_mut().unwrap().symbols.insert(
+                    name,
+                    Value::Function {
+                        function_arguments: arguments
+                            .iter()
+                            .map(|argument| argument.name.1)
+                            .collect(),
+                        body: body.clone(),
+                    }
+                    .into(),
+                );
+
+                Ok(Value::Nothing.into())
+            }
             Expr::Call {
                 callee,
                 lpt: _,
@@ -98,7 +112,6 @@ impl<'ast> Interpreter<'ast> {
                     match find_symbol_from_stack_frames(callee, &mut self.stack_frames) {
                         Some((_, callee_value)) => {
                             if let Value::Function {
-                                name: _,
                                 function_arguments,
                                 body,
                             } = &*dbg!(callee_value)
@@ -127,7 +140,7 @@ impl<'ast> Interpreter<'ast> {
                                     .zip(evaluated_call_arguments)
                                     .for_each(|(function_arg_name, call_arg_value)| {
                                         stack_frame
-                                            .variables
+                                            .symbols
                                             .insert(function_arg_name, call_arg_value);
                                     });
 
@@ -200,9 +213,9 @@ fn find_symbol_from_stack_frames<'ast: 'stack_frame, 'stack_frame>(
 ) -> Option<(&'stack_frame mut StackFrame<'ast>, Rc<Value<'ast>>)> {
     let stack_frame = stack_frames
         .into_iter()
-        .find(|stack_frame| stack_frame.variables.contains_key(symbol))?;
+        .find(|stack_frame| stack_frame.symbols.contains_key(symbol))?;
 
-    let symbol = stack_frame.variables[symbol].clone();
+    let symbol = stack_frame.symbols[symbol].clone();
 
     Some((stack_frame, symbol))
 }
@@ -258,21 +271,20 @@ fn evaluate_binary_operation<'ast>(
 
 #[derive(Default)]
 pub struct StackFrame<'ast> {
-    variables: HashMap<&'ast str, Rc<Value<'ast>>>,
+    symbols: HashMap<&'ast str, Rc<Value<'ast>>>,
 }
 
 #[derive(Debug, Clone, derive_more::Display, From)]
-pub enum Value<'ast> {
+pub enum Value<'tokens> {
     Int(i32),
     Float(f32),
     String(std::string::String),
 
-    #[display(fmt = "function {}", name)]
+    #[display(fmt = "function")]
     Function {
-        name: &'ast str,
-        function_arguments: Vec<&'ast str>,
+        function_arguments: Vec<&'tokens str>,
 
-        body: &'ast Expr<'ast>,
+        body: Box<Expr<'tokens>>,
     },
 
     Nothing,

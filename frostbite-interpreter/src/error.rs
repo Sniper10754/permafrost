@@ -59,6 +59,6 @@ impl<'ast> IntoReport for InterpretationError<'ast> {
             }
         }
 
-        frostbite_reports::Report::new(Level::Error, Some(location), title, description, [], [])
+        frostbite_reports::Report::new(Level::Error, location, title, description, [], [])
     }
 }

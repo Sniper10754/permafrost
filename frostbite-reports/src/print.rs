@@ -1,9 +1,11 @@
+mod ariadne;
+
 use alloc::string::ToString;
-use core::fmt::{self, Display};
+use core::fmt::{self, Display, Write};
 
 use derive_more::*;
 
-use crate::{print_backend::PrintBackend, Report};
+use crate::Report;
 
 #[derive(Debug, Display, From)]
 pub enum PrintingError {
@@ -32,4 +34,15 @@ impl<'output, O: fmt::Write> ReportPrinter<'output, O> {
             report,
         )
     }
+}
+
+pub type DefaultPrintBackend = ariadne::AriadnePrintBackend;
+
+pub trait PrintBackend {
+    fn write_report_to<W: Write>(
+        destination: &mut W,
+        source_id: Option<&str>,
+        source: &str,
+        report: &Report,
+    ) -> Result<(), PrintingError>;
 }

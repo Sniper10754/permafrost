@@ -2,8 +2,11 @@
 
 extern crate alloc;
 
+#[cfg(feature = "std")]
+extern crate std;
+
+#[cfg(feature = "std")]
 pub mod print;
-pub mod print_backend;
 pub mod utils;
 
 use alloc::{borrow::Cow, vec::Vec};
@@ -20,7 +23,7 @@ pub trait IntoReport {
 #[derive(Debug, Clone, PartialEq)]
 pub struct Report {
     pub level: Level,
-    pub location: Option<Location>,
+    pub location: Range<usize>,
     pub title: Cow<'static, str>,
     pub description: Option<Cow<'static, str>>,
     pub infos: Vec<Info>,
@@ -30,7 +33,7 @@ pub struct Report {
 impl Report {
     pub fn new(
         level: Level,
-        location: Option<impl Into<Location>>,
+        location: Range<usize>,
         title: impl Into<Cow<'static, str>>,
         description: Option<impl Into<Cow<'static, str>>>,
         infos: impl IntoIterator<Item = Info>,
@@ -38,7 +41,7 @@ impl Report {
     ) -> Self {
         Self {
             level,
-            location: location.map(Into::into),
+            location,
             title: title.into(),
             description: description.map(Into::into),
             infos: infos.into_iter().collect(),
@@ -50,11 +53,14 @@ impl Report {
 #[derive(Debug, Clone, PartialEq)]
 pub struct Info {
     pub info: Cow<'static, str>,
-    pub location: Option<Location>,
+    pub location: Option<Range<usize>>,
 }
 
 impl Info {
-    pub fn new(info: impl Into<Cow<'static, str>>, location: Option<impl Into<Location>>) -> Self {
+    pub fn new(
+        info: impl Into<Cow<'static, str>>,
+        location: Option<impl Into<Range<usize>>>,
+    ) -> Self {
         Self {
             info: info.into(),
             location: location.map(Into::into),
@@ -65,11 +71,14 @@ impl Info {
 #[derive(Debug, Clone, PartialEq)]
 pub struct Help {
     pub info: Cow<'static, str>,
-    pub location: Option<Location>,
+    pub location: Option<Range<usize>>,
 }
 
 impl Help {
-    pub fn new(info: impl Into<Cow<'static, str>>, location: Option<impl Into<Location>>) -> Self {
+    pub fn new(
+        info: impl Into<Cow<'static, str>>,
+        location: Option<impl Into<Range<usize>>>,
+    ) -> Self {
         Self {
             info: info.into(),
             location: location.map(Into::into),
@@ -82,23 +91,4 @@ pub enum Level {
     Error,
     Warn,
     Info,
-}
-
-#[derive(Debug, Clone, From, PartialEq)]
-pub enum Location {
-    /// A column in the file, may be placed anywhere
-    Column(usize),
-
-    /// a span, consisting of a start column and an end column
-    Span(Range<usize>),
-}
-
-impl Location {
-    /// Returns
-    pub fn start(&self) -> usize {
-        match self {
-            Location::Column(start) => *start,
-            Location::Span(span) => span.start,
-        }
-    }
 }
