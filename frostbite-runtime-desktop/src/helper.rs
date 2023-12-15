@@ -3,6 +3,7 @@ use std::fmt::Display;
 use frostbite_parser::{ast::Program, lexer::tokenize, Parser};
 use frostbite_reports::{
     print::{DefaultPrintBackend, ReportPrinter},
+    sourcemap::{SourceId, SourceMap},
     IntoReport, Report,
 };
 
@@ -23,11 +24,11 @@ pub fn lex_and_parse(content: &str) -> Result<Program<'_>, Vec<Report>> {
     })
 }
 
-pub fn print_report(source_id: Option<impl Display + ToString>, source: &str, report: &Report) {
+pub fn print_report(report_source_id: SourceId<'_>, sources: &SourceMap<'_, '_>, report: &Report) {
     let mut buf = String::new();
 
     ReportPrinter::new(&mut buf)
-        .print::<DefaultPrintBackend>(source_id, source, report)
+        .print::<DefaultPrintBackend>(report_source_id, sources, report)
         .unwrap();
 
     println!("{buf}")

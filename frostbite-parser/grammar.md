@@ -6,4 +6,5 @@ An expression may be composed by one of the following elements:
 - Floats (regex: `(-?[0-9]*)?\.[0-9]+`)
 - Idents (regex: `[a-zA-Z][a-zA-Z0-9]+`)
 - Strings (regex: `".*"`)
-- Assigns ()
+- Assigns (`lhs = rhs`)
+- Functions (`function name(x, y) = x + y`)

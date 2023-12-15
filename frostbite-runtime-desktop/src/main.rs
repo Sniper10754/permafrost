@@ -3,7 +3,10 @@
 use std::{error::Error, fs, process::exit};
 
 use clap::Parser;
-use frostbite_reports::IntoReport;
+use frostbite_reports::{
+    sourcemap::{SourceId, SourceMap},
+    IntoReport,
+};
 use frostbite_runtime::Runtime;
 use helper::{lex_and_parse, print_report};
 
@@ -18,12 +21,18 @@ fn main() -> Result<(), Box<dyn Error>> {
         cli::CliSubcommand::Run { filepath } => {
             let source = fs::read_to_string(&filepath)?;
 
+            let src_id = SourceId::Filepath(&filepath);
+
+            let mut source_map = SourceMap::new();
+
+            source_map.insert(src_id, &source);
+
             let ast = match lex_and_parse(&source) {
                 Ok(ast) => ast,
                 Err(reports) => {
-                    reports.into_iter().for_each(|report| {
-                        print_report(filepath.display().into(), &source, &report)
-                    });
+                    reports
+                        .into_iter()
+                        .for_each(|report| print_report(src_id, &source_map, &report));
 
                     exit(1);
                 }
@@ -38,7 +47,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             if let Err(error) = interpretation_result {
                 let report = IntoReport::into_report(error, ());
 
-                print_report(Some(filepath.display()), &source, &report);
+                print_report(src_id, &source_map, &report);
 
                 exit(1);
             }
