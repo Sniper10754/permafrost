@@ -3,7 +3,7 @@ use std::{
     rc::Rc,
 };
 
-use crate::interpreter::{Interpreter, Value};
+use frostbite_runtime::{Runtime, Value};
 
 fn print(args: Vec<Rc<Value<'_>>>) -> Value<'_> {
     let mut buf = String::new();
@@ -22,8 +22,8 @@ fn print(args: Vec<Rc<Value<'_>>>) -> Value<'_> {
     Value::Nothing
 }
 
-pub fn insert_intrinsics(interpreter: &mut Interpreter<'_>) {
-    let intrinsics_functions = interpreter.intrinsic_functions_mut();
+pub fn insert_intrinsics(runtime: &mut Runtime<'_>) {
+    let intrinsics_functions = runtime.intrinsic_functions_mut();
 
     intrinsics_functions.insert("print", Box::new(print));
 }

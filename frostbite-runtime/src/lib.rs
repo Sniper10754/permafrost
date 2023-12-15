@@ -1,17 +1,37 @@
-use std::{collections::HashMap, rc::Rc};
+#![no_std]
+
+extern crate alloc;
+
+use alloc::{
+    boxed::Box,
+    rc::Rc,
+    string::{String, ToString},
+    vec,
+    vec::Vec,
+};
+
+use alloc::collections::BTreeMap as HashMap;
 
 use frostbite_parser::ast::{tokens::OperatorKind, Expr, Program, Span, Spannable, Spanned};
 
 use derive_more::*;
 
+mod error;
+
 pub type ExternalFunction<'ast> = dyn Fn(Vec<Rc<Value<'ast>>>) -> Value<'ast>;
 
-pub struct Interpreter<'ast> {
+pub struct Runtime<'ast> {
     stack_frames: Vec<StackFrame<'ast>>,
     intrinsic_functions: HashMap<&'static str, Box<ExternalFunction<'ast>>>,
 }
 
-impl<'ast> Interpreter<'ast> {
+impl<'ast> Default for Runtime<'ast> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl<'ast> Runtime<'ast> {
     pub fn new() -> Self {
         Self {
             stack_frames: vec![StackFrame::default()],
@@ -114,7 +134,7 @@ impl<'ast> Interpreter<'ast> {
                             if let Value::Function {
                                 function_arguments,
                                 body,
-                            } = &*dbg!(callee_value)
+                            } = &*callee_value
                             {
                                 let evaluated_call_arguments = call_arguments
                                     .iter()
@@ -207,7 +227,7 @@ impl<'ast> Interpreter<'ast> {
     }
 }
 
-fn find_symbol_from_stack_frames<'ast: 'stack_frame, 'stack_frame>(
+fn find_symbol_from_stack_frames<'ast, 'stack_frame>(
     symbol: &'ast str,
     stack_frames: impl IntoIterator<Item = &'stack_frame mut StackFrame<'ast>>,
 ) -> Option<(&'stack_frame mut StackFrame<'ast>, Rc<Value<'ast>>)> {
@@ -278,7 +298,7 @@ pub struct StackFrame<'ast> {
 pub enum Value<'tokens> {
     Int(i32),
     Float(f32),
-    String(std::string::String),
+    String(String),
 
     #[display(fmt = "function")]
     Function {

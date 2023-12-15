@@ -4,13 +4,11 @@ use std::{error::Error, fs, process::exit};
 
 use clap::Parser;
 use frostbite_reports::IntoReport;
+use frostbite_runtime::Runtime;
 use helper::{lex_and_parse, print_report};
-use interpreter::Interpreter;
 
 mod cli;
-mod error;
 mod helper;
-mod interpreter;
 mod intrinsics;
 
 fn main() -> Result<(), Box<dyn Error>> {
@@ -24,18 +22,18 @@ fn main() -> Result<(), Box<dyn Error>> {
                 Ok(ast) => ast,
                 Err(reports) => {
                     reports.into_iter().for_each(|report| {
-                        print_report(Some(filepath.display()), &source, &report)
+                        print_report(filepath.display().into(), &source, &report)
                     });
 
                     exit(1);
                 }
             };
 
-            let mut interpreter = Interpreter::new();
+            let mut runtime = Runtime::new();
 
-            intrinsics::insert_intrinsics(&mut interpreter);
+            intrinsics::insert_intrinsics(&mut runtime);
 
-            let interpretation_result = interpreter.eval_program(&ast);
+            let interpretation_result = runtime.eval_program(&ast);
 
             if let Err(error) = interpretation_result {
                 let report = IntoReport::into_report(error, ());

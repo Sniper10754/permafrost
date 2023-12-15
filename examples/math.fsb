@@ -1,7 +1,7 @@
-function my_add(a, b) = a + b + 1;
+function my_add(a, b) = a + b + 2;
 
 print(1 + 2 + 5);
 
-print(1 * 6);
+print(my_add(1, 6));
 
 print("1 / 6");

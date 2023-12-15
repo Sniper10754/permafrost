@@ -1,0 +1,15 @@
+[package]
+name = "frostbite-runtime"
+version.workspace = true
+edition.workspace = true
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+derive_more = { workspace = true }
+
+frostbite-parser = { path = "../frostbite-parser" }
+frostbite-reports = { path = "../frostbite-reports", features = ["printer"] }
+
+[lints]
+workspace = true

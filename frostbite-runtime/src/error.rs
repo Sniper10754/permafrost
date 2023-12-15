@@ -1,4 +1,4 @@
-use std::borrow::Cow;
+use alloc::{borrow::Cow, format};
 
 use frostbite_parser::ast::Span;
 use frostbite_reports::{IntoReport, Level};
