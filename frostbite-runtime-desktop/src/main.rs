@@ -1,6 +1,6 @@
 #![feature(fmt_internals)]
 
-use std::{error::Error, fs, process::exit};
+use std::{borrow::Borrow, error::Error, fs, process::exit};
 
 use clap::Parser;
 use frostbite_reports::{
