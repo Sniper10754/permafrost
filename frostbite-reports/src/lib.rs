@@ -2,15 +2,21 @@
 
 extern crate alloc;
 
-#[cfg(feature = "std")]
-extern crate std;
-
-#[cfg(feature = "std")]
-pub mod print;
-pub mod utils;
-
 use alloc::{borrow::Cow, vec::Vec};
 use core::ops::Range;
+
+cfg_if! {
+    if #[cfg(feature = "std")] {
+        extern crate std;
+
+        pub mod print;
+    }
+}
+
+pub mod utils;
+pub mod sourcemap;
+
+use cfg_if::cfg_if;
 
 use derive_more::*;
 

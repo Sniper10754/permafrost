@@ -1,45 +1,49 @@
-use core::fmt::Debug;
+use std::fmt;
 
-use alloc::{boxed::Box, string::ToString};
+use alloc::string::ToString;
 
-use crate::{print, Level, Report};
+use crate::{
+    print,
+    sourcemap::{SourceId, SourceMap},
+    Level, Report,
+};
 
 use super::PrintBackend;
 
 pub struct AriadnePrintBackend;
 
 mod utils {
-    use alloc::string::String;
+    use std::{fmt, io, string::String};
 
-    pub struct FmtWriteAsIoWrite<'a, W: std::fmt::Write + ?Sized> {
+    pub struct FmtWriteAsIoWrite<'a, W: fmt::Write + ?Sized> {
         pub destination: &'a mut W,
     }
 
-    impl<'a, W: std::fmt::Write + ?Sized> std::io::Write for FmtWriteAsIoWrite<'a, W> {
-        fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+    impl<'a, W: fmt::Write + ?Sized> io::Write for FmtWriteAsIoWrite<'a, W> {
+        fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
             let uft8_string = String::from_utf8_lossy(buf);
 
             self.destination
                 .write_str(&uft8_string)
-                .map_err(|_| std::io::Error::new(std::io::ErrorKind::Other, ""))?;
+                .map_err(|_| io::Error::new(io::ErrorKind::Other, ""))?;
 
             Ok(buf.len())
         }
 
-        fn flush(&mut self) -> std::io::Result<()> {
+        fn flush(&mut self) -> io::Result<()> {
             Ok(())
         }
     }
 }
 
 impl PrintBackend for AriadnePrintBackend {
-    fn write_report_to<W: core::fmt::Write + ?Sized>(
+    fn write_report_to<W: fmt::Write + ?Sized>(
         destination: &mut W,
-        source_id: Option<&str>,
-        source: &str,
+        report_source_id: &SourceId<'_>,
+        sources: SourceMap<'_, '_>,
         report: &Report,
     ) -> Result<(), print::PrintingError> {
-        let source_id = source_id.unwrap_or("Unknown");
+        let source_id = sources.get(report_source_id).unwrap_or(&"Unknown");
 
         let report_kind = report.level.into();
         let mut report_builder =
@@ -51,16 +55,19 @@ impl PrintBackend for AriadnePrintBackend {
         let report = report_builder.finish();
 
         let cache = ariadne::FnCache::new(|id: &&str| {
-            if **id == *source_id {
+            if report_source_id.matches(id) {
+                Ok(sources[report_source_id].to_string())
+            } else if let Some((_, source)) = sources.iter().find(|(src_id, _)| src_id.matches(id))
+            {
                 Ok(source.to_string())
             } else {
-                Err(Box::new("Hello madafaka") as Box<dyn Debug>)
+                todo!()
             }
         });
 
-        let wrapper = utils::FmtWriteAsIoWrite { destination };
+        let mut wrapper = utils::FmtWriteAsIoWrite { destination };
 
-        report.write(cache, wrapper).unwrap();
+        report.write(cache, &mut wrapper).unwrap();
 
         Ok(())
     }

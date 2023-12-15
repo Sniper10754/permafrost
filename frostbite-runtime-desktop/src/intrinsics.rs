@@ -3,9 +3,9 @@ use std::{
     rc::Rc,
 };
 
-use frostbite_runtime::{Runtime, Value};
+use frostbite_runtime::{value::Value, Runtime};
 
-fn print(args: Vec<Rc<Value<'_>>>) -> Value<'_> {
+fn print<'args>(args: &[Rc<Value<'_>>]) -> Value<'args> {
     let mut buf = String::new();
     let mut fmt = Formatter::new(&mut buf);
 

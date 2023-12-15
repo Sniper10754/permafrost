@@ -2,27 +2,31 @@
 
 extern crate alloc;
 
-use alloc::{
-    boxed::Box,
-    rc::Rc,
-    string::{String, ToString},
-    vec,
-    vec::Vec,
-};
+use alloc::{boxed::Box, collections::BTreeMap, rc::Rc, vec, vec::Vec};
 
-use alloc::collections::BTreeMap as HashMap;
+use frostbite_parser::ast::{Expr, Program, Spannable, Spanned};
 
-use frostbite_parser::ast::{tokens::OperatorKind, Expr, Program, Span, Spannable, Spanned};
+use error::InterpretationError;
+use math::evaluate_binary_operation;
+use value::Value;
 
-use derive_more::*;
+pub mod error;
+pub mod value;
 
-mod error;
+mod math;
 
-pub type ExternalFunction<'ast> = dyn Fn(Vec<Rc<Value<'ast>>>) -> Value<'ast>;
+pub type ExternalFunction<'ast> = dyn Fn(&[Rc<Value<'ast>>]) -> Value<'ast>;
+
+pub(crate) type Shared<T> = Rc<T>;
 
 pub struct Runtime<'ast> {
     stack_frames: Vec<StackFrame<'ast>>,
-    intrinsic_functions: HashMap<&'static str, Box<ExternalFunction<'ast>>>,
+    intrinsic_functions: BTreeMap<&'static str, Box<ExternalFunction<'ast>>>,
+}
+
+#[derive(Default)]
+pub struct StackFrame<'ast> {
+    symbols: BTreeMap<&'ast str, Shared<Value<'ast>>>,
 }
 
 impl<'ast> Default for Runtime<'ast> {
@@ -34,8 +38,8 @@ impl<'ast> Default for Runtime<'ast> {
 impl<'ast> Runtime<'ast> {
     pub fn new() -> Self {
         Self {
-            stack_frames: vec![StackFrame::default()],
-            intrinsic_functions: HashMap::new(),
+            stack_frames: [StackFrame::default()].into(),
+            intrinsic_functions: BTreeMap::default(),
         }
     }
 
@@ -58,10 +62,15 @@ impl<'ast> Runtime<'ast> {
         Ok(())
     }
 
-    fn eval(&mut self, expr: &Expr<'ast>) -> Result<Rc<Value<'ast>>, InterpretationError<'ast>> {
+    fn eval(
+        &mut self,
+        expr: &Expr<'ast>,
+    ) -> Result<Shared<Value<'ast>>, InterpretationError<'ast>> {
         match expr {
             Expr::Int(_, int) => Ok(Value::from(*int).into()),
+
             Expr::Float(_, float) => Ok(Value::from(*float).into()),
+
             Expr::Ident(span, symbol) => {
                 find_symbol_from_stack_frames(symbol, &mut self.stack_frames)
                     .map(|(_, value)| value.clone())
@@ -70,12 +79,15 @@ impl<'ast> Runtime<'ast> {
                         symbol,
                     })
             }
-            Expr::String(_, string) => Ok(Value::from(string.to_string()).into()),
+
+            Expr::String(_, string) => Ok(Value::from(*string).into()),
+
             Expr::BinaryOperation { lhs, operator, rhs } => {
                 let (lhs, rhs) = (self.eval(lhs)?, self.eval(rhs)?);
 
                 evaluate_binary_operation(expr.span(), lhs, operator.1, rhs).map(Into::into)
             }
+
             Expr::Assign {
                 lhs,
                 eq_token: _,
@@ -85,7 +97,7 @@ impl<'ast> Runtime<'ast> {
                     let (stack_frame, _) =
                         find_symbol_from_stack_frames(ident, &mut self.stack_frames).ok_or_else(
                             || InterpretationError::SymbolNotFound {
-                                at: expr.span(),
+                                at: lhs.span(),
                                 symbol: ident,
                             },
                         )?;
@@ -97,6 +109,7 @@ impl<'ast> Runtime<'ast> {
 
                 (expr, _) => Err(InterpretationError::CannotAssignTo { at: expr.span() }),
             },
+
             Expr::Function {
                 fn_token: _,
                 name: Spanned(_, name),
@@ -122,6 +135,7 @@ impl<'ast> Runtime<'ast> {
 
                 Ok(Value::Nothing.into())
             }
+
             Expr::Call {
                 callee,
                 lpt: _,
@@ -202,7 +216,7 @@ impl<'ast> Runtime<'ast> {
 
                                 let function = &self.intrinsic_functions[*callee];
 
-                                Ok(function(evaluated_call_arguments).into())
+                                Ok(function(&evaluated_call_arguments).into())
                             } else {
                                 Err(InterpretationError::SymbolNotFound {
                                     at: expr.span(),
@@ -222,7 +236,7 @@ impl<'ast> Runtime<'ast> {
 
     pub fn intrinsic_functions_mut<'hashmap>(
         &'hashmap mut self,
-    ) -> &'hashmap mut HashMap<&'static str, Box<ExternalFunction<'ast>>> {
+    ) -> &'hashmap mut BTreeMap<&'static str, Box<ExternalFunction<'ast>>> {
         &mut self.intrinsic_functions
     }
 }
@@ -230,7 +244,7 @@ impl<'ast> Runtime<'ast> {
 fn find_symbol_from_stack_frames<'ast, 'stack_frame>(
     symbol: &'ast str,
     stack_frames: impl IntoIterator<Item = &'stack_frame mut StackFrame<'ast>>,
-) -> Option<(&'stack_frame mut StackFrame<'ast>, Rc<Value<'ast>>)> {
+) -> Option<(&'stack_frame mut StackFrame<'ast>, Shared<Value<'ast>>)> {
     let stack_frame = stack_frames
         .into_iter()
         .find(|stack_frame| stack_frame.symbols.contains_key(symbol))?;
@@ -238,74 +252,4 @@ fn find_symbol_from_stack_frames<'ast, 'stack_frame>(
     let symbol = stack_frame.symbols[symbol].clone();
 
     Some((stack_frame, symbol))
-}
-
-use Value::*;
-
-use crate::error::InterpretationError;
-
-fn evaluate_binary_operation<'ast>(
-    at: Span,
-    lhs: Rc<Value<'ast>>,
-    operator: OperatorKind,
-    rhs: Rc<Value<'ast>>,
-) -> Result<Value<'ast>, InterpretationError<'static>> {
-    match (&*lhs, operator, &*rhs) {
-        (Int(..), OperatorKind::Div, Int(0)) => Err(InterpretationError::DivisionByZero { at }),
-        (Float(..), OperatorKind::Div, Float(right)) if *right == 0.0 => {
-            Err(InterpretationError::DivisionByZero { at })
-        }
-        (Int(left), op, Int(right)) => Ok(match op {
-            OperatorKind::Add => Int(left + right),
-            OperatorKind::Sub => Int(left - right),
-            OperatorKind::Mul => Int(left * right),
-            OperatorKind::Div => Float(*left as f32 / *right as f32),
-        }),
-        (Float(left), op, Float(right)) => Ok(match op {
-            OperatorKind::Add => Float(left + right),
-            OperatorKind::Sub => Float(left - right),
-            OperatorKind::Mul => Float(left * right),
-            OperatorKind::Div => Float(left / right),
-        }),
-        (lhs @ Int(_) | lhs @ Float(_), op, rhs @ Int(_) | rhs @ Float(_)) => {
-            let left_float = match lhs {
-                Int(val) => *val as f32,
-                Float(val) => *val,
-                _ => unreachable!(),
-            };
-            let right_float = match rhs {
-                Int(val) => *val as f32,
-                Float(val) => *val,
-                _ => unreachable!(),
-            };
-            Ok(match op {
-                OperatorKind::Add => Float(left_float + right_float),
-                OperatorKind::Sub => Float(left_float - right_float),
-                OperatorKind::Mul => Float(left_float * right_float),
-                OperatorKind::Div => Float(left_float / right_float),
-            })
-        }
-        _ => Err(InterpretationError::InvalidOperands { at }),
-    }
-}
-
-#[derive(Default)]
-pub struct StackFrame<'ast> {
-    symbols: HashMap<&'ast str, Rc<Value<'ast>>>,
-}
-
-#[derive(Debug, Clone, derive_more::Display, From)]
-pub enum Value<'tokens> {
-    Int(i32),
-    Float(f32),
-    String(String),
-
-    #[display(fmt = "function")]
-    Function {
-        function_arguments: Vec<&'tokens str>,
-
-        body: Box<Expr<'tokens>>,
-    },
-
-    Nothing,
 }

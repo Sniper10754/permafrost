@@ -5,11 +5,16 @@ use core::fmt::{self, Display, Write};
 
 use derive_more::*;
 
-use crate::Report;
+use crate::{
+    sourcemap::{SourceId, SourceMap},
+    Report,
+};
 
 #[derive(Debug, Display, From)]
 pub enum PrintingError {
     Fmt(core::fmt::Error),
+
+    Other(&'static str),
 }
 
 pub struct ReportPrinter<'output, O: fmt::Write>(&'output mut O);
@@ -23,16 +28,11 @@ impl<'output, O: fmt::Write> ReportPrinter<'output, O> {
     /// May return error if the backend fails writing the report
     pub fn print<B: PrintBackend>(
         self,
-        source_id: Option<impl Display + ToString>,
-        source: impl AsRef<str>,
+        report_source_id: &SourceId<'_>,
+        sources: SourceMap<'_, '_>,
         report: &Report,
     ) -> Result<(), PrintingError> {
-        B::write_report_to(
-            self.0,
-            source_id.map(|string| string.to_string()).as_deref(),
-            source.as_ref(),
-            report,
-        )
+        B::write_report_to(self.0, report_source_id, sources, report)
     }
 }
 
@@ -41,8 +41,8 @@ pub type DefaultPrintBackend = ariadne::AriadnePrintBackend;
 pub trait PrintBackend {
     fn write_report_to<W: Write>(
         destination: &mut W,
-        source_id: Option<&str>,
-        source: &str,
+        report_source_id: &SourceId<'_>,
+        sources: SourceMap<'_, '_>,
         report: &Report,
     ) -> Result<(), PrintingError>;
 }
