@@ -1,6 +1,6 @@
 use core::ops::Index;
 
-use alloc::{borrow::Cow, collections::BTreeMap};
+use alloc::collections::BTreeMap;
 
 /// Map representing a list of pairs composed by source identifiers and source codes
 #[derive(Debug, Default)]

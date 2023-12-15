@@ -1,7 +1,6 @@
 mod ariadne;
 
-use alloc::string::ToString;
-use core::fmt::{self, Display, Write};
+use core::fmt::{self, Write};
 
 use derive_more::*;
 
@@ -39,10 +38,10 @@ impl<'output, O: fmt::Write> ReportPrinter<'output, O> {
 pub type DefaultPrintBackend = ariadne::AriadnePrintBackend;
 
 pub trait PrintBackend {
-    fn write_report_to<'id, 'src, W: Write>(
+    fn write_report_to<'id, W: Write>(
         destination: &mut W,
         report_source_id: SourceId<'id>,
-        sources: &SourceMap<'id, 'src>,
+        sources: &SourceMap<'id, '_>,
         report: &Report,
     ) -> Result<(), PrintingError>;
 }
