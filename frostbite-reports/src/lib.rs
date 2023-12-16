@@ -13,8 +13,8 @@ cfg_if! {
     }
 }
 
-pub mod utils;
 pub mod sourcemap;
+pub mod utils;
 
 use cfg_if::cfg_if;
 
@@ -32,8 +32,8 @@ pub struct Report {
     pub location: Range<usize>,
     pub title: Cow<'static, str>,
     pub description: Option<Cow<'static, str>>,
-    pub infos: Vec<Info>,
-    pub helps: Vec<Help>,
+    pub infos: Vec<Label>,
+    pub helps: Vec<Label>,
 }
 
 impl Report {
@@ -42,8 +42,8 @@ impl Report {
         location: Range<usize>,
         title: impl Into<Cow<'static, str>>,
         description: Option<impl Into<Cow<'static, str>>>,
-        infos: impl IntoIterator<Item = Info>,
-        helps: impl IntoIterator<Item = Help>,
+        infos: impl IntoIterator<Item = Label>,
+        helps: impl IntoIterator<Item = Label>,
     ) -> Self {
         Self {
             level,
@@ -57,37 +57,19 @@ impl Report {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct Info {
+pub struct Label {
     pub info: Cow<'static, str>,
     pub location: Option<Range<usize>>,
 }
 
-impl Info {
+impl Label {
     pub fn new(
         info: impl Into<Cow<'static, str>>,
-        location: Option<impl Into<Range<usize>>>,
+        location: impl Into<Option<Range<usize>>>,
     ) -> Self {
         Self {
             info: info.into(),
-            location: location.map(Into::into),
-        }
-    }
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub struct Help {
-    pub info: Cow<'static, str>,
-    pub location: Option<Range<usize>>,
-}
-
-impl Help {
-    pub fn new(
-        info: impl Into<Cow<'static, str>>,
-        location: Option<impl Into<Range<usize>>>,
-    ) -> Self {
-        Self {
-            info: info.into(),
-            location: location.map(Into::into),
+            location: location.into(),
         }
     }
 }

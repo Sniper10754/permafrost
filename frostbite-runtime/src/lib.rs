@@ -1,23 +1,29 @@
 #![no_std]
 
+extern crate std;
+
 extern crate alloc;
 
-use alloc::{boxed::Box, collections::BTreeMap, rc::Rc, vec, vec::Vec};
+use alloc::{boxed::Box, collections::BTreeMap, vec, vec::Vec};
 
 use frostbite_parser::ast::{Expr, Program, Spannable, Spanned};
 
 use error::InterpretationError;
+use helper::find_symbol_from_stack_frames;
+use internals::Shared;
 use math::evaluate_binary_operation;
 use value::Value;
+
+/// Touch only in case you are working with the runtime internals
+pub mod internals;
 
 pub mod error;
 pub mod value;
 
+mod helper;
 mod math;
 
-pub type ExternalFunction<'ast> = dyn Fn(&[Rc<Value<'ast>>]) -> Value<'ast>;
-
-pub(crate) type Shared<T> = Rc<T>;
+pub type ExternalFunction<'ast> = dyn Fn(&[Shared<Value<'ast>>]) -> Value<'ast>;
 
 pub struct Runtime<'ast> {
     stack_frames: Vec<StackFrame<'ast>>,
@@ -62,7 +68,7 @@ impl<'ast> Runtime<'ast> {
         Ok(())
     }
 
-    fn eval(
+    pub fn eval(
         &mut self,
         expr: &Expr<'ast>,
     ) -> Result<Shared<Value<'ast>>, InterpretationError<'ast>> {
@@ -94,15 +100,17 @@ impl<'ast> Runtime<'ast> {
                 value,
             } => match (&**lhs, self.eval(value)?) {
                 (Expr::Ident(_, ident), value) => {
-                    let (stack_frame, _) =
-                        find_symbol_from_stack_frames(ident, &mut self.stack_frames).ok_or_else(
-                            || InterpretationError::SymbolNotFound {
-                                at: lhs.span(),
-                                symbol: ident,
-                            },
-                        )?;
-
-                    stack_frame.symbols.insert(ident, value);
+                    if let Some((stack_frame, _)) =
+                        find_symbol_from_stack_frames(ident, &mut self.stack_frames)
+                    {
+                        stack_frame.symbols.insert(ident, value);
+                    } else {
+                        self.stack_frames
+                            .first_mut()
+                            .unwrap()
+                            .symbols
+                            .insert(ident, value);
+                    }
 
                     Ok(Value::Nothing.into())
                 }
@@ -239,20 +247,4 @@ impl<'ast> Runtime<'ast> {
     ) -> &'hashmap mut BTreeMap<&'static str, Box<ExternalFunction<'ast>>> {
         &mut self.intrinsic_functions
     }
-}
-
-fn find_symbol_from_stack_frames<'ast, 'stack_frame, I>(
-    symbol: &'ast str,
-    stack_frames: I,
-) -> Option<(&'stack_frame mut StackFrame<'ast>, Shared<Value<'ast>>)>
-where
-    I: IntoIterator<Item = &'stack_frame mut StackFrame<'ast>>,
-{
-    let stack_frame = stack_frames
-        .into_iter()
-        .find(|stack_frame| stack_frame.symbols.contains_key(symbol))?;
-
-    let symbol = stack_frame.symbols[symbol].clone();
-
-    Some((stack_frame, symbol))
 }

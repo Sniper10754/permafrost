@@ -28,10 +28,10 @@ impl<'output, O: fmt::Write> ReportPrinter<'output, O> {
     pub fn print<B: PrintBackend>(
         self,
         report_source_id: SourceId<'_>,
-        sources: &SourceMap<'_, '_>,
+        source_map: &SourceMap<'_, '_>,
         report: &Report,
     ) -> Result<(), PrintingError> {
-        B::write_report_to(self.0, report_source_id, sources, report)
+        B::write_report_to(self.0, report_source_id, source_map, report)
     }
 }
 
@@ -41,7 +41,7 @@ pub trait PrintBackend {
     fn write_report_to<'id, W: Write>(
         destination: &mut W,
         report_source_id: SourceId<'id>,
-        sources: &SourceMap<'id, '_>,
+        source_map: &SourceMap<'id, '_>,
         report: &Report,
     ) -> Result<(), PrintingError>;
 }

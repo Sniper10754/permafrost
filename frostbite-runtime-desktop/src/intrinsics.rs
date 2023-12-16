@@ -1,11 +1,8 @@
-use std::{
-    fmt::{Display, Formatter},
-    rc::Rc,
-};
+use std::fmt::{Display, Formatter};
 
-use frostbite_runtime::{value::Value, Runtime};
+use frostbite_runtime::{internals::Shared, value::Value, Runtime};
 
-fn print<'args>(args: &[Rc<Value<'_>>]) -> Value<'args> {
+fn print<'args>(args: &[Shared<Value<'_>>]) -> Value<'args> {
     let mut buf = String::new();
     let mut fmt = Formatter::new(&mut buf);
 
