@@ -9,7 +9,10 @@ edition = "2021"
 derive_more = { workspace = true }
 cfg-if = { workspace = true }
 
+ariadne = "0.3"
+
 [features]
+printer = ["std"]
 std = []
 
 [lints]

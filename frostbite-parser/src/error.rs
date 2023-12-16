@@ -1,5 +1,7 @@
-use alloc::{format};
-use frostbite_reports::{Help, Info, IntoReport, Level, Location, Report};
+use core::ops::Range;
+
+use alloc::format;
+use frostbite_reports::{IntoReport, Label, Level, Report};
 
 use crate::ast::Span;
 
@@ -24,31 +26,31 @@ impl IntoReport for Error {
         match self {
             Error::UnrecognizedToken { location, expected } => Report::new(
                 Level::Error,
-                Some(location),
-                "Invalid Token",
-                Some("Token in wrong place"),
-                [Info::new(format!("Expected {expected}"), None::<Location>)],
+                location,
+                "Token in invalid position",
+                None::<&str>,
+                [Label::new(format!("Expected {expected}"), None::<Range<_>>)],
                 [],
             ),
             Error::UnrecognizedEof { expected } => Report::new(
                 Level::Error,
-                None::<Location>,
+                Span::default(),
                 "Unexpected EOF",
                 None::<&str>,
                 [],
-                [Help::new(
+                [Label::new(
                     format!("Expected one of: {}", expected.join(", ")),
-                    None::<Location>,
+                    None::<Range<_>>,
                 )],
             ),
             Error::NumberTooBig { span } => Report::new(
                 Level::Error,
-                Some(span),
+                span,
                 "Number is too big",
                 Some("Number is too big to lex"),
-                [Info::new(
+                [Label::new(
                     const_format::formatcp!("Maximum limit is {}", i32::MAX),
-                    None::<Location>,
+                    None::<Range<_>>,
                 )],
                 [],
             ),

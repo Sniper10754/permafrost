@@ -1,4 +1,4 @@
-use std::borrow::Cow;
+use alloc::{borrow::Cow, format};
 
 use frostbite_parser::ast::Span;
 use frostbite_reports::{IntoReport, Level};
@@ -59,6 +59,6 @@ impl<'ast> IntoReport for InterpretationError<'ast> {
             }
         }
 
-        frostbite_reports::Report::new(Level::Error, Some(location), title, description, [], [])
+        frostbite_reports::Report::new(Level::Error, location, title, description, [], [])
     }
 }

@@ -1,11 +1,8 @@
-use std::{
-    fmt::{Display, Formatter},
-    rc::Rc,
-};
+use std::fmt::{Display, Formatter};
 
-use crate::interpreter::{Interpreter, Value};
+use frostbite_runtime::{internals::Shared, value::Value, Runtime};
 
-fn print(args: Vec<Rc<Value<'_>>>) -> Value<'_> {
+fn print<'args>(args: &[Shared<Value<'_>>]) -> Value<'args> {
     let mut buf = String::new();
     let mut fmt = Formatter::new(&mut buf);
 
@@ -22,8 +19,8 @@ fn print(args: Vec<Rc<Value<'_>>>) -> Value<'_> {
     Value::Nothing
 }
 
-pub fn insert_intrinsics(interpreter: &mut Interpreter<'_>) {
-    let intrinsics_functions = interpreter.intrinsic_functions_mut();
+pub fn insert_intrinsics(runtime: &mut Runtime<'_>) {
+    let intrinsics_functions = runtime.intrinsic_functions_mut();
 
     intrinsics_functions.insert("print", Box::new(print));
 }

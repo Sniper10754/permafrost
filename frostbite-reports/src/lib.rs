@@ -2,12 +2,21 @@
 
 extern crate alloc;
 
-pub mod print;
-pub mod print_backend;
-pub mod utils;
-
 use alloc::{borrow::Cow, vec::Vec};
 use core::ops::Range;
+
+cfg_if! {
+    if #[cfg(feature = "std")] {
+        extern crate std;
+
+        pub mod print;
+    }
+}
+
+pub mod sourcemap;
+pub mod utils;
+
+use cfg_if::cfg_if;
 
 use derive_more::*;
 
@@ -20,25 +29,25 @@ pub trait IntoReport {
 #[derive(Debug, Clone, PartialEq)]
 pub struct Report {
     pub level: Level,
-    pub location: Option<Location>,
+    pub location: Range<usize>,
     pub title: Cow<'static, str>,
     pub description: Option<Cow<'static, str>>,
-    pub infos: Vec<Info>,
-    pub helps: Vec<Help>,
+    pub infos: Vec<Label>,
+    pub helps: Vec<Label>,
 }
 
 impl Report {
     pub fn new(
         level: Level,
-        location: Option<impl Into<Location>>,
+        location: Range<usize>,
         title: impl Into<Cow<'static, str>>,
         description: Option<impl Into<Cow<'static, str>>>,
-        infos: impl IntoIterator<Item = Info>,
-        helps: impl IntoIterator<Item = Help>,
+        infos: impl IntoIterator<Item = Label>,
+        helps: impl IntoIterator<Item = Label>,
     ) -> Self {
         Self {
             level,
-            location: location.map(Into::into),
+            location,
             title: title.into(),
             description: description.map(Into::into),
             infos: infos.into_iter().collect(),
@@ -48,31 +57,19 @@ impl Report {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct Info {
+pub struct Label {
     pub info: Cow<'static, str>,
-    pub location: Option<Location>,
+    pub location: Option<Range<usize>>,
 }
 
-impl Info {
-    pub fn new(info: impl Into<Cow<'static, str>>, location: Option<impl Into<Location>>) -> Self {
+impl Label {
+    pub fn new(
+        info: impl Into<Cow<'static, str>>,
+        location: impl Into<Option<Range<usize>>>,
+    ) -> Self {
         Self {
             info: info.into(),
-            location: location.map(Into::into),
-        }
-    }
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub struct Help {
-    pub info: Cow<'static, str>,
-    pub location: Option<Location>,
-}
-
-impl Help {
-    pub fn new(info: impl Into<Cow<'static, str>>, location: Option<impl Into<Location>>) -> Self {
-        Self {
-            info: info.into(),
-            location: location.map(Into::into),
+            location: location.into(),
         }
     }
 }
@@ -82,23 +79,4 @@ pub enum Level {
     Error,
     Warn,
     Info,
-}
-
-#[derive(Debug, Clone, From, PartialEq)]
-pub enum Location {
-    /// A column in the file, may be placed anywhere
-    Column(usize),
-
-    /// a span, consisting of a start column and an end column
-    Span(Range<usize>),
-}
-
-impl Location {
-    /// Returns
-    pub fn start(&self) -> usize {
-        match self {
-            Location::Column(start) => *start,
-            Location::Span(span) => span.start,
-        }
-    }
 }
