@@ -1,12 +1,18 @@
 use core::ops::Range;
 
 use alloc::format;
-use frostbite_reports::{IntoReport, Label, Level, Report};
+use frostbite_reports::{sourcemap::SourceId, IntoReport, Label, Level, Report};
 
 use crate::ast::Span;
 
 #[derive(Debug, Clone, PartialEq)]
-pub enum Error {
+pub struct Error<'id> {
+    pub kind: ErrorKind,
+    pub source_id: SourceId<'id>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum ErrorKind {
     UnrecognizedToken {
         location: Span,
         expected: &'static str,
@@ -19,20 +25,24 @@ pub enum Error {
     },
 }
 
-impl IntoReport for Error {
+impl<'id> IntoReport<'id> for Error<'id> {
     type Arguments = ();
 
-    fn into_report(self, _: Self::Arguments) -> frostbite_reports::Report {
-        match self {
-            Error::UnrecognizedToken { location, expected } => Report::new(
+    fn into_report(self, _: Self::Arguments) -> frostbite_reports::Report<'id> {
+        match self.kind {
+            ErrorKind::UnrecognizedToken { location, expected } => Report::new_diagnostic(
                 Level::Error,
                 location,
                 "Token in invalid position",
                 None::<&str>,
-                [Label::new(format!("Expected {expected}"), None::<Range<_>>)],
+                [Label::new(
+                    format!("Expected {expected}"),
+                    None::<Range<_>>,
+                    self.source_id,
+                )],
                 [],
             ),
-            Error::UnrecognizedEof { expected } => Report::new(
+            ErrorKind::UnrecognizedEof { expected } => Report::new_diagnostic(
                 Level::Error,
                 Span::default(),
                 "Unexpected EOF",
@@ -41,9 +51,10 @@ impl IntoReport for Error {
                 [Label::new(
                     format!("Expected one of: {}", expected.join(", ")),
                     None::<Range<_>>,
+                    self.source_id,
                 )],
             ),
-            Error::NumberTooBig { span } => Report::new(
+            ErrorKind::NumberTooBig { span } => Report::new_diagnostic(
                 Level::Error,
                 span,
                 "Number is too big",
@@ -51,6 +62,7 @@ impl IntoReport for Error {
                 [Label::new(
                     const_format::formatcp!("Maximum limit is {}", i32::MAX),
                     None::<Range<_>>,
+                    self.source_id,
                 )],
                 [],
             ),

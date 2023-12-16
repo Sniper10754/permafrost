@@ -13,10 +13,11 @@ use ast::{
     tokens::{Arrow, Eq, LeftParenthesisToken, Operator, RightParenthesisToken, TypeAnnotation},
     Argument, Expr, Program, Spanned,
 };
-use error::Error;
+use error::ErrorKind;
+use frostbite_reports::sourcemap::SourceId;
 use lexer::{Token, TokenStream};
 
-use crate::ast::tokens::FunctionToken;
+use crate::{ast::tokens::FunctionToken, error::Error};
 
 mod utils {
     #[macro_export]
@@ -25,20 +26,33 @@ mod utils {
             match $parser.token_stream.next() {
                 Some(pattern @ Spanned(_, $token)) => Some(pattern),
                 Some(Spanned(span, _)) => {
-                    $parser.errors.push(Error::UnrecognizedToken {
+                    $parser.errors.push(error!(parser: $parser, ErrorKind::UnrecognizedToken {
                         location: span,
                         expected: $token_description,
-                    });
+                    }));
 
                     None
                 }
                 None => {
-                    $parser.errors.push(Error::UnrecognizedEof {
-                        expected: &[$token_description],
-                    });
+                    $parser.errors.push(error!(
+                        parser: $parser,
+                        ErrorKind::UnrecognizedEof {
+                            expected: &[$token_description],
+                        }
+                    ));
 
                     None
                 }
+            }
+        };
+    }
+
+    #[macro_export]
+    macro_rules! error {
+        (parser: $parser:expr, $kind:expr) => {
+            Error {
+                kind: $kind,
+                source_id: $parser.source_id,
             }
         };
     }
@@ -46,20 +60,22 @@ mod utils {
 
 /// A Backend-agnostic wrapper around lalrpop
 #[derive(Debug)]
-pub struct Parser<'input> {
+pub struct Parser<'input, 'id> {
     token_stream: TokenStream<'input>,
-    errors: Vec<Error>,
+    errors: Vec<Error<'id>>,
+    source_id: SourceId<'id>,
 }
 
-impl<'input> Parser<'input> {
-    pub fn with_tokenstream(token_stream: TokenStream<'input>) -> Self {
+impl<'input, 'id> Parser<'input, 'id> {
+    pub fn with_tokenstream(token_stream: TokenStream<'input>, source_id: SourceId<'id>) -> Self {
         Self {
             token_stream,
             errors: vec![],
+            source_id,
         }
     }
 
-    pub fn parse(mut self) -> Result<Program<'input>, Vec<Error>> {
+    pub fn parse(mut self) -> Result<Program<'input>, Vec<Error<'id>>> {
         let mut exprs = vec![];
 
         while self.token_stream.peek().is_some() {
@@ -99,81 +115,86 @@ impl<'input> Parser<'input> {
     pub fn parse_expr(&mut self) -> Option<Expr<'input>> {
         let mut expression = self.parse_atom_expr()?;
 
-        match self.token_stream.peek() {
-            Some(Spanned(op_span, Token::BinaryOperator(operator))) => {
-                let operator = Operator(op_span.clone(), *operator);
+        loop {
+            match self.token_stream.peek() {
+                Some(Spanned(op_span, Token::BinaryOperator(operator))) => {
+                    let operator = Operator(op_span.clone(), *operator);
 
-                self.token_stream.skip_token();
+                    self.token_stream.skip_token();
 
-                let rhs = self.parse_expr()?;
+                    let rhs = self.parse_expr()?;
 
-                expression = Expr::BinaryOperation {
-                    lhs: Box::new(expression),
-                    operator,
-                    rhs: Box::new(rhs),
-                }
-            }
-
-            Some(Spanned(eq_span, Token::Eq)) => {
-                let eq_token = tokens::Eq(eq_span.clone());
-
-                self.token_stream.skip_token();
-
-                let rhs = self.parse_expr()?;
-
-                expression = Expr::Assign {
-                    lhs: Box::new(expression),
-                    eq_token,
-                    value: Box::new(rhs),
-                }
-            }
-
-            Some(Spanned(_, Token::LParen)) => {
-                let lpt = consume_token!(
-                    parser: self,
-                    token: Token::LParen,
-                    description: "Left pharentesis"
-                )?
-                .0
-                .into();
-
-                let mut arguments = vec![];
-                let rpt;
-
-                loop {
-                    match self.token_stream.peek() {
-                        Some(Spanned(_, Token::Comma)) => {
-                            self.token_stream.skip_token();
-                        }
-                        Some(Spanned(_, Token::RParen)) => {
-                            rpt = consume_token!(
-                                parser: self,
-                                token: Token::RParen,
-                                description: "Right pharentesis"
-                            )?
-                            .0
-                            .into();
-
-                            break;
-                        }
-                        Some(Spanned(_, _)) => {
-                            arguments.push(self.parse_expr()?);
-                        }
-                        None => self.errors.push(Error::UnrecognizedEof {
-                            expected: &["a comma", "an argument"],
-                        }),
+                    expression = Expr::BinaryOperation {
+                        lhs: Box::new(expression),
+                        operator,
+                        rhs: Box::new(rhs),
                     }
                 }
 
-                expression = Expr::Call {
-                    callee: Box::new(expression),
-                    lpt,
-                    arguments,
-                    rpt,
-                }
-            }
+                Some(Spanned(eq_span, Token::Eq)) => {
+                    let eq_token = tokens::Eq(eq_span.clone());
 
-            _ => (),
+                    self.token_stream.skip_token();
+
+                    let rhs = self.parse_expr()?;
+
+                    expression = Expr::Assign {
+                        lhs: Box::new(expression),
+                        eq_token,
+                        value: Box::new(rhs),
+                    }
+                }
+
+                Some(Spanned(_, Token::LParen)) => {
+                    let lpt = consume_token!(
+                        parser: self,
+                        token: Token::LParen,
+                        description: "Left pharentesis"
+                    )?
+                    .0
+                    .into();
+
+                    let mut arguments = vec![];
+                    let rpt;
+
+                    loop {
+                        match self.token_stream.peek() {
+                            Some(Spanned(_, Token::Comma)) => {
+                                self.token_stream.skip_token();
+                            }
+                            Some(Spanned(_, Token::RParen)) => {
+                                rpt = consume_token!(
+                                    parser: self,
+                                    token: Token::RParen,
+                                    description: "Right pharentesis"
+                                )?
+                                .0
+                                .into();
+
+                                break;
+                            }
+                            Some(Spanned(_, _)) => {
+                                arguments.push(self.parse_expr()?);
+                            }
+                            None => {
+                                self.errors
+                                    .push(error!(parser: self, ErrorKind::UnrecognizedEof {
+                                        expected: &["a comma", "an argument"],
+                                    }))
+                            }
+                        }
+                    }
+
+                    expression = Expr::Call {
+                        callee: Box::new(expression),
+                        lpt,
+                        arguments,
+                        rpt,
+                    }
+                }
+
+                _ => break,
+            }
         }
 
         Some(expression)
@@ -187,7 +208,7 @@ impl<'input> Parser<'input> {
             Some(Spanned(span, Token::String(value))) => Some(Expr::String(span, value)),
 
             Some(Spanned(_, Token::LParen)) => {
-                let expr = self.parse_atom_expr()?;
+                let expr = self.parse_expr()?;
 
                 consume_token!(
                     parser: self,
@@ -253,17 +274,19 @@ impl<'input> Parser<'input> {
                         }
                         Some(Spanned(_, Token::Comma)) => continue,
                         Some(Spanned(span, _)) => {
-                            self.errors.push(Error::UnrecognizedToken {
-                                location: span,
-                                expected: "an identifier",
-                            });
+                            self.errors
+                                .push(error!(parser: self, ErrorKind::UnrecognizedToken {
+                                    location: span,
+                                    expected: "an identifier",
+                                }));
 
                             return None;
                         }
                         None => {
-                            self.errors.push(Error::UnrecognizedEof {
-                                expected: &["an identifier"],
-                            });
+                            self.errors
+                                .push(error!(parser: self, ErrorKind::UnrecognizedEof {
+                                    expected: &["an identifier"],
+                                }));
 
                             return None;
                         }
@@ -303,18 +326,20 @@ impl<'input> Parser<'input> {
             }
 
             Some(Spanned(span, _)) => {
-                self.errors.push(Error::UnrecognizedToken {
-                    location: span,
-                    expected: "Expression",
-                });
+                self.errors
+                    .push(error!(parser: self, ErrorKind::UnrecognizedToken {
+                        location: span,
+                        expected: "Expression",
+                    }));
 
                 None
             }
 
             None => {
-                self.errors.push(Error::UnrecognizedEof {
-                    expected: &["an expression"],
-                });
+                self.errors
+                    .push(error!(parser: self, ErrorKind::UnrecognizedEof {
+                        expected: &["an expression"],
+                    }));
 
                 None
             }
@@ -332,17 +357,19 @@ impl<'input> Parser<'input> {
                 Some(Spanned(span, TypeAnnotation::Other(other)))
             }
             Some(Spanned(span, _)) => {
-                self.errors.push(Error::UnrecognizedToken {
-                    location: span,
-                    expected: "A type",
-                });
+                self.errors
+                    .push(error!(parser: self, ErrorKind::UnrecognizedToken {
+                        location: span,
+                        expected: "A type",
+                    }));
 
                 None
             }
             None => {
-                self.errors.push(Error::UnrecognizedEof {
-                    expected: &["type annotation"],
-                });
+                self.errors
+                    .push(error!(parser: self, ErrorKind::UnrecognizedEof {
+                        expected: &["type annotation"],
+                    }));
 
                 None
             }
@@ -370,6 +397,7 @@ mod tests {
             crate::Parser::with_tokenstream(
                 crate::lexer::tokenize($text_to_parse)
                     .expect(alloc::format!("Failed to tokenize `{}`", { $text_to_parse }).as_str()),
+                frostbite_reports::sourcemap::SourceId::Undefined,
             )
         };
     }

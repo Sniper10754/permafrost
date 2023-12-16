@@ -1,9 +1,9 @@
-use std::{dbg, fmt};
+use std::fmt;
 
 use crate::{
-    print,
+    diagnostic_printer,
     sourcemap::{SourceId, SourceMap},
-    Level, Report,
+    Diagnostic, Level,
 };
 
 use self::utils::SourceMapCache;
@@ -13,10 +13,8 @@ use super::PrintBackend;
 pub struct AriadnePrintBackend;
 
 mod utils {
-    use core::fmt::Debug;
-    use std::{fmt, io, string::String};
+    use std::{borrow::ToOwned, boxed::Box, fmt, fmt::Debug, io, string::String};
 
-    use alloc::{borrow::ToOwned, boxed::Box};
     use ariadne::{Cache, FnCache};
 
     use crate::sourcemap::{SourceId, SourceMap};
@@ -83,30 +81,36 @@ impl PrintBackend for AriadnePrintBackend {
         destination: &mut W,
         report_source_id: SourceId<'id>,
         source_map: &SourceMap<'id, '_>,
-        report: &Report,
-    ) -> Result<(), print::PrintingError> {
-        let report_kind = report.level.into();
-        let mut report_builder =
-            ariadne::Report::build(report_kind, report_source_id, dbg!(&report.location).start)
-                .with_message(&report.title);
+        diagnostic: &Diagnostic<'id>,
+    ) -> Result<(), diagnostic_printer::PrintingError> {
+        let Diagnostic {
+            level,
+            location,
+            title,
+            description,
+            infos,
+            helps,
+        } = diagnostic;
 
-        if let Some(desc) = &report.description {
+        let report_kind = (*level).into();
+        let mut report_builder =
+            ariadne::Report::build(report_kind, report_source_id, location.start)
+                .with_message(title);
+
+        if let Some(desc) = &description {
             let mut report_description =
-                ariadne::Label::new((report_source_id, report.location.clone())).with_order(1);
+                ariadne::Label::new((report_source_id, location.clone())).with_order(1);
 
             report_description = report_description.with_message(desc);
 
             report_builder.add_label(report_description);
         }
 
-        for label in Iterator::chain(report.infos.iter(), report.helps.iter()) {
+        for label in Iterator::chain(infos.iter(), helps.iter()) {
             report_builder.add_label(
                 ariadne::Label::new((
                     report_source_id,
-                    label
-                        .location
-                        .clone()
-                        .unwrap_or_else(|| report.location.clone()),
+                    label.span.clone().unwrap_or_else(|| location.clone()),
                 ))
                 .with_message(&label.info),
             );

@@ -1,4 +1,5 @@
+function my_add(x, y) = (x + y) / 2;
 
 x = 5;
 
-print("1 / 6");
+print(my_add(x, 8495));

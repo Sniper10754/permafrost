@@ -49,10 +49,10 @@ pub enum LexerError {
     GenericLexerError,
 }
 
-impl IntoReport for LexerError {
+impl<'id> IntoReport<'id> for LexerError {
     type Arguments = ();
 
-    fn into_report(self, _: Self::Arguments) -> frostbite_reports::Report {
+    fn into_report(self, _: Self::Arguments) -> frostbite_reports::Report<'id> {
         let location;
         let title;
         let description;
@@ -75,7 +75,7 @@ impl IntoReport for LexerError {
             LexerError::GenericLexerError => unreachable!(),
         }
 
-        Report::new(Level::Error, location, title, Some(description), [], [])
+        Report::new_diagnostic(Level::Error, location, title, Some(description), [], [])
     }
 }
 

@@ -27,7 +27,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
             source_map.insert(src_id, &source);
 
-            let ast = match lex_and_parse(&source) {
+            let ast = match lex_and_parse(&source, src_id) {
                 Ok(ast) => ast,
                 Err(reports) => {
                     reports
@@ -42,7 +42,9 @@ fn main() -> Result<(), Box<dyn Error>> {
 
             intrinsics::insert_intrinsics(&mut runtime);
 
-            let interpretation_result = runtime.eval_program(&ast);
+            let thread = runtime.new_thread(src_id);
+
+            
 
             if let Err(error) = interpretation_result {
                 let report = IntoReport::into_report(error, ());

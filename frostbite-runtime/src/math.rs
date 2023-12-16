@@ -4,12 +4,12 @@ use frostbite_parser::ast::{tokens::OperatorKind, Span};
 
 use crate::{error::InterpretationError, Shared};
 
-pub fn evaluate_binary_operation<'ast>(
+pub fn evaluate_binary_operation<'id, 'ast>(
     at: Span,
-    lhs: Shared<Value<'ast>>,
+    lhs: Shared<Value<'id, 'ast>>,
     operator: OperatorKind,
-    rhs: Shared<Value<'ast>>,
-) -> Result<Value<'ast>, InterpretationError<'static>> {
+    rhs: Shared<Value<'id, 'ast>>,
+) -> Result<Value<'id, 'ast>, InterpretationError<'static>> {
     match (&*lhs, operator, &*rhs) {
         (Int(..), OperatorKind::Div, Int(0)) => Err(InterpretationError::DivisionByZero { at }),
         (Float(..), OperatorKind::Div, Float(right)) if *right == 0.0 => {

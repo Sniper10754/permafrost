@@ -1,3 +1,4 @@
+#[cfg(feature = "ariadne")]
 mod ariadne;
 
 use core::fmt::{self, Write};
@@ -6,8 +7,11 @@ use derive_more::*;
 
 use crate::{
     sourcemap::{SourceId, SourceMap},
-    Report,
+    Diagnostic,
 };
+
+#[cfg(feature = "ariadne")]
+pub type DefaultPrintBackend = ariadne::AriadnePrintBackend;
 
 #[derive(Debug, Display, From)]
 pub enum PrintingError {
@@ -16,9 +20,9 @@ pub enum PrintingError {
     Other(&'static str),
 }
 
-pub struct ReportPrinter<'output, O: fmt::Write>(&'output mut O);
+pub struct DiagnosticPrinter<'output, O: fmt::Write>(&'output mut O);
 
-impl<'output, O: fmt::Write> ReportPrinter<'output, O> {
+impl<'output, O: fmt::Write> DiagnosticPrinter<'output, O> {
     pub fn new(output: &'output mut O) -> Self {
         Self(output)
     }
@@ -29,19 +33,17 @@ impl<'output, O: fmt::Write> ReportPrinter<'output, O> {
         self,
         report_source_id: SourceId<'_>,
         source_map: &SourceMap<'_, '_>,
-        report: &Report,
+        report: &Diagnostic<'_>,
     ) -> Result<(), PrintingError> {
         B::write_report_to(self.0, report_source_id, source_map, report)
     }
 }
-
-pub type DefaultPrintBackend = ariadne::AriadnePrintBackend;
 
 pub trait PrintBackend {
     fn write_report_to<'id, W: Write>(
         destination: &mut W,
         report_source_id: SourceId<'id>,
         source_map: &SourceMap<'id, '_>,
-        report: &Report,
+        report: &Diagnostic<'id>,
     ) -> Result<(), PrintingError>;
 }

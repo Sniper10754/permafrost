@@ -4,15 +4,18 @@ extern crate alloc;
 
 use alloc::{borrow::Cow, vec::Vec};
 use core::ops::Range;
+use sourcemap::SourceId;
 
 cfg_if! {
     if #[cfg(feature = "std")] {
         extern crate std;
 
-        pub mod print;
     }
 }
 
+pub mod backtrace_printer;
+#[cfg(feature = "diagnostic_printer")]
+pub mod diagnostic_printer;
 pub mod sourcemap;
 pub mod utils;
 
@@ -20,56 +23,77 @@ use cfg_if::cfg_if;
 
 use derive_more::*;
 
-pub trait IntoReport {
+pub trait IntoReport<'id> {
     type Arguments;
 
-    fn into_report(self, arguments: Self::Arguments) -> Report;
+    fn into_report(self, arguments: Self::Arguments) -> Report<'id>;
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct Report {
-    pub level: Level,
-    pub location: Range<usize>,
-    pub title: Cow<'static, str>,
-    pub description: Option<Cow<'static, str>>,
-    pub infos: Vec<Label>,
-    pub helps: Vec<Label>,
+pub enum Report<'id> {
+    Diagnostic(Diagnostic<'id>),
+    Backtrace(Backtrace<'id>),
 }
 
-impl Report {
-    pub fn new(
+impl<'id> Report<'id> {
+    pub fn new_diagnostic(
         level: Level,
         location: Range<usize>,
         title: impl Into<Cow<'static, str>>,
         description: Option<impl Into<Cow<'static, str>>>,
-        infos: impl IntoIterator<Item = Label>,
-        helps: impl IntoIterator<Item = Label>,
+        infos: impl IntoIterator<Item = Label<'id>>,
+        helps: impl IntoIterator<Item = Label<'id>>,
     ) -> Self {
-        Self {
+        Self::Diagnostic(Diagnostic {
             level,
             location,
             title: title.into(),
             description: description.map(Into::into),
             infos: infos.into_iter().collect(),
             helps: helps.into_iter().collect(),
-        }
+        })
+    }
+
+    pub fn new_backtrace(
+        reason: impl Into<Cow<'static, str>>,
+        message: impl Into<Cow<'static, str>>,
+        frames: Vec<Frame<'id>>,
+    ) -> Self {
+        Self::Backtrace(Backtrace {
+            reason: reason.into(),
+            message: message.into(),
+            frames,
+        })
     }
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct Label {
-    pub info: Cow<'static, str>,
-    pub location: Option<Range<usize>>,
+pub struct Diagnostic<'id> {
+    level: Level,
+    location: Range<usize>,
+    title: Cow<'static, str>,
+    description: Option<Cow<'static, str>>,
+    infos: Vec<Label<'id>>,
+    helps: Vec<Label<'id>>,
 }
 
-impl Label {
+#[derive(Debug, Clone, PartialEq)]
+pub struct Label<'id> {
+    pub info: Cow<'static, str>,
+    pub span: Option<Range<usize>>,
+    pub src_id: SourceId<'id>,
+}
+
+impl<'id> Label<'id> {
     pub fn new(
         info: impl Into<Cow<'static, str>>,
         location: impl Into<Option<Range<usize>>>,
+        src_id: impl Into<SourceId<'id>>,
     ) -> Self {
         Self {
             info: info.into(),
-            location: location.into(),
+            span: location.into(),
+            src_id: src_id.into(),
         }
     }
 }
@@ -79,4 +103,23 @@ pub enum Level {
     Error,
     Warn,
     Info,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct Backtrace<'id> {
+    pub reason: Cow<'static, str>,
+    pub message: Cow<'static, str>,
+    pub frames: Vec<Frame<'id>>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct Frame<'id> {
+    pub source_id: SourceId<'id>,
+    pub position: Option<Position>,
+}
+
+#[derive(Debug, Clone, Hash, PartialEq, Eq, derive_more::From)]
+pub enum Position {
+    Span(Range<usize>),
+    Line(usize),
 }

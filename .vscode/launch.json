@@ -18,6 +18,7 @@
             },
             "args": ["run", "examples/math.fsb"],
             "cwd": "${workspaceFolder}"
+            
         }
     ]
 }

@@ -9,10 +9,11 @@ edition = "2021"
 derive_more = { workspace = true }
 cfg-if = { workspace = true }
 
-ariadne = "0.3"
+ariadne = { version = "0.3", optional = true }
 
 [features]
-printer = ["std"]
+ariadne = ["std", "dep:ariadne", "diagnostic_printer"]
+diagnostic_printer = []
 std = []
 
 [lints]

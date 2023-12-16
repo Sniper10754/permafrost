@@ -12,10 +12,10 @@ pub enum InterpretationError<'ast> {
     CannotCallNonFunctionValue { at: Span },
 }
 
-impl<'ast> IntoReport for InterpretationError<'ast> {
+impl<'id, 'ast> IntoReport<'id> for InterpretationError<'ast> {
     type Arguments = ();
 
-    fn into_report(self, _arguments: Self::Arguments) -> frostbite_reports::Report {
+    fn into_report(self, _arguments: Self::Arguments) -> frostbite_reports::Report<'id> {
         let location;
         let title;
         let description: Option<Cow<'_, _>>;
@@ -59,6 +59,13 @@ impl<'ast> IntoReport for InterpretationError<'ast> {
             }
         }
 
-        frostbite_reports::Report::new(Level::Error, location, title, description, [], [])
+        frostbite_reports::Report::new_diagnostic(
+            Level::Error,
+            location,
+            title,
+            description,
+            [],
+            [],
+        )
     }
 }
