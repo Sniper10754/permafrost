@@ -1,4 +1,4 @@
-use alloc::{format, vec};
+use alloc::{format};
 use frostbite_reports::{Help, Info, IntoReport, Level, Location, Report};
 
 use crate::ast::Span;
