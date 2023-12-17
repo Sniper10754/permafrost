@@ -13,6 +13,9 @@ use crate::{
 #[cfg(feature = "ariadne")]
 pub type DefaultPrintBackend = ariadne::AriadnePrintBackend;
 
+#[cfg(not(any(feature = "ariadne")))]
+compile_error!("No backend selected");
+
 #[derive(Debug, Display, From)]
 pub enum PrintingError {
     Fmt(core::fmt::Error),
