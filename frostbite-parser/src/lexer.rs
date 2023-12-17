@@ -31,6 +31,12 @@ mod helpers {
             _ => unreachable!("Caller must guarantee that the current slice of text is a operator"),
         }
     }
+
+    pub fn unquote_str<'input>(lexer: &Lexer<'input, Token<'input>>) -> &'input str {
+        let input = lexer.slice();
+
+        &input[1..(input.len() - 1)]
+    }
 }
 
 pub type SpannedToken<'a> = Spanned<Token<'a>>;
@@ -92,7 +98,7 @@ pub enum Token<'input> {
     #[regex("[a-zA-Z]([a-zA-Z0-9]|_)*")]
     Ident(&'input str),
 
-    #[regex(r#""(\\[\\"]|[^"])*""#)]
+    #[regex(r#""(\\[\\"]|[^"])*""#, helpers::unquote_str)]
     String(&'input str),
 
     #[token("(")]
@@ -164,10 +170,13 @@ impl<'input> TokenStream<'input> {
         taken_tokens
     }
 
+    #[allow(clippy::should_implement_trait)]
     pub fn next(&mut self) -> Option<SpannedToken<'input>> {
         if self.index < self.tokens.len() {
             let token = self.tokens[self.index].clone();
+
             self.index += 1;
+
             Some(token)
         } else {
             None
