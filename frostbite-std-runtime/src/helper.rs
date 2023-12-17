@@ -25,11 +25,7 @@ pub fn lex_and_parse<'ast, 'id>(
     })
 }
 
-pub fn print_report(
-    _report_source_id: SourceId<'_>,
-    sources: &SourceMap<'_, '_>,
-    report: &Report<'_>,
-) {
+pub fn print_report(sources: &SourceMap<'_, '_>, report: &Report<'_>) {
     let mut buf = String::new();
 
     match report {

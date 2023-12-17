@@ -28,6 +28,12 @@ impl<'id, 'src> StdRuntime<'id, 'src> {
     }
 }
 
+impl<'id, 'src> Default for StdRuntime<'id, 'src> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 fn main() -> Result<(), Box<dyn Error>> {
     let args = cli::CliArgs::parse();
 
@@ -44,9 +50,9 @@ fn main() -> Result<(), Box<dyn Error>> {
             let ast = match lex_and_parse(&source, main_src_id) {
                 Ok(ast) => ast,
                 Err(reports) => {
-                    reports.into_iter().for_each(|report| {
-                        print_report(main_src_id, &std_runtime.source_map, &report)
-                    });
+                    reports
+                        .into_iter()
+                        .for_each(|report| print_report(&std_runtime.source_map, &report));
 
                     exit(1);
                 }
@@ -63,7 +69,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             if let Err(error) = interpretation_result {
                 let report = IntoReport::into_report(error, main_src_id);
 
-                print_report(main_src_id, &std_runtime.source_map, &report);
+                print_report(&std_runtime.source_map, &report);
 
                 exit(1);
             }
