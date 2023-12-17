@@ -26,7 +26,7 @@ pub fn lex_and_parse<'ast, 'id>(
 }
 
 pub fn print_report(
-    report_source_id: SourceId<'_>,
+    _report_source_id: SourceId<'_>,
     sources: &SourceMap<'_, '_>,
     report: &Report<'_>,
 ) {
