@@ -35,7 +35,7 @@ pub fn print_report(
     match report {
         Report::Diagnostic(diagnostic) => {
             DiagnosticPrinter::new(&mut buf)
-                .print::<DefaultPrintBackend>(report_source_id, sources, diagnostic)
+                .print::<DefaultPrintBackend>(sources, diagnostic)
                 .unwrap();
         }
         Report::Backtrace(_) => todo!(),
