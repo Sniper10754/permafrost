@@ -4,58 +4,78 @@ extern crate std;
 
 extern crate alloc;
 
-use alloc::{boxed::Box, vec, vec::Vec};
+use alloc::rc::Rc;
 
+use error::InterpretationError;
+use eval::Sandbox;
+use frostbite_parser::ast::{Expr, Program};
 use frostbite_reports::sourcemap::SourceId;
 use internals::Shared;
 use intrinsic::IntrinsicContext;
 use stack::StackFrame;
-use thread::{RuntimeThread, ThreadBackend, ThreadJoinHandle};
 use value::Value;
 
 /// Touch only in case you are working with the runtime internals
 pub mod internals;
+
+/// Touch only in case you are working with the runtime internals
+pub mod intrinsic;
 
 pub mod error;
 pub mod value;
 
 mod eval;
 mod helper;
-mod intrinsic;
 mod math;
 mod stack;
-mod thread;
 
-pub type ExternalFunction<'id, 'ast> = dyn Fn(&[Shared<Value<'id, 'ast>>]) -> Value<'id, 'ast>;
+pub type ExternalFunction<'id, 'ast> = Rc<dyn Fn(&[Shared<Value<'id, 'ast>>]) -> Value<'id, 'ast>>;
 
-pub struct Runtime<'itself, 'id, 'ast> {
-    threads: Vec<RuntimeThread<'itself, 'id, 'ast>>,
-    intrinsic_ctx: IntrinsicContext<'id, 'ast>,
-    thread_backend: Box<dyn ThreadBackend<BackendJoinHandle = Box<dyn ThreadJoinHandle>>>,
+pub struct Runtime<'id, 'ast> {
+    sandbox: Sandbox<'id, 'ast>,
 }
 
-impl<'itself, 'id, 'ast> Default for Runtime<'itself, 'id, 'ast> {
+impl<'id, 'ast> Default for Runtime<'id, 'ast> {
     fn default() -> Self {
-        Self::new()
+        Self::new(SourceId::Undefined)
     }
 }
 
-impl<'itself, 'id, 'ast> Runtime<'itself, 'id, 'ast> {
-    pub fn new() -> Self {
+impl<'id, 'ast> Runtime<'id, 'ast> {
+    pub fn new(source_id: SourceId<'id>) -> Self {
+        let intrinsic_ctx = Rc::new(IntrinsicContext::new());
+
         Self {
-            threads: vec![],
-            intrinsic_ctx: IntrinsicContext::new(),
-            thread_backend: Box::new(thread::DefaultThreadBackend::new()),
+            sandbox: Sandbox::new(source_id, intrinsic_ctx),
         }
     }
 
-    pub fn run(&self, source_id: SourceId<'id>) -> Box<dyn ThreadJoinHandle> {
-        let runtime_thread = RuntimeThread::new(&self, source_id, &self.intrinsic_ctx);
+    pub fn with_intrinsic_ctx(
+        source_id: SourceId<'id>,
+        intrinsic_ctx: IntrinsicContext<'id, 'ast>,
+    ) -> Self {
+        let intrinsic_ctx = Rc::new(intrinsic_ctx);
 
-        self.thread_backend.spawn_thread(runtime_thread)
+        Self {
+            sandbox: Sandbox::new(source_id, intrinsic_ctx),
+        }
     }
 
-    pub fn intrinsic_ctx<'ctx>(&'ctx mut self) -> &'ctx mut IntrinsicContext<'id, 'ast> {
-        &mut self.intrinsic_ctx
+    pub fn eval_ast_expr(
+        &mut self,
+        ast_node: &Expr<'ast>,
+    ) -> Result<Shared<Value<'id, 'ast>>, InterpretationError<'ast>> {
+        self.sandbox.eval(ast_node)
+    }
+
+    pub fn eval_ast_tree(
+        &mut self,
+        ast_tree: &Program<'ast>,
+    ) -> Result<(), InterpretationError<'ast>> {
+        for node in ast_tree.exprs.iter() {
+            self.eval_ast_expr(node)?;
+        }
+
+        Ok(())
     }
 }

@@ -1,10 +1,16 @@
-use alloc::{collections::BTreeMap, vec::Vec};
+use alloc::{collections::BTreeMap, vec, vec::Vec};
 use frostbite_reports::sourcemap::SourceId;
 
 use crate::{internals::Shared, value::Value};
 
-#[derive(Debug, Clone, Default, derive_more::Deref, derive_more::DerefMut)]
+#[derive(Debug, Clone, derive_more::Deref, derive_more::DerefMut)]
 pub struct Stack<'id, 'ast>(Vec<StackFrame<'id, 'ast>>);
+
+impl<'id, 'ast> Default for Stack<'id, 'ast> {
+    fn default() -> Self {
+        Self(vec![StackFrame::new(SourceId::Undefined, None)])
+    }
+}
 
 impl<'id, 'ast, T: IntoIterator<Item = StackFrame<'id, 'ast>>> From<T> for Stack<'id, 'ast> {
     fn from(value: T) -> Self {

@@ -19,6 +19,7 @@ pub enum ErrorKind {
     },
     UnrecognizedEof {
         expected: &'static [&'static str],
+        previous_element_span: Span,
     },
     NumberTooBig {
         span: Span,
@@ -42,9 +43,12 @@ impl<'id> IntoReport<'id> for Error<'id> {
                 )],
                 [],
             ),
-            ErrorKind::UnrecognizedEof { expected } => Report::new_diagnostic(
+            ErrorKind::UnrecognizedEof {
+                expected,
+                previous_element_span,
+            } => Report::new_diagnostic(
                 Level::Error,
-                Span::default(),
+                previous_element_span,
                 "Unexpected EOF",
                 None::<&str>,
                 [],

@@ -1,4 +1,5 @@
-use alloc::{boxed::Box, collections::BTreeMap, vec};
+use alloc::{rc::Rc, vec};
+
 use frostbite_parser::ast::{Expr, Spannable, Spanned};
 use frostbite_reports::sourcemap::SourceId;
 
@@ -10,19 +11,18 @@ use crate::{
     math::evaluate_binary_operation,
     stack::{Stack, StackFrame},
     value::Value,
-    ExternalFunction,
 };
 
-pub struct Sandbox<'intrinsic_ctx, 'id, 'ast> {
+pub struct Sandbox<'id, 'ast> {
     main_file_source_id: SourceId<'id>,
     stack: Stack<'id, 'ast>,
-    intrinsic_ctx: &'intrinsic_ctx IntrinsicContext<'id, 'ast>,
+    intrinsic_ctx: Rc<IntrinsicContext<'id, 'ast>>,
 }
 
-impl<'intrinsic_ctx, 'id, 'ast> Sandbox<'intrinsic_ctx, 'id, 'ast> {
+impl<'id, 'ast> Sandbox<'id, 'ast> {
     pub fn new(
         main_file_source_id: SourceId<'id>,
-        intrinsic_ctx: &'intrinsic_ctx IntrinsicContext<'id, 'ast>,
+        intrinsic_ctx: Rc<IntrinsicContext<'id, 'ast>>,
     ) -> Self {
         Self {
             main_file_source_id,
