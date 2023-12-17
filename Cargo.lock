@@ -200,7 +200,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "frostbite-runtime-desktop"
+name = "frostbite-std-runtime"
 version = "0.1.0"
 dependencies = [
  "clap",

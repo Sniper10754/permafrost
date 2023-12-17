@@ -11,7 +11,7 @@ pub fn lex_and_parse<'ast, 'id>(
 ) -> Result<Program<'ast>, Vec<Report<'id>>> {
     let token_stream = tokenize(content).map_err(|err| {
         err.into_iter()
-            .map(|err| err.into_report(()))
+            .map(|err| err.into_report(source_id))
             .collect::<Vec<_>>()
     })?;
 

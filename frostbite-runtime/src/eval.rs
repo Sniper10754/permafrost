@@ -201,4 +201,12 @@ impl<'id, 'ast> Sandbox<'id, 'ast> {
             Expr::Poisoned => unreachable!(),
         }
     }
+
+    pub fn main_file_source_id(&self) -> SourceId<'_> {
+        self.main_file_source_id
+    }
+
+    pub fn main_file_source_id_mut(&mut self) -> &mut SourceId<'id> {
+        &mut self.main_file_source_id
+    }
 }

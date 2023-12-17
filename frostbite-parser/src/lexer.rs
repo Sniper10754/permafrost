@@ -1,6 +1,6 @@
 use alloc::{collections::VecDeque, vec, vec::Vec};
 
-use frostbite_reports::{IntoReport, Level, Report};
+use frostbite_reports::{sourcemap::SourceId, IntoReport, Level, Report};
 use logos::{Logos, Span};
 
 use crate::ast::{tokens::OperatorKind, Spanned};
@@ -56,9 +56,9 @@ pub enum LexerError {
 }
 
 impl<'id> IntoReport<'id> for LexerError {
-    type Arguments = ();
+    type Arguments = SourceId<'id>;
 
-    fn into_report(self, _: Self::Arguments) -> frostbite_reports::Report<'id> {
+    fn into_report(self, src_id: Self::Arguments) -> frostbite_reports::Report<'id> {
         let location;
         let title;
         let description;
@@ -81,7 +81,15 @@ impl<'id> IntoReport<'id> for LexerError {
             LexerError::GenericLexerError => unreachable!(),
         }
 
-        Report::new_diagnostic(Level::Error, location, title, Some(description), [], [])
+        Report::new_diagnostic(
+            Level::Error,
+            location,
+            src_id,
+            title,
+            Some(description),
+            [],
+            [],
+        )
     }
 }
 

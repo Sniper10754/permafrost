@@ -1,5 +1,5 @@
 [package]
-name = "frostbite-runtime-desktop"
+name = "frostbite-std-runtime"
 version.workspace = true
 edition.workspace = true
 

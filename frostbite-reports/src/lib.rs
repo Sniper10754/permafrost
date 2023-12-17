@@ -39,6 +39,7 @@ impl<'id> Report<'id> {
     pub fn new_diagnostic(
         level: Level,
         location: Range<usize>,
+        source_id: impl Into<SourceId<'id>>,
         title: impl Into<Cow<'static, str>>,
         description: Option<impl Into<Cow<'static, str>>>,
         infos: impl IntoIterator<Item = Label<'id>>,
@@ -46,7 +47,8 @@ impl<'id> Report<'id> {
     ) -> Self {
         Self::Diagnostic(Diagnostic {
             level,
-            location,
+            span: location,
+            source_id: source_id.into(),
             title: title.into(),
             description: description.map(Into::into),
             infos: infos.into_iter().collect(),
@@ -70,7 +72,8 @@ impl<'id> Report<'id> {
 #[derive(Debug, Clone, PartialEq)]
 pub struct Diagnostic<'id> {
     level: Level,
-    location: Range<usize>,
+    span: Range<usize>,
+    source_id: SourceId<'id>,
     title: Cow<'static, str>,
     description: Option<Cow<'static, str>>,
     infos: Vec<Label<'id>>,

@@ -37,27 +37,24 @@ pub struct Runtime<'id, 'ast> {
 
 impl<'id, 'ast> Default for Runtime<'id, 'ast> {
     fn default() -> Self {
-        Self::new(SourceId::Undefined)
+        Self::new()
     }
 }
 
 impl<'id, 'ast> Runtime<'id, 'ast> {
-    pub fn new(source_id: SourceId<'id>) -> Self {
+    pub fn new() -> Self {
         let intrinsic_ctx = Rc::new(IntrinsicContext::new());
 
         Self {
-            sandbox: Sandbox::new(source_id, intrinsic_ctx),
+            sandbox: Sandbox::new(SourceId::Undefined, intrinsic_ctx),
         }
     }
 
-    pub fn with_intrinsic_ctx(
-        source_id: SourceId<'id>,
-        intrinsic_ctx: IntrinsicContext<'id, 'ast>,
-    ) -> Self {
+    pub fn with_intrinsic_ctx(intrinsic_ctx: IntrinsicContext<'id, 'ast>) -> Self {
         let intrinsic_ctx = Rc::new(intrinsic_ctx);
 
         Self {
-            sandbox: Sandbox::new(source_id, intrinsic_ctx),
+            sandbox: Sandbox::new(SourceId::Undefined, intrinsic_ctx),
         }
     }
 
@@ -77,5 +74,13 @@ impl<'id, 'ast> Runtime<'id, 'ast> {
         }
 
         Ok(())
+    }
+
+    pub fn sandbox(&self) -> &Sandbox<'id, 'ast> {
+        &self.sandbox
+    }
+
+    pub fn sandbox_mut(&mut self) -> &mut Sandbox<'id, 'ast> {
+        &mut self.sandbox
     }
 }

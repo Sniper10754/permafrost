@@ -27,7 +27,7 @@ mod utils {
                 Some(pattern @ Spanned(_, $token)) => Some(pattern),
                 Some(Spanned(span, _)) => {
                     $parser.errors.push(error!(parser: $parser, ErrorKind::UnrecognizedToken {
-                        location: span,
+                        span,
                         expected: $token_description,
                     }));
 
@@ -277,7 +277,7 @@ impl<'input, 'id> Parser<'input, 'id> {
                         Some(Spanned(span, _)) => {
                             self.errors
                                 .push(error!(parser: self, ErrorKind::UnrecognizedToken {
-                                    location: span,
+                                    span: span,
                                     expected: "an identifier",
                                 }));
 
@@ -330,7 +330,7 @@ impl<'input, 'id> Parser<'input, 'id> {
             Some(Spanned(span, _)) => {
                 self.errors
                     .push(error!(parser: self, ErrorKind::UnrecognizedToken {
-                        location: span,
+                        span: span,
                         expected: "Expression",
                     }));
 
@@ -362,7 +362,7 @@ impl<'input, 'id> Parser<'input, 'id> {
             Some(Spanned(span, _)) => {
                 self.errors
                     .push(error!(parser: self, ErrorKind::UnrecognizedToken {
-                        location: span,
+                        span: span,
                         expected: "A type",
 
                     }));
