@@ -1,3 +1,7 @@
+x = 6;
 
-print()
-print("The unity will bring about the master race");
+y = 2 * x;
+
+z = x * 10 * y * 2;
+
+print(z);
