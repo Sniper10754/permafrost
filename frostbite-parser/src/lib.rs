@@ -277,7 +277,7 @@ impl<'input, 'id> Parser<'input, 'id> {
                         Some(Spanned(span, _)) => {
                             self.errors
                                 .push(error!(parser: self, ErrorKind::UnrecognizedToken {
-                                    span: span,
+                                    span,
                                     expected: "an identifier",
                                 }));
 
@@ -330,7 +330,7 @@ impl<'input, 'id> Parser<'input, 'id> {
             Some(Spanned(span, _)) => {
                 self.errors
                     .push(error!(parser: self, ErrorKind::UnrecognizedToken {
-                        span: span,
+                        span,
                         expected: "Expression",
                     }));
 
@@ -360,21 +360,24 @@ impl<'input, 'id> Parser<'input, 'id> {
                 Some(Spanned(span, TypeAnnotation::Other(other)))
             }
             Some(Spanned(span, _)) => {
-                self.errors
-                    .push(error!(parser: self, ErrorKind::UnrecognizedToken {
-                        span: span,
+                self.errors.push(error!(
+                    parser: self,
+                    ErrorKind::UnrecognizedToken {
+                        span,
                         expected: "A type",
-
-                    }));
+                    }
+                ));
 
                 None
             }
             None => {
-                self.errors
-                    .push(error!(parser: self, ErrorKind::UnrecognizedEof {
+                self.errors.push(error!(
+                    parser: self,
+                    ErrorKind::UnrecognizedEof {
                         expected: &["type annotation"],
                         previous_element_span: self.token_stream.previous().unwrap().0.clone(),
-                    }));
+                    }
+                ));
 
                 None
             }
