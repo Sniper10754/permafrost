@@ -11,7 +11,7 @@ pub fn lex_and_parse<'ast, 'id>(
 ) -> Result<Program<'ast>, Vec<Report<'id>>> {
     let token_stream = tokenize(content).map_err(|err| {
         err.into_iter()
-            .map(|err| err.into_report(()))
+            .map(|err| err.into_report(source_id))
             .collect::<Vec<_>>()
     })?;
 
@@ -25,17 +25,13 @@ pub fn lex_and_parse<'ast, 'id>(
     })
 }
 
-pub fn print_report(
-    report_source_id: SourceId<'_>,
-    sources: &SourceMap<'_, '_>,
-    report: &Report<'_>,
-) {
+pub fn print_report(sources: &SourceMap<'_, '_>, report: &Report<'_>) {
     let mut buf = String::new();
 
     match report {
         Report::Diagnostic(diagnostic) => {
             DiagnosticPrinter::new(&mut buf)
-                .print::<DefaultPrintBackend>(report_source_id, sources, diagnostic)
+                .print::<DefaultPrintBackend>(sources, diagnostic)
                 .unwrap();
         }
         Report::Backtrace(_) => todo!(),

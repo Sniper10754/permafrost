@@ -1,10 +1,6 @@
 use std::fmt;
 
-use crate::{
-    diagnostic_printer,
-    sourcemap::{SourceId, SourceMap},
-    Diagnostic, Level,
-};
+use crate::{diagnostic_printer, sourcemap::SourceMap, Diagnostic, Level};
 
 use self::utils::SourceMapCache;
 
@@ -79,27 +75,28 @@ mod utils {
 impl PrintBackend for AriadnePrintBackend {
     fn write_report_to<'id, W: fmt::Write + ?Sized>(
         destination: &mut W,
-        report_source_id: SourceId<'id>,
         source_map: &SourceMap<'id, '_>,
         diagnostic: &Diagnostic<'id>,
     ) -> Result<(), diagnostic_printer::PrintingError> {
         let Diagnostic {
             level,
-            location,
+            span,
+            source_id,
             title,
             description,
             infos,
             helps,
         } = diagnostic;
 
+        let report_source_id = *source_id;
+
         let report_kind = (*level).into();
         let mut report_builder =
-            ariadne::Report::build(report_kind, report_source_id, location.start)
-                .with_message(title);
+            ariadne::Report::build(report_kind, report_source_id, span.start).with_message(title);
 
         if let Some(desc) = &description {
             let mut report_description =
-                ariadne::Label::new((report_source_id, location.clone())).with_order(1);
+                ariadne::Label::new((report_source_id, span.clone())).with_order(1);
 
             report_description = report_description.with_message(desc);
 
@@ -110,7 +107,7 @@ impl PrintBackend for AriadnePrintBackend {
             report_builder.add_label(
                 ariadne::Label::new((
                     report_source_id,
-                    label.span.clone().unwrap_or_else(|| location.clone()),
+                    label.span.clone().unwrap_or_else(|| span.clone()),
                 ))
                 .with_message(&label.info),
             );

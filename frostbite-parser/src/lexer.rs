@@ -1,6 +1,6 @@
 use alloc::{collections::VecDeque, vec, vec::Vec};
 
-use frostbite_reports::{IntoReport, Level, Report};
+use frostbite_reports::{sourcemap::SourceId, IntoReport, Level, Report};
 use logos::{Logos, Span};
 
 use crate::ast::{tokens::OperatorKind, Spanned};
@@ -31,6 +31,12 @@ mod helpers {
             _ => unreachable!("Caller must guarantee that the current slice of text is a operator"),
         }
     }
+
+    pub fn unquote_str<'input>(lexer: &Lexer<'input, Token<'input>>) -> &'input str {
+        let input = lexer.slice();
+
+        &input[1..(input.len() - 1)]
+    }
 }
 
 pub type SpannedToken<'a> = Spanned<Token<'a>>;
@@ -50,9 +56,9 @@ pub enum LexerError {
 }
 
 impl<'id> IntoReport<'id> for LexerError {
-    type Arguments = ();
+    type Arguments = SourceId<'id>;
 
-    fn into_report(self, _: Self::Arguments) -> frostbite_reports::Report<'id> {
+    fn into_report(self, src_id: Self::Arguments) -> frostbite_reports::Report<'id> {
         let location;
         let title;
         let description;
@@ -75,7 +81,15 @@ impl<'id> IntoReport<'id> for LexerError {
             LexerError::GenericLexerError => unreachable!(),
         }
 
-        Report::new_diagnostic(Level::Error, location, title, Some(description), [], [])
+        Report::new_diagnostic(
+            Level::Error,
+            location,
+            src_id,
+            title,
+            Some(description),
+            [],
+            [],
+        )
     }
 }
 
@@ -92,7 +106,7 @@ pub enum Token<'input> {
     #[regex("[a-zA-Z]([a-zA-Z0-9]|_)*")]
     Ident(&'input str),
 
-    #[regex(r#""(\\[\\"]|[^"])*""#)]
+    #[regex(r#""(\\[\\"]|[^"])*""#, helpers::unquote_str)]
     String(&'input str),
 
     #[token("(")]
@@ -129,19 +143,18 @@ pub enum Token<'input> {
 #[derive(Debug, Clone)]
 pub struct TokenStream<'input> {
     tokens: VecDeque<SpannedToken<'input>>,
+    index: usize,
 }
 
 impl<'input> TokenStream<'input> {
     pub fn with_vec_deque(tokens: impl Into<VecDeque<SpannedToken<'input>>>) -> Self {
-        Self {
-            tokens: tokens.into(),
-        }
+        let tokens = tokens.into();
+        Self { tokens, index: 0 }
     }
 
     pub fn with_iter(tokens: impl IntoIterator<Item = SpannedToken<'input>>) -> Self {
-        Self {
-            tokens: tokens.into_iter().collect(),
-        }
+        let tokens = tokens.into_iter().collect::<VecDeque<_>>();
+        Self { tokens, index: 0 }
     }
 
     pub fn skip_token(&mut self) -> Option<SpannedToken<'input>> {
@@ -155,9 +168,10 @@ impl<'input> TokenStream<'input> {
         let mut taken_tokens = vec![];
 
         for _ in 0..count {
-            match stream.next() {
-                Some(token) => taken_tokens.push(token),
-                None => break,
+            if let Some(token) = stream.next() {
+                taken_tokens.push(token);
+            } else {
+                break;
             }
         }
 
@@ -166,11 +180,19 @@ impl<'input> TokenStream<'input> {
 
     #[allow(clippy::should_implement_trait)]
     pub fn next(&mut self) -> Option<SpannedToken<'input>> {
-        self.tokens.pop_front()
+        if self.index < self.tokens.len() {
+            let token = self.tokens[self.index].clone();
+
+            self.index += 1;
+
+            Some(token)
+        } else {
+            None
+        }
     }
 
     pub fn peek(&self) -> Option<&SpannedToken<'input>> {
-        self.tokens.front()
+        self.tokens.get(self.index)
     }
 
     pub fn take_while<P>(
@@ -182,17 +204,25 @@ impl<'input> TokenStream<'input> {
     {
         let mut taken_tokens = vec![];
 
-        while let Some(token) = stream.next() {
-            if predicate(&token) {
-                taken_tokens.push(token);
-
-                break;
+        while let Some(token) = stream.peek() {
+            if predicate(token) {
+                if let Some(token) = stream.next() {
+                    taken_tokens.push(token);
+                }
             } else {
-                taken_tokens.push(token);
+                break;
             }
         }
 
         taken_tokens
+    }
+
+    pub fn previous(&self) -> Option<SpannedToken<'input>> {
+        if self.index > 0 {
+            Some(self.tokens[self.index - 1].clone())
+        } else {
+            None
+        }
     }
 }
 

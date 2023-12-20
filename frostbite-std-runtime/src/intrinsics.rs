@@ -22,5 +22,5 @@ fn print<'id, 'args>(args: &[Shared<Value<'id, '_>>]) -> Value<'id, 'args> {
 pub fn insert_intrinsics(intrinsics_ctx: &mut IntrinsicContext<'_, '_>) {
     intrinsics_ctx
         .intrinsic_functions
-        .insert("print", Box::new(print));
+        .insert("print", Shared::new(print));
 }

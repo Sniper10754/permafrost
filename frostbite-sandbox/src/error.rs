@@ -1,7 +1,7 @@
 use alloc::{borrow::Cow, format};
 
 use frostbite_parser::ast::Span;
-use frostbite_reports::{IntoReport, Level};
+use frostbite_reports::{sourcemap::SourceId, IntoReport, Level};
 
 pub enum InterpretationError<'ast> {
     SymbolNotFound { at: Span, symbol: &'ast str },
@@ -13,9 +13,9 @@ pub enum InterpretationError<'ast> {
 }
 
 impl<'id, 'ast> IntoReport<'id> for InterpretationError<'ast> {
-    type Arguments = ();
+    type Arguments = SourceId<'id>;
 
-    fn into_report(self, _arguments: Self::Arguments) -> frostbite_reports::Report<'id> {
+    fn into_report(self, id: Self::Arguments) -> frostbite_reports::Report<'id> {
         let location;
         let title;
         let description: Option<Cow<'_, _>>;
@@ -62,6 +62,7 @@ impl<'id, 'ast> IntoReport<'id> for InterpretationError<'ast> {
         frostbite_reports::Report::new_diagnostic(
             Level::Error,
             location,
+            id,
             title,
             description,
             [],

@@ -1,5 +1,7 @@
-function my_add(x, y) = (x + y) / 2;
+x = 6;
 
-x = 5;
+y = 2 * x;
 
-print(my_add(x, 8495));
+z = x * 10 * y * 2;
+
+print(z);

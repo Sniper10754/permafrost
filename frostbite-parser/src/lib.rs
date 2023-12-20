@@ -27,7 +27,7 @@ mod utils {
                 Some(pattern @ Spanned(_, $token)) => Some(pattern),
                 Some(Spanned(span, _)) => {
                     $parser.errors.push(error!(parser: $parser, ErrorKind::UnrecognizedToken {
-                        location: span,
+                        span,
                         expected: $token_description,
                     }));
 
@@ -38,6 +38,7 @@ mod utils {
                         parser: $parser,
                         ErrorKind::UnrecognizedEof {
                             expected: &[$token_description],
+                            previous_element_span: $parser.token_stream.previous().unwrap().0.clone(),
                         }
                     ));
 
@@ -176,12 +177,12 @@ impl<'input, 'id> Parser<'input, 'id> {
                             Some(Spanned(_, _)) => {
                                 arguments.push(self.parse_expr()?);
                             }
-                            None => {
-                                self.errors
-                                    .push(error!(parser: self, ErrorKind::UnrecognizedEof {
-                                        expected: &["a comma", "an argument"],
-                                    }))
-                            }
+                            None => self.errors.push(
+                                error!(parser: self, ErrorKind::UnrecognizedEof {
+                                    expected: &["a comma", "an argument"],
+                                    previous_element_span: self.token_stream.previous().unwrap().0.clone()
+                                }),
+                            ),
                         }
                     }
 
@@ -212,7 +213,7 @@ impl<'input, 'id> Parser<'input, 'id> {
 
                 consume_token!(
                     parser: self,
-                    token: Token::LParen,
+                    token: Token::RParen,
                     description: ")"
                 )?;
 
@@ -276,7 +277,7 @@ impl<'input, 'id> Parser<'input, 'id> {
                         Some(Spanned(span, _)) => {
                             self.errors
                                 .push(error!(parser: self, ErrorKind::UnrecognizedToken {
-                                    location: span,
+                                    span,
                                     expected: "an identifier",
                                 }));
 
@@ -286,6 +287,7 @@ impl<'input, 'id> Parser<'input, 'id> {
                             self.errors
                                 .push(error!(parser: self, ErrorKind::UnrecognizedEof {
                                     expected: &["an identifier"],
+                                    previous_element_span: self.token_stream.previous().unwrap().0.clone()
                                 }));
 
                             return None;
@@ -328,7 +330,7 @@ impl<'input, 'id> Parser<'input, 'id> {
             Some(Spanned(span, _)) => {
                 self.errors
                     .push(error!(parser: self, ErrorKind::UnrecognizedToken {
-                        location: span,
+                        span,
                         expected: "Expression",
                     }));
 
@@ -339,6 +341,7 @@ impl<'input, 'id> Parser<'input, 'id> {
                 self.errors
                     .push(error!(parser: self, ErrorKind::UnrecognizedEof {
                         expected: &["an expression"],
+                        previous_element_span: self.token_stream.previous().unwrap().0.clone()
                     }));
 
                 None
@@ -357,19 +360,24 @@ impl<'input, 'id> Parser<'input, 'id> {
                 Some(Spanned(span, TypeAnnotation::Other(other)))
             }
             Some(Spanned(span, _)) => {
-                self.errors
-                    .push(error!(parser: self, ErrorKind::UnrecognizedToken {
-                        location: span,
+                self.errors.push(error!(
+                    parser: self,
+                    ErrorKind::UnrecognizedToken {
+                        span,
                         expected: "A type",
-                    }));
+                    }
+                ));
 
                 None
             }
             None => {
-                self.errors
-                    .push(error!(parser: self, ErrorKind::UnrecognizedEof {
+                self.errors.push(error!(
+                    parser: self,
+                    ErrorKind::UnrecognizedEof {
                         expected: &["type annotation"],
-                    }));
+                        previous_element_span: self.token_stream.previous().unwrap().0.clone(),
+                    }
+                ));
 
                 None
             }

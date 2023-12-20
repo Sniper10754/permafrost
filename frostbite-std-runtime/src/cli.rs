@@ -10,7 +10,5 @@ pub struct CliArgs {
 #[derive(Debug, clap::Subcommand)]
 pub enum CliSubcommand {
     #[command(about = "Run a frostbite language file")]
-    Run {
-        filepath: PathBuf,
-    },
+    Run { filepath: PathBuf },
 }
