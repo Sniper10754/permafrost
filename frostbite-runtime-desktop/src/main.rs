@@ -7,7 +7,7 @@ use frostbite_reports::{
     sourcemap::{SourceId, SourceMap},
     IntoReport,
 };
-use frostbite_runtime::Runtime;
+use frostbite_sandbox::{eval::Sandbox, intrinsic::IntrinsicContext};
 use helper::{lex_and_parse, print_report};
 
 mod cli;
@@ -38,13 +38,13 @@ fn main() -> Result<(), Box<dyn Error>> {
                 }
             };
 
-            let mut runtime = Runtime::new();
+            let mut intrinsic_ctx = IntrinsicContext::new();
 
-            intrinsics::insert_intrinsics(&mut runtime);
+            intrinsics::insert_intrinsics(&mut intrinsic_ctx);
 
-            let thread = runtime.new_thread(src_id);
+            let mut sandbox = Sandbox::new(src_id, &intrinsic_ctx);
 
-            
+            let interpretation_result = sandbox.eval_program(&ast);
 
             if let Err(error) = interpretation_result {
                 let report = IntoReport::into_report(error, ());

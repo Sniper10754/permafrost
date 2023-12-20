@@ -1,5 +1,5 @@
-use alloc::{boxed::Box, collections::BTreeMap, vec};
-use frostbite_parser::ast::{Expr, Spannable, Spanned};
+use alloc::vec;
+use frostbite_parser::ast::{Expr, Program, Spannable, Spanned};
 use frostbite_reports::sourcemap::SourceId;
 
 use crate::{
@@ -10,7 +10,6 @@ use crate::{
     math::evaluate_binary_operation,
     stack::{Stack, StackFrame},
     value::Value,
-    ExternalFunction,
 };
 
 pub struct Sandbox<'intrinsic_ctx, 'id, 'ast> {
@@ -29,6 +28,14 @@ impl<'intrinsic_ctx, 'id, 'ast> Sandbox<'intrinsic_ctx, 'id, 'ast> {
             stack: Stack::default(),
             intrinsic_ctx,
         }
+    }
+
+    pub fn eval_program(&mut self, program: &Program<'ast>) -> Result<(), InterpretationError<'ast>> {
+        for expr in &program.exprs {
+            self.eval(expr)?;
+        }
+
+        Ok(())
     }
 
     pub fn eval(

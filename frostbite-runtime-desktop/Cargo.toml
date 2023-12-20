@@ -10,8 +10,11 @@ edition.workspace = true
 clap = { version = "4.4.10", features = ["derive"] }
 derive_more = { workspace = true }
 
-frostbite-reports = { path = "../frostbite-reports", features = ["diagnostic_printer"] }
-frostbite-runtime = { path = "../frostbite-runtime" }
+frostbite-reports = { path = "../frostbite-reports", features = [
+    "diagnostic_printer",
+    "ariadne",
+] }
+frostbite-sandbox = { path = "../frostbite-sandbox" }
 frostbite-parser = { path = "../frostbite-parser" }
 
 [lints]

@@ -1,5 +1,5 @@
 [package]
-name = "frostbite-runtime"
+name = "frostbite-sandbox"
 version.workspace = true
 edition.workspace = true
 
@@ -9,7 +9,9 @@ edition.workspace = true
 derive_more = { workspace = true }
 
 frostbite-parser = { path = "../frostbite-parser" }
-frostbite-reports = { path = "../frostbite-reports", features = ["diagnostic_printer"] }
+frostbite-reports = { path = "../frostbite-reports", features = [
+    "diagnostic_printer",
+] }
 
 [lints]
 workspace = true
