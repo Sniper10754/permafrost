@@ -6,9 +6,9 @@ use frostbite_reports::{sourcemap::SourceId, IntoReport, Label, Level, Report};
 use crate::ast::Span;
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct Error<'id> {
+pub struct Error {
     pub kind: ErrorKind,
-    pub source_id: SourceId<'id>,
+    pub source_id: SourceId,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -26,10 +26,10 @@ pub enum ErrorKind {
     },
 }
 
-impl<'id> IntoReport<'id> for Error<'id> {
+impl IntoReport for Error {
     type Arguments = ();
 
-    fn into_report(self, _: Self::Arguments) -> frostbite_reports::Report<'id> {
+    fn into_report(self, _: Self::Arguments) -> frostbite_reports::Report {
         let source_id = self.source_id;
 
         match self.kind {

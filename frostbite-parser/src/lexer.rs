@@ -55,10 +55,10 @@ pub enum LexerError {
     GenericLexerError,
 }
 
-impl<'id> IntoReport<'id> for LexerError {
-    type Arguments = SourceId<'id>;
+impl IntoReport for LexerError {
+    type Arguments = SourceId;
 
-    fn into_report(self, src_id: Self::Arguments) -> frostbite_reports::Report<'id> {
+    fn into_report(self, src_id: Self::Arguments) -> frostbite_reports::Report {
         let location;
         let title;
         let description;

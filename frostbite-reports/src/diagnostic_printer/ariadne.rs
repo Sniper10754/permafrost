@@ -36,15 +36,13 @@ mod utils {
     }
 
     #[allow(clippy::type_complexity)]
-    pub struct SourceMapCache<'src_map, 'id> {
-        fn_cache: FnCache<
-            SourceId<'id>,
-            Box<dyn Fn(&SourceId<'id>) -> Result<String, Box<dyn Debug>> + 'src_map>,
-        >,
+    pub struct SourceMapCache<'src_map> {
+        fn_cache:
+            FnCache<SourceId, Box<dyn Fn(&SourceId) -> Result<String, Box<dyn Debug>> + 'src_map>>,
     }
 
-    impl<'src_map, 'id, 'src> SourceMapCache<'src_map, 'id> {
-        pub fn new(source_map: &'src_map SourceMap<'id, 'src>) -> Self {
+    impl<'src_map> SourceMapCache<'src_map> {
+        pub fn new(source_map: &'src_map SourceMap) -> Self {
             Self {
                 fn_cache: FnCache::new(Box::new(|id: &_| {
                     let Some((_, source)) = source_map.iter().find(|(src_id, _)| *src_id == id)
@@ -52,21 +50,18 @@ mod utils {
                         unreachable!()
                     };
 
-                    Ok(source.to_owned())
+                    Ok(source.source_code.to_owned())
                 }) as Box<_>),
             }
         }
     }
 
-    impl<'src_map, 'id> Cache<SourceId<'id>> for SourceMapCache<'src_map, 'id> {
-        fn fetch(
-            &mut self,
-            id: &SourceId<'id>,
-        ) -> Result<&ariadne::Source, Box<dyn fmt::Debug + '_>> {
+    impl<'src_map> Cache<SourceId> for SourceMapCache<'src_map> {
+        fn fetch(&mut self, id: &SourceId) -> Result<&ariadne::Source, Box<dyn fmt::Debug + '_>> {
             self.fn_cache.fetch(id)
         }
 
-        fn display<'a>(&self, id: &'a SourceId<'id>) -> Option<Box<dyn fmt::Display + 'a>> {
+        fn display<'a>(&self, id: &'a SourceId) -> Option<Box<dyn fmt::Display + 'a>> {
             self.fn_cache.display(id)
         }
     }
@@ -75,8 +70,8 @@ mod utils {
 impl PrintBackend for AriadnePrintBackend {
     fn write_report_to<'id, W: fmt::Write + ?Sized>(
         destination: &mut W,
-        source_map: &SourceMap<'id, '_>,
-        diagnostic: &Diagnostic<'id>,
+        source_map: &SourceMap,
+        diagnostic: &Diagnostic,
     ) -> Result<(), diagnostic_printer::PrintingError> {
         let Diagnostic {
             level,

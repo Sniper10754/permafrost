@@ -61,14 +61,14 @@ mod utils {
 
 /// A Backend-agnostic wrapper around lalrpop
 #[derive(Debug)]
-pub struct Parser<'input, 'id> {
+pub struct Parser<'input> {
     token_stream: TokenStream<'input>,
-    errors: Vec<Error<'id>>,
-    source_id: SourceId<'id>,
+    errors: Vec<Error>,
+    source_id: SourceId,
 }
 
-impl<'input, 'id> Parser<'input, 'id> {
-    pub fn with_tokenstream(token_stream: TokenStream<'input>, source_id: SourceId<'id>) -> Self {
+impl<'input> Parser<'input> {
+    pub fn with_tokenstream(token_stream: TokenStream<'input>, source_id: SourceId) -> Self {
         Self {
             token_stream,
             errors: vec![],
@@ -76,7 +76,7 @@ impl<'input, 'id> Parser<'input, 'id> {
         }
     }
 
-    pub fn parse(mut self) -> Result<Program<'input>, Vec<Error<'id>>> {
+    pub fn parse(mut self) -> Result<Program<'input>, Vec<Error>> {
         let mut exprs = vec![];
 
         while self.token_stream.peek().is_some() {
@@ -405,7 +405,7 @@ mod tests {
             crate::Parser::with_tokenstream(
                 crate::lexer::tokenize($text_to_parse)
                     .expect(alloc::format!("Failed to tokenize `{}`", { $text_to_parse }).as_str()),
-                frostbite_reports::sourcemap::SourceId::Undefined,
+                frostbite_reports::sourcemap::SourceId(0),
             )
         };
     }

@@ -1,36 +1,35 @@
 use core::ops::Index;
+use std::path::PathBuf;
 
-use alloc::collections::BTreeMap;
+use alloc::{collections::BTreeMap, string::String};
 
 /// Map representing a list of pairs composed by source identifiers and source codes
 #[derive(Debug, Default)]
-pub struct SourceMap<'id, 'src> {
-    pairs: BTreeMap<SourceId<'id>, &'src str>,
-}
+pub struct SourceMap(BTreeMap<SourceId, SourceDescription>);
 
-impl<'id, 'src> SourceMap<'id, 'src> {
+impl SourceMap {
     pub fn new() -> Self {
         Self::default()
     }
 
-    pub fn get(&self, src_id: &SourceId<'id>) -> Option<&'src str> {
-        self.pairs.get(src_id).copied()
+    pub fn get(&self, src_id: SourceId) -> Option<&SourceDescription> {
+        self.0.get(&src_id)
     }
 
-    pub fn insert(&mut self, src_id: SourceId<'id>, source_code: &'src str) {
-        self.pairs.insert(src_id, source_code);
+    pub fn insert(&mut self, src_id: SourceId, source_description: SourceDescription) {
+        self.0.insert(src_id, source_description);
     }
 
-    pub fn iter(&self) -> impl Iterator<Item = (&SourceId<'id>, &'src str)> {
-        self.pairs.iter().map(|(id, src)| (id, *src))
+    pub fn iter(&self) -> impl Iterator<Item = (&SourceId, &SourceDescription)> {
+        self.0.iter()
     }
 }
 
-impl<'id, 'src> Index<&SourceId<'id>> for SourceMap<'id, 'src> {
-    type Output = str;
+impl Index<SourceId> for SourceMap {
+    type Output = SourceDescription;
 
-    fn index(&self, index: &SourceId<'id>) -> &Self::Output {
-        self.pairs[index]
+    fn index(&self, index: SourceId) -> &Self::Output {
+        &self.0[&index]
     }
 }
 
@@ -46,12 +45,23 @@ impl<'id, 'src> Index<&SourceId<'id>> for SourceMap<'id, 'src> {
     derive_more::From,
     derive_more::Display,
 )]
-pub enum SourceId<'id> {
+
+pub struct SourceId(pub usize);
+
+#[derive(Debug, derive_more::Display)]
+#[display(fmt = "{}", "url")]
+pub struct SourceDescription {
+    pub url: SourceUrl,
+    pub source_code: String,
+}
+
+#[derive(Debug, derive_more::Display)]
+pub enum SourceUrl {
     #[cfg(feature = "std")]
-    #[display(fmt = "{}", "_0.to_string_lossy()")]
-    Filepath(&'id std::path::Path),
+    #[display(fmt = "{}", "_0.display()")]
+    Path(PathBuf),
 
-    String(&'id str),
+    String(String),
 
-    Undefined,
+    Unknown,
 }
