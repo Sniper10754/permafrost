@@ -31,17 +31,17 @@ impl<'output, O: fmt::Write> DiagnosticPrinter<'output, O> {
     /// May return error if the backend fails writing the report
     pub fn print<B: PrintBackend>(
         self,
-        source_map: &SourceMap<'_, '_>,
-        report: &Diagnostic<'_>,
+        source_map: &SourceMap,
+        report: &Diagnostic,
     ) -> Result<(), PrintingError> {
         B::write_report_to(self.0, source_map, report)
     }
 }
 
 pub trait PrintBackend {
-    fn write_report_to<'id, W: Write>(
+    fn write_report_to<W: Write>(
         destination: &mut W,
-        source_map: &SourceMap<'id, '_>,
-        report: &Diagnostic<'id>,
+        source_map: &SourceMap,
+        report: &Diagnostic,
     ) -> Result<(), PrintingError>;
 }

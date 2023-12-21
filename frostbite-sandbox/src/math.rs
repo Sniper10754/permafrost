@@ -2,7 +2,7 @@ use crate::value::{Value, Value::*};
 
 use frostbite_parser::ast::{tokens::OperatorKind, Span};
 
-use crate::{error::InterpretationError, Shared};
+use crate::{error::InterpretationError, internals::Shared};
 
 pub fn evaluate_binary_operation<'id, 'ast>(
     at: Span,

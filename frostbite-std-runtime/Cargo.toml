@@ -15,7 +15,7 @@ frostbite-reports = { path = "../frostbite-reports", features = [
     "diagnostic_printer",
     "ariadne",
 ] }
-frostbite-runtime = { path = "../frostbite-runtime" }
+frostbite-sandbox = { path = "../frostbite-sandbox" }
 frostbite-parser = { path = "../frostbite-parser" }
 
 [lints]

@@ -1,4 +1,4 @@
-use alloc::collections::BTreeMap;
+use alloc::{collections::BTreeMap, rc::Rc};
 
 use crate::{internals::Shared, value::Value};
 
@@ -6,7 +6,7 @@ pub type ExternalFunction<'id, 'ast> = dyn Fn(&[Shared<Value<'id, 'ast>>]) -> Va
 
 #[derive(Clone)]
 pub struct IntrinsicContext<'id, 'ast> {
-    pub intrinsic_functions: BTreeMap<&'static str, ExternalFunction<'id, 'ast>>,
+    pub intrinsic_functions: BTreeMap<&'static str, Rc<ExternalFunction<'id, 'ast>>>,
 }
 
 impl<'id, 'ast> IntrinsicContext<'id, 'ast> {
@@ -14,7 +14,7 @@ impl<'id, 'ast> IntrinsicContext<'id, 'ast> {
         Self::with(BTreeMap::default())
     }
 
-    pub fn with(intrinsic_functions: BTreeMap<&'static str, ExternalFunction<'id, 'ast>>) -> Self {
+    pub fn with(intrinsic_functions: BTreeMap<&'static str, Rc<ExternalFunction<'id, 'ast>>>) -> Self {
         Self {
             intrinsic_functions,
         }

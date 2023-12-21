@@ -1,4 +1,8 @@
-use crate::{stack::Stack, value::Value, Shared, StackFrame};
+use crate::{
+    internals::Shared,
+    stack::{Stack, StackFrame},
+    value::Value,
+};
 
 pub fn find_symbol_from_stack_frames<'id, 'ast, 'stack_frame>(
     symbol: &'ast str,

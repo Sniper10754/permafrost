@@ -191,7 +191,16 @@ dependencies = [
 ]
 
 [[package]]
-name = "frostbite-runtime-desktop"
+name = "frostbite-sandbox"
+version = "0.1.0"
+dependencies = [
+ "derive_more",
+ "frostbite-parser",
+ "frostbite-reports",
+]
+
+[[package]]
+name = "frostbite-std-runtime"
 version = "0.1.0"
 dependencies = [
  "clap",
@@ -199,15 +208,6 @@ dependencies = [
  "frostbite-parser",
  "frostbite-reports",
  "frostbite-sandbox",
-]
-
-[[package]]
-name = "frostbite-sandbox"
-version = "0.1.0"
-dependencies = [
- "derive_more",
- "frostbite-parser",
- "frostbite-reports",
 ]
 
 [[package]]

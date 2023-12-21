@@ -7,32 +7,13 @@ use frostbite_reports::{
     sourcemap::{SourceId, SourceMap},
     IntoReport,
 };
-use frostbite_runtime::{intrinsic::IntrinsicContext, Runtime};
+use frostbite_sandbox::{eval::Sandbox, intrinsic::IntrinsicContext};
+
 use helper::{lex_and_parse, print_report};
 
 mod cli;
 mod helper;
 mod intrinsics;
-
-pub struct StdRuntime<'id, 'src> {
-    source_map: SourceMap<'id, 'src>,
-    runtime: Runtime<'id, 'src>,
-}
-
-impl<'id, 'src> StdRuntime<'id, 'src> {
-    pub fn new() -> Self {
-        Self {
-            source_map: SourceMap::new(),
-            runtime: Runtime::new(),
-        }
-    }
-}
-
-impl<'id, 'src> Default for StdRuntime<'id, 'src> {
-    fn default() -> Self {
-        Self::new()
-    }
-}
 
 fn main() -> Result<(), Box<dyn Error>> {
     let args = cli::CliArgs::parse();
@@ -42,17 +23,16 @@ fn main() -> Result<(), Box<dyn Error>> {
             let source = fs::read_to_string(&filepath)?;
             let main_src_id = SourceId::Filepath(&filepath);
 
-            let mut std_runtime = StdRuntime::new();
+            let mut source_map = SourceMap::new();
 
-            std_runtime.source_map.insert(main_src_id, &source);
-            *std_runtime.runtime.sandbox_mut().main_file_source_id_mut() = main_src_id;
+            source_map.insert(main_src_id, &source);
 
             let ast = match lex_and_parse(&source, main_src_id) {
                 Ok(ast) => ast,
                 Err(reports) => {
                     reports
                         .into_iter()
-                        .for_each(|report| print_report(&std_runtime.source_map, &report));
+                        .for_each(|report| print_report(&source_map, &report));
 
                     exit(1);
                 }
@@ -62,14 +42,14 @@ fn main() -> Result<(), Box<dyn Error>> {
 
             intrinsics::insert_intrinsics(&mut intrinsic_ctx);
 
-            let mut runtime = Runtime::with_intrinsic_ctx(intrinsic_ctx);
+            let mut runtime = Sandbox::new(main_src_id, &intrinsic_ctx);
 
-            let interpretation_result = runtime.eval_ast_tree(&ast);
+            let interpretation_result = runtime.eval_program(&ast);
 
             if let Err(error) = interpretation_result {
                 let report = IntoReport::into_report(error, main_src_id);
 
-                print_report(&std_runtime.source_map, &report);
+                print_report(&source_map, &report);
 
                 exit(1);
             }
