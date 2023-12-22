@@ -26,7 +26,7 @@ pub enum Symbol<'ast> {
     #[display(fmt = "str")]
     String,
 
-    #[display(fmt = "class {}", "_0")]
+    #[display(fmt = "class {_0}")]
     Other(&'ast str),
 
     #[display(fmt = "function")]
@@ -86,7 +86,7 @@ pub enum TypecheckError<'ast> {
 impl<'ast> IntoReport for TypecheckError<'ast> {
     type Arguments = ();
 
-    fn into_report(self, _: Self::Arguments) -> Report {
+    fn into_report(self, (): Self::Arguments) -> Report {
         match self {
             TypecheckError::TypeMismatch {
                 source_id,
@@ -98,7 +98,7 @@ impl<'ast> IntoReport for TypecheckError<'ast> {
                 span,
                 source_id,
                 "Type mismatch",
-                Some(format!("Expected type {}, found type {}", expected, found)),
+                Some(format!("Expected type {expected}, found type {found}")),
                 [],
                 [],
             ),
@@ -160,8 +160,7 @@ impl<'ast> IntoReport for TypecheckError<'ast> {
                 source_id,
                 "Too many arguments",
                 Some(format!(
-                    "Function expected {} arguments, but was called with {} arguments",
-                    function_arguments, call_arguments
+                    "Function expected {function_arguments} arguments, but was called with {call_arguments} arguments"
                 )),
                 [],
                 [],
@@ -177,8 +176,7 @@ impl<'ast> IntoReport for TypecheckError<'ast> {
                 source_id,
                 "Not enough arguments",
                 Some(format!(
-                    "Function expected {} arguments, but was called with {} arguments",
-                    function_arguments_len, call_arguments_len
+                    "Function expected {function_arguments_len} arguments, but was called with {call_arguments_len} arguments"
                 )),
                 [],
                 [],
@@ -202,9 +200,9 @@ impl SemanticCheck for Typecheck {
         let mut rts = RecursiveTypechecker::new();
         let mut errors = vec![];
 
-        for expr in ast.exprs.iter() {
+        for expr in &ast.exprs {
             match rts.visit_expr(source_id, expr) {
-                Ok(_) => (),
+                Ok(()) => (),
                 Err(err) => errors.push(err),
             }
         }
@@ -287,8 +285,7 @@ impl<'ast> RecursiveTypechecker<'ast> {
                         return_type: Box::new(
                             return_type_annotation
                                 .as_ref()
-                                .map(|Spanned(_, type_annotation)| Symbol::from(*type_annotation))
-                                .unwrap_or(Symbol::NotSpecified),
+                                .map_or(Symbol::NotSpecified, |Spanned(_, type_annotation)| Symbol::from(*type_annotation)),
                         ),
                     })
                 } else {

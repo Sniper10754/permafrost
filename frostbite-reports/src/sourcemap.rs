@@ -7,11 +7,11 @@ use alloc::{collections::BTreeMap, string::String};
 pub struct SourceMap(BTreeMap<SourceId, SourceDescription>);
 
 impl SourceMap {
-    pub fn new() -> Self {
+    #[must_use] pub fn new() -> Self {
         Self::default()
     }
 
-    pub fn get(&self, src_id: SourceId) -> Option<&SourceDescription> {
+    #[must_use] pub fn get(&self, src_id: SourceId) -> Option<&SourceDescription> {
         self.0.get(&src_id)
     }
 
@@ -48,7 +48,7 @@ impl Index<SourceId> for SourceMap {
 pub struct SourceId(pub usize);
 
 #[derive(Debug, derive_more::Display)]
-#[display(fmt = "{}", "url")]
+#[display(fmt = "{url}")]
 pub struct SourceDescription {
     pub url: SourceUrl,
     pub source_code: String,

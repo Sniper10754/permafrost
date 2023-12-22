@@ -191,7 +191,7 @@ impl<'input> TokenStream<'input> {
         }
     }
 
-    pub fn peek(&self) -> Option<&SpannedToken<'input>> {
+    #[must_use] pub fn peek(&self) -> Option<&SpannedToken<'input>> {
         self.tokens.get(self.index)
     }
 
@@ -217,7 +217,7 @@ impl<'input> TokenStream<'input> {
         taken_tokens
     }
 
-    pub fn previous(&self) -> Option<SpannedToken<'input>> {
+    #[must_use] pub fn previous(&self) -> Option<SpannedToken<'input>> {
         if self.index > 0 {
             Some(self.tokens[self.index - 1].clone())
         } else {

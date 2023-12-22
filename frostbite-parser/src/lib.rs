@@ -68,7 +68,7 @@ pub struct Parser<'input> {
 }
 
 impl<'input> Parser<'input> {
-    pub fn with_tokenstream(token_stream: TokenStream<'input>, source_id: SourceId) -> Self {
+    #[must_use] pub fn with_tokenstream(token_stream: TokenStream<'input>, source_id: SourceId) -> Self {
         Self {
             token_stream,
             errors: vec![],

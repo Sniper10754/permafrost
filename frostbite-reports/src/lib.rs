@@ -21,7 +21,7 @@ pub mod utils;
 
 use cfg_if::cfg_if;
 
-use derive_more::*;
+use derive_more::Display;
 
 pub trait IntoReport {
     type Arguments;

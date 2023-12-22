@@ -1,7 +1,7 @@
 use alloc::{boxed::Box, vec::Vec};
 use core::ops::Range;
 
-use derive_more::*;
+use derive_more::From;
 
 use self::tokens::{
     Arrow, Eq, FunctionToken, LeftParenthesisToken, Operator, RightParenthesisToken, TypeAnnotation,
@@ -10,7 +10,7 @@ use self::tokens::{
 pub type Span = Range<usize>;
 
 pub mod tokens {
-    use derive_more::*;
+    use derive_more::Display;
 
     use super::{Span, Spannable};
 
@@ -111,10 +111,10 @@ pub struct Program<'a> {
 impl<'a> Spannable for Expr<'a> {
     fn span(&self) -> Span {
         match self {
-            Expr::Int(span, _) => span.clone(),
-            Expr::Float(span, _) => span.clone(),
-            Expr::Ident(span, _) => span.clone(),
-            Expr::String(span, _) => span.clone(),
+            Expr::Int(span, _)
+            | Expr::Float(span, _)
+            | Expr::Ident(span, _)
+            | Expr::String(span, _) => span.clone(),
             Expr::BinaryOperation {
                 lhs,
                 operator: _,
