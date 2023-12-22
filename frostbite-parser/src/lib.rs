@@ -223,18 +223,24 @@ impl<'input> Parser<'input> {
             Some(Spanned(fn_token_span, Token::Fn)) => {
                 let fn_token = FunctionToken(fn_token_span);
 
-                let name = consume_token!(
-                    parser: self,
-                    token: Token::Ident(_),
-                    description: "Function Identifier"
-                )?
-                .map(|token| {
-                    let Token::Ident(name) = token else {
-                        unreachable!();
+                let mut name = None;
+
+                if matches!(
+                    self.token_stream.peek(),
+                    Some(Spanned(.., Token::Ident(..)))
+                ) {
+                    let Spanned(span, fn_name) = consume_token!(
+                        parser: self,
+                        token: Token::Ident(..),
+                        description: "identifier"
+                    )?;
+
+                    let Token::Ident(fn_name) = fn_name else {
+                        unreachable!()
                     };
 
-                    name
-                });
+                    name = Some(Spanned(span, fn_name));
+                }
 
                 let Spanned(left_paren_span, _) = consume_token!(
                     parser: self,
@@ -461,7 +467,7 @@ mod tests {
             Ok(Program {
                 exprs: vec![Expr::Function {
                     fn_token: FunctionToken(0..8),
-                    name: Spanned(9..13, "test"),
+                    name: Some(Spanned(9..13, "test")),
                     lpt: LeftParenthesisToken(13..14),
                     arguments: vec![
                         Argument {
@@ -496,7 +502,7 @@ mod tests {
             Ok(Program {
                 exprs: vec![Expr::Function {
                     fn_token: FunctionToken(0..8),
-                    name: Spanned(9..13, "test"),
+                    name: Some(Spanned(9..13, "test")),
                     lpt: LeftParenthesisToken(13..14),
                     arguments: vec![
                         Argument {

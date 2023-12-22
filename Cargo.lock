@@ -104,6 +104,7 @@ dependencies = [
 name = "frostbite-semantic"
 version = "0.1.0"
 dependencies = [
+ "derive_more",
  "frostbite-parser",
  "frostbite-reports",
 ]

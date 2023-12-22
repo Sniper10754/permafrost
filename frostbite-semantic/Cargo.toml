@@ -9,5 +9,7 @@ edition.workspace = true
 frostbite-parser = { path = "../frostbite-parser" }
 frostbite-reports = { path = "../frostbite-reports" }
 
+derive_more = { workspace = true }
+
 [lints]
 workspace = true

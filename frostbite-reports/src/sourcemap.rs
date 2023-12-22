@@ -1,5 +1,4 @@
 use core::ops::Index;
-use std::path::PathBuf;
 
 use alloc::{collections::BTreeMap, string::String};
 
@@ -59,7 +58,7 @@ pub struct SourceDescription {
 pub enum SourceUrl {
     #[cfg(feature = "std")]
     #[display(fmt = "{}", "_0.display()")]
-    Path(PathBuf),
+    Path(std::path::PathBuf),
 
     String(String),
 

@@ -1,3 +1,9 @@
+#![no_std]
+
+extern crate alloc;
+
+use alloc::vec::Vec;
+
 use frostbite_parser::ast::Program;
 use frostbite_reports::{
     sourcemap::{SourceId, SourceMap},
@@ -8,11 +14,11 @@ mod typecheck;
 
 pub trait SemanticCheck {
     type Output;
-    type Error: IntoReport;
+    type Error<'a>: IntoReport + 'a;
 
-    fn check(
+    fn check<'ast>(
         source_id: SourceId,
         source_map: &SourceMap,
-        ast: &Program<'_>,
-    ) -> Result<Self::Output, Vec<Self::Error>>;
+        ast: &Program<'ast>,
+    ) -> Result<Self::Output, Vec<Self::Error<'ast>>>;
 }

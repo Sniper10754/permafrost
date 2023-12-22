@@ -159,7 +159,7 @@ pub enum Expr<'a> {
 
     Function {
         fn_token: FunctionToken,
-        name: Spanned<&'a str>,
+        name: Option<Spanned<&'a str>>,
         lpt: LeftParenthesisToken,
         arguments: Vec<Argument<'a>>,
         rpt: RightParenthesisToken,
