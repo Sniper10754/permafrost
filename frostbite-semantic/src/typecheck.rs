@@ -207,9 +207,10 @@ impl SemanticCheck for Typecheck {
             }
         }
 
-        match errors.is_empty() {
-            true => Ok(()),
-            false => Err(errors),
+        if errors.is_empty() {
+            Ok(())
+        } else {
+            Err(errors)
         }
     }
 }
@@ -285,7 +286,9 @@ impl<'ast> RecursiveTypechecker<'ast> {
                         return_type: Box::new(
                             return_type_annotation
                                 .as_ref()
-                                .map_or(Symbol::NotSpecified, |Spanned(_, type_annotation)| Symbol::from(*type_annotation)),
+                                .map_or(Symbol::NotSpecified, |Spanned(_, type_annotation)| {
+                                    Symbol::from(*type_annotation)
+                                }),
                         ),
                     })
                 } else {
