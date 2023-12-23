@@ -68,7 +68,8 @@ pub struct Parser<'input> {
 }
 
 impl<'input> Parser<'input> {
-    #[must_use] pub fn with_tokenstream(token_stream: TokenStream<'input>, source_id: SourceId) -> Self {
+    #[must_use]
+    pub fn with_tokenstream(token_stream: TokenStream<'input>, source_id: SourceId) -> Self {
         Self {
             token_stream,
             errors: vec![],
@@ -409,7 +410,7 @@ mod tests {
     macro_rules! parser {
         ($text_to_parse:expr) => {
             crate::Parser::with_tokenstream(
-                crate::lexer::tokenize($text_to_parse)
+                crate::lexer::tokenize(frostbite_reports::sourcemap::SourceId(0), $text_to_parse)
                     .expect(alloc::format!("Failed to tokenize `{}`", { $text_to_parse }).as_str()),
                 frostbite_reports::sourcemap::SourceId(0),
             )

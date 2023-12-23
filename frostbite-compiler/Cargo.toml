@@ -5,7 +5,12 @@ edition.workspace = true
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
+
 [dependencies]
+frostbite-semantic = { path = "../frostbite-semantic" }
+frostbite-bytecode ={ path = "../frostbite-bytecode" }
+frostbite-reports = { path = "../frostbite-reports" }
+frostbite-parser = { path = "../frostbite-parser" }
 
 [lints]
 workspace = true

@@ -27,9 +27,7 @@ pub enum ErrorKind {
 }
 
 impl IntoReport for Error {
-    type Arguments = ();
-
-    fn into_report(self, (): Self::Arguments) -> frostbite_reports::Report {
+    fn into_report(self) -> frostbite_reports::Report {
         let source_id = self.source_id;
 
         match self.kind {

@@ -84,9 +84,7 @@ pub enum TypecheckError<'ast> {
 }
 
 impl<'ast> IntoReport for TypecheckError<'ast> {
-    type Arguments = ();
-
-    fn into_report(self, (): Self::Arguments) -> Report {
+    fn into_report(self) -> Report {
         match self {
             TypecheckError::TypeMismatch {
                 source_id,
@@ -330,7 +328,7 @@ impl<'ast> RecursiveTypechecker<'ast> {
 
                 _ => Err(TypecheckError::CannotCallNonIdent(source_id, callee.span())),
             },
-            Expr::Poisoned => todo!(),
+            Expr::Poisoned => Ok(Symbol::NotSpecified),
         }
     }
 

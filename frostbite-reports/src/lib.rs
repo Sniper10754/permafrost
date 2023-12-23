@@ -3,7 +3,7 @@
 extern crate alloc;
 
 use alloc::{borrow::Cow, vec::Vec};
-use core::ops::Range;
+use core::{convert::Infallible, ops::Range};
 use sourcemap::SourceId;
 
 cfg_if! {
@@ -24,9 +24,13 @@ use cfg_if::cfg_if;
 use derive_more::Display;
 
 pub trait IntoReport {
-    type Arguments;
+    fn into_report(self) -> Report;
+}
 
-    fn into_report(self, arguments: Self::Arguments) -> Report;
+impl IntoReport for Infallible {
+    fn into_report(self) -> Report {
+        match self {}
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]

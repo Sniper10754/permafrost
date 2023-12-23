@@ -11,14 +11,15 @@ mod helpers {
 
     use crate::ast::tokens::OperatorKind;
 
-    use super::{LexerError, Token};
+    use super::{LexerErrorKind, Token};
 
     pub fn parse_number<'input, N: Num>(
         lexer: &Lexer<'input, Token<'input>>,
-    ) -> Result<N, LexerError> {
+    ) -> Result<N, LexerErrorKind> {
         let slice = lexer.slice();
 
-        N::from_str_radix(slice, 10).map_err(|_| LexerError::NumberTooBig { span: lexer.span() })
+        N::from_str_radix(slice, 10)
+            .map_err(|_| LexerErrorKind::NumberTooBig { span: lexer.span() })
     }
 
     pub fn parse_operator<'input>(lexer: &Lexer<'input, Token<'input>>) -> OperatorKind {
@@ -41,8 +42,14 @@ mod helpers {
 
 pub type SpannedToken<'a> = Spanned<Token<'a>>;
 
+#[derive(Debug, PartialEq, Clone)]
+pub struct LexerError {
+    source_id: SourceId,
+    kind: LexerErrorKind,
+}
+
 #[derive(Debug, PartialEq, Clone, Default)]
-pub enum LexerError {
+pub enum LexerErrorKind {
     NumberTooBig {
         span: Span,
     },
@@ -56,35 +63,35 @@ pub enum LexerError {
 }
 
 impl IntoReport for LexerError {
-    type Arguments = SourceId;
+    fn into_report(self) -> frostbite_reports::Report {
+        let source_id = self.source_id;
 
-    fn into_report(self, src_id: Self::Arguments) -> frostbite_reports::Report {
         let location;
         let title;
         let description;
 
-        match self {
-            LexerError::NumberTooBig { span } => {
+        match self.kind {
+            LexerErrorKind::NumberTooBig { span } => {
                 location = span;
 
                 title = "Number too big";
 
                 description = "Number can't be lexed because is too big";
             }
-            LexerError::UnknownToken { span } => {
+            LexerErrorKind::UnknownToken { span } => {
                 location = span;
 
                 title = "Unknown token";
 
                 description = "Token was not recognized";
             }
-            LexerError::GenericLexerError => unreachable!(),
+            LexerErrorKind::GenericLexerError => unreachable!(),
         }
 
         Report::new_diagnostic(
             Level::Error,
             location,
-            src_id,
+            source_id,
             title,
             Some(description),
             [],
@@ -94,7 +101,7 @@ impl IntoReport for LexerError {
 }
 
 #[derive(Logos, Debug, Clone, PartialEq)]
-#[logos(error = LexerError)]
+#[logos(error = LexerErrorKind)]
 #[logos(skip r"[\t\n\r ]+")]
 pub enum Token<'input> {
     #[regex("-?[0-9]+", helpers::parse_number::<i32>)]
@@ -191,7 +198,8 @@ impl<'input> TokenStream<'input> {
         }
     }
 
-    #[must_use] pub fn peek(&self) -> Option<&SpannedToken<'input>> {
+    #[must_use]
+    pub fn peek(&self) -> Option<&SpannedToken<'input>> {
         self.tokens.get(self.index)
     }
 
@@ -217,7 +225,8 @@ impl<'input> TokenStream<'input> {
         taken_tokens
     }
 
-    #[must_use] pub fn previous(&self) -> Option<SpannedToken<'input>> {
+    #[must_use]
+    pub fn previous(&self) -> Option<SpannedToken<'input>> {
         if self.index > 0 {
             Some(self.tokens[self.index - 1].clone())
         } else {
@@ -226,7 +235,7 @@ impl<'input> TokenStream<'input> {
     }
 }
 
-pub fn tokenize(input: &str) -> Result<TokenStream<'_>, Vec<LexerError>> {
+pub fn tokenize(source_id: SourceId, input: &str) -> Result<TokenStream<'_>, Vec<LexerError>> {
     let lexer = Token::lexer(input).spanned();
     let mut tokens = Vec::new();
     let mut errors = vec![];
@@ -234,11 +243,20 @@ pub fn tokenize(input: &str) -> Result<TokenStream<'_>, Vec<LexerError>> {
     for (token, span) in lexer {
         match token {
             Ok(t) => tokens.push((span, t).into()),
-            Err(e) => errors.push(match e {
-                LexerError::GenericLexerError => LexerError::UnknownToken { span },
+            Err(e) => {
+                let error_kind = match e {
+                    LexerErrorKind::GenericLexerError => LexerErrorKind::UnknownToken { span },
 
-                error => error,
-            }),
+                    error => error,
+                };
+
+                let error = LexerError {
+                    source_id,
+                    kind: error_kind,
+                };
+
+                errors.push(error);
+            }
         }
     }
 
