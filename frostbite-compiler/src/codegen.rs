@@ -1,4 +1,4 @@
-use frostbite_parser::ast::Expr;
+use frostbite_parser::ast::Program;
 use frostbite_reports::IntoReport;
 
 mod bytecode;
@@ -9,9 +9,7 @@ pub trait CodegenBackend: Default {
     type Output;
     type Error: IntoReport;
 
-    fn codegen(&mut self, expr: &Expr<'_>) -> Result<(), Self::Error>;
-
-    fn finalize(self) -> Self::Output;
+    fn codegen(&mut self, expr: &Program<'_>) -> Result<Self::Output, Self::Error>;
 }
 
 pub struct CodegenBackends;
