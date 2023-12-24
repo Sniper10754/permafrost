@@ -1,16 +1,21 @@
+#![allow(clippy::single_match)]
+
 use core::{
     cmp::Ordering::{Equal, Greater, Less},
+    mem::{self, MaybeUninit},
     ops::Range,
 };
 
-use alloc::{boxed::Box, collections::BTreeMap, format, vec, vec::Vec};
+use alloc::{
+    borrow::ToOwned, boxed::Box, collections::BTreeMap, format, string::ToString, vec, vec::Vec,
+};
 use frostbite_parser::ast::{tokens::TypeAnnotation, Expr, Program, Spannable, Spanned};
 use frostbite_reports::{
     sourcemap::{SourceId, SourceMap},
     IntoReport, Level, Report,
 };
 
-use crate::SemanticCheck;
+use crate::hir::{Hir, HirNode, Type};
 
 type ScopeTable<'ast> = Vec<Scope<'ast>>;
 type Scope<'ast> = BTreeMap<&'ast str, Symbol<'ast>>;
@@ -49,7 +54,31 @@ impl<'ast> From<TypeAnnotation<'ast>> for Symbol<'ast> {
             TypeAnnotation::Float => Self::Float,
             TypeAnnotation::String => Self::String,
             TypeAnnotation::NotSpecified => Self::NotSpecified,
-            TypeAnnotation::Other(other) => Self::Other(other),
+            TypeAnnotation::Object(other) => Self::Other(other),
+            TypeAnnotation::Unit => Self::Unit,
+        }
+    }
+}
+
+impl<'a> From<Symbol<'a>> for Type {
+    fn from(value: Symbol<'a>) -> Self {
+        match value {
+            Symbol::Int => Type::Int,
+            Symbol::Float => Type::Float,
+            Symbol::String => Type::String,
+            Symbol::Other(obj) => Type::Object(obj.to_owned()),
+            Symbol::Function {
+                arguments,
+                return_type,
+            } => Type::Function {
+                arguments: arguments
+                    .into_iter()
+                    .map(|(ident, r#type)| (ident.to_owned(), r#type.into()))
+                    .collect(),
+                return_value: Box::new((*return_type).into()),
+            },
+            Symbol::Unit => todo!(),
+            Symbol::NotSpecified => todo!(),
         }
     }
 }
@@ -183,33 +212,31 @@ impl<'ast> IntoReport for TypecheckError<'ast> {
     }
 }
 
-pub struct Typecheck;
+pub fn check_types<'ast>(
+    source_id: SourceId,
+    // Will use in import resolution
+    _map: &SourceMap,
+    ast: &Program<'ast>,
+    hir: &mut Hir,
+) -> Result<(), Vec<TypecheckError<'ast>>> {
+    let mut rts = RecursiveTypechecker::new();
+    let mut errors = vec![];
 
-impl SemanticCheck for Typecheck {
-    type Output = ();
-    type Error<'ast> = TypecheckError<'ast>;
+    for expr in &ast.exprs {
+        let mut hir_node = None;
 
-    fn check<'ast>(
-        source_id: SourceId,
-        // Will use in import resolution
-        _map: &SourceMap,
-        ast: &Program<'ast>,
-    ) -> Result<Self::Output, Vec<Self::Error<'ast>>> {
-        let mut rts = RecursiveTypechecker::new();
-        let mut errors = vec![];
-
-        for expr in &ast.exprs {
-            match rts.visit_expr(source_id, expr) {
-                Ok(()) => (),
-                Err(err) => errors.push(err),
-            }
+        match rts.visit_expr(source_id, expr, &mut hir_node) {
+            Ok(()) => (),
+            Err(err) => errors.push(err),
         }
 
-        if errors.is_empty() {
-            Ok(())
-        } else {
-            Err(errors)
-        }
+        hir.nodes.push(hir_node.unwrap());
+    }
+
+    if errors.is_empty() {
+        Ok(())
+    } else {
+        Err(errors)
     }
 }
 
@@ -230,9 +257,9 @@ impl<'ast> RecursiveTypechecker<'ast> {
         expr: &Expr<'ast>,
     ) -> Result<Symbol<'ast>, TypecheckError<'ast>> {
         match expr {
-            Expr::Int(_, _) => Ok(Symbol::Int),
-            Expr::Float(_, _) => Ok(Symbol::Float),
-            Expr::Ident(span, ident) => match self
+            Expr::Int(Spanned(_, _)) => Ok(Symbol::Int),
+            Expr::Float(Spanned(_, _)) => Ok(Symbol::Float),
+            Expr::Ident(Spanned(span, ident)) => match self
                 .scope_table
                 .iter()
                 .find(|scope| scope.contains_key(ident))
@@ -243,7 +270,7 @@ impl<'ast> RecursiveTypechecker<'ast> {
                     Spanned(span.clone(), ident),
                 )),
             },
-            Expr::String(_, _) => Ok(Symbol::String),
+            Expr::String(Spanned(_, _)) => Ok(Symbol::String),
             Expr::BinaryOperation { lhs, operator, rhs } => match (
                 self.infer_type(source_id, lhs)?,
                 operator,
@@ -299,7 +326,7 @@ impl<'ast> RecursiveTypechecker<'ast> {
                 arguments: _,
                 rpt: _,
             } => match &**callee {
-                Expr::Ident(_, ident) => {
+                Expr::Ident(Spanned(_, ident)) => {
                     match self
                         .scope_table
                         .iter()
@@ -336,43 +363,76 @@ impl<'ast> RecursiveTypechecker<'ast> {
         &mut self,
         source_id: SourceId,
         expr: &Expr<'ast>,
+        hir_node: &mut Option<HirNode>,
     ) -> Result<(), TypecheckError<'ast>> {
         match expr {
-            Expr::Ident(span, ident) => {
-                if !self
+            Expr::Int(Spanned(span, value)) => {
+                *hir_node = Some(HirNode::Int(Spanned(span.clone(), *value)))
+            }
+
+            Expr::Float(Spanned(span, value)) => {
+                *hir_node = Some(HirNode::Float(Spanned(span.clone(), *value)))
+            }
+
+            Expr::String(Spanned(span, value)) => {
+                *hir_node = Some(HirNode::String(Spanned(span.clone(), value.to_string())))
+            }
+
+            Expr::Ident(Spanned(span, ident)) => {
+                if let Some(scope) = self
                     .scope_table
                     .iter()
-                    .any(|scope| scope.contains_key(ident))
+                    .find(|scope| scope.contains_key(ident))
                 {
+                    let symbol = scope[ident].clone();
+
+                    *hir_node = Some(HirNode::Ident(
+                        symbol.into(),
+                        Spanned(span.clone(), ident).map(ToString::to_string),
+                    ));
+                } else {
                     return Err(TypecheckError::SymbolNotFound(
                         source_id,
                         Spanned(span.clone(), ident),
                     ));
                 }
             }
-            Expr::BinaryOperation {
-                lhs,
-                operator: _,
-                rhs,
-            } => {
-                self.visit_expr(source_id, lhs)?;
-                self.visit_expr(source_id, rhs)?;
+            Expr::BinaryOperation { lhs, operator, rhs } => {
+                let (mut hir_lhs, mut hir_rhs) = (None, None);
 
-                // Check operators by inferring types
-                let _ = self.infer_type(source_id, expr)?;
+                self.visit_expr(source_id, lhs, &mut hir_lhs)?;
+                self.visit_expr(source_id, rhs, &mut hir_rhs)?;
+
+                *hir_node = Some(HirNode::BinaryOperation {
+                    lhs: Box::new(hir_lhs.unwrap()),
+                    operator: operator.clone(),
+                    rhs: Box::new(hir_rhs.unwrap()),
+                });
             }
             Expr::Assign {
                 lhs,
                 eq_token: _,
                 value,
             } => match &**lhs {
-                Expr::Ident(_, ident) => {
+                Expr::Ident(Spanned(_, ident)) => {
                     let inferred_type = self.infer_type(source_id, value)?;
 
                     self.scope_table
                         .first_mut()
                         .unwrap()
                         .insert(ident, inferred_type);
+
+                    let (mut hir_lhs, mut hir_value) = (None, None);
+
+                    self.visit_expr(source_id, lhs, &mut hir_lhs)?;
+                    self.visit_expr(source_id, value, &mut hir_value)?;
+
+                    *hir_node = Some(HirNode::Assign {
+                        lhs: hir_lhs.unwrap().try_into().expect(
+                            "Guaranteed to be a assignable since the match above guards it",
+                        ),
+                        value: hir_value.unwrap().into(),
+                    });
                 }
 
                 _ => {
@@ -386,19 +446,21 @@ impl<'ast> RecursiveTypechecker<'ast> {
                 arguments,
                 rpt: _,
                 return_type_token: _,
-                return_type_annotation: _,
+                return_type_annotation,
                 equals: _,
                 body,
             } => {
-                self.visit_expr(source_id, body)?;
+                let mut hir_arguments = BTreeMap::new();
 
-                for argument_type in arguments.iter().map(|argument| {
-                    Spanned(
-                        argument.type_annotation.span(),
-                        Symbol::from(argument.type_annotation.1),
+                for (name, argument_type) in arguments.iter().map(|argument| {
+                    (
+                        argument.name.1,
+                        Spanned(
+                            argument.type_annotation.span(),
+                            Symbol::from(argument.type_annotation.1),
+                        ),
                     )
                 }) {
-                    #[allow(clippy::single_match)]
                     match argument_type {
                         Spanned(span, Symbol::Other(identifier)) => {
                             if !self
@@ -415,6 +477,24 @@ impl<'ast> RecursiveTypechecker<'ast> {
 
                         _ => (),
                     }
+
+                    hir_arguments.insert(name.to_string(), argument_type.1.into());
+                }
+
+                match return_type_annotation {
+                    Some(Spanned(span, TypeAnnotation::Object(object))) => {
+                        if !self
+                            .scope_table
+                            .iter()
+                            .any(|scope| scope.contains_key(object))
+                        {
+                            return Err(TypecheckError::SymbolNotFound(
+                                source_id,
+                                Spanned(span.clone(), object),
+                            ));
+                        }
+                    }
+                    _ => (),
                 }
 
                 if let Some(Spanned(_, name)) = name {
@@ -424,6 +504,25 @@ impl<'ast> RecursiveTypechecker<'ast> {
                         .unwrap()
                         .insert(name, fn_symbol);
                 }
+
+                let mut hir_body = None;
+
+                self.visit_expr(source_id, body, &mut hir_body)?;
+
+                *hir_node = Some(HirNode::Function {
+                    name: name
+                        .as_ref()
+                        .cloned()
+                        .map(|spanned_name| spanned_name.map(ToString::to_string)),
+                    arguments: hir_arguments,
+                    return_type: return_type_annotation
+                        .as_ref()
+                        .cloned()
+                        .map(|Spanned(_, annotation)| annotation)
+                        .unwrap_or(TypeAnnotation::NotSpecified)
+                        .into(),
+                    body: Box::new(hir_body.unwrap()),
+                })
             }
             Expr::Call {
                 callee,
@@ -431,9 +530,8 @@ impl<'ast> RecursiveTypechecker<'ast> {
                 arguments: call_arguments,
                 rpt,
             } => {
-                #[allow(clippy::single_match)]
                 match &**callee {
-                    Expr::Ident(span, ident) => {
+                    Expr::Ident(Spanned(callee_span, ident)) => {
                         if !self
                             .scope_table
                             .iter()
@@ -441,9 +539,11 @@ impl<'ast> RecursiveTypechecker<'ast> {
                         {
                             return Err(TypecheckError::SymbolNotFound(
                                 source_id,
-                                Spanned(span.clone(), ident),
+                                Spanned(callee_span.clone(), ident),
                             ));
                         }
+
+                        let mut hir_call_arguments = vec![];
 
                         let function_type = self
                             .scope_table
@@ -454,7 +554,7 @@ impl<'ast> RecursiveTypechecker<'ast> {
 
                         let call_arguments_span = (lpt.0.start)..(rpt.0.end);
 
-                        match function_type {
+                        match &function_type {
                             Symbol::Function {
                                 arguments: function_arguments,
                                 return_type: _,
@@ -485,6 +585,14 @@ impl<'ast> RecursiveTypechecker<'ast> {
                                     Equal => (),
                                 }
 
+                                for argument in call_arguments {
+                                    let mut hir_node = None;
+
+                                    self.visit_expr(source_id, argument, &mut hir_node)?;
+
+                                    hir_call_arguments.push(hir_node.unwrap());
+                                }
+
                                 let call_arguments_types = call_arguments
                                     .iter()
                                     .map(|argument| {
@@ -512,23 +620,31 @@ impl<'ast> RecursiveTypechecker<'ast> {
                                         });
                                     }
                                 }
+
+                                *hir_node = Some(HirNode::Call {
+                                    callee: Spanned(callee_span.clone(), function_type.into()),
+                                    arguments: hir_call_arguments,
+                                    return_type: self.infer_type(source_id, expr)?.into(),
+                                })
                             }
 
                             _ => {
                                 return Err(TypecheckError::CannotCallNonFunction(
                                     source_id,
-                                    span.clone(),
+                                    callee_span.clone(),
                                 ))
                             }
                         }
                     }
 
-                    _ => {}
+                    _ => (),
                 }
             }
 
-            _ => (),
+            Expr::Poisoned => unreachable!(),
         };
+
+        debug_assert!(hir_node.is_some());
 
         Ok(())
     }

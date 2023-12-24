@@ -1,28 +1,34 @@
 use core::convert::Infallible;
 
-use alloc::vec::Vec;
-use frostbite_parser::ast::Expr;
+use alloc::{collections::BTreeMap, vec::Vec};
+use frostbite_bytecode::{BytecodeVersion, Manifest, Module};
+
+use crate::hir::Hir;
 
 use super::CodegenBackend;
 
-type Buffer = Vec<u8>;
-
 #[derive(Debug, Default)]
-pub struct BytecodeCodegenBackend {
-    buffer: Buffer,
+pub struct BytecodeCodegenBackend;
+
+impl BytecodeCodegenBackend {
+    fn compile_program(&mut self, module: &mut Module) {}
 }
 
 impl CodegenBackend for BytecodeCodegenBackend {
-    type Output = Buffer;
+    type Output = Module;
     type Error = Infallible;
 
-    fn codegen(&mut self, expr: &Expr<'_>) -> Result<(), Self::Error> {
-        match expr {}
+    fn codegen(self, program: &Hir) -> Result<Self::Output, Vec<Self::Error>> {
+        let module = Module {
+            manifest: Manifest {
+                bytecode_version: BytecodeVersion::Number(0.1),
+            },
+            constants_pool: BTreeMap::new(),
+            symbols_pool: BTreeMap::new(),
+            functions: Vec::new(),
+            instructions: Vec::new(),
+        };
 
-        Ok(())
-    }
-
-    fn finalize(self) -> Self::Output {
-        self.buffer
+        Ok(module)
     }
 }

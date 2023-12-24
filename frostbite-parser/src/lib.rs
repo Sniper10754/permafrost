@@ -204,10 +204,10 @@ impl<'input> Parser<'input> {
 
     fn parse_atom_expr(&mut self) -> Option<Expr<'input>> {
         match self.token_stream.next() {
-            Some(Spanned(span, Token::Int(value))) => Some(Expr::Int(span, value)),
-            Some(Spanned(span, Token::Float(value))) => Some(Expr::Float(span, value)),
-            Some(Spanned(span, Token::Ident(value))) => Some(Expr::Ident(span, value)),
-            Some(Spanned(span, Token::String(value))) => Some(Expr::String(span, value)),
+            Some(Spanned(span, Token::Int(value))) => Some(Expr::Int(Spanned(span, value))),
+            Some(Spanned(span, Token::Float(value))) => Some(Expr::Float(Spanned(span, value))),
+            Some(Spanned(span, Token::Ident(value))) => Some(Expr::Ident(Spanned(span, value))),
+            Some(Spanned(span, Token::String(value))) => Some(Expr::String(Spanned(span, value))),
 
             Some(Spanned(_, Token::LParen)) => {
                 let expr = self.parse_expr()?;
@@ -364,7 +364,7 @@ impl<'input> Parser<'input> {
             }
             Some(Spanned(span, Token::Ident("str"))) => Some(Spanned(span, TypeAnnotation::String)),
             Some(Spanned(span, Token::Ident(other))) => {
-                Some(Spanned(span, TypeAnnotation::Other(other)))
+                Some(Spanned(span, TypeAnnotation::Object(other)))
             }
             Some(Spanned(span, _)) => {
                 self.errors.push(error!(
@@ -399,6 +399,8 @@ mod tests {
 
     use std::{boxed::Box, vec};
 
+    use logos::Span;
+
     use crate::ast::{
         tokens::{
             Arrow, Eq, FunctionToken, LeftParenthesisToken, Operator, OperatorKind,
@@ -431,12 +433,12 @@ mod tests {
             parser.parse(),
             Ok(Program {
                 exprs: vec![Expr::BinaryOperation {
-                    lhs: boxed!(Expr::Int(0..1, 1)),
+                    lhs: boxed!(Expr::Int(Spanned(0..1, 1))),
                     operator: Operator(2..3, OperatorKind::Add),
                     rhs: boxed!(Expr::BinaryOperation {
-                        lhs: boxed!(Expr::Int(4..5, 2)),
+                        lhs: boxed!(Expr::Int(Spanned(4..5, 2))),
                         operator: Operator(6..7, OperatorKind::Add),
-                        rhs: boxed!(Expr::Int(8..9, 3))
+                        rhs: boxed!(Expr::Int(Spanned(8..9, 3)))
                     }),
                 }]
             })
@@ -451,9 +453,9 @@ mod tests {
             parser.parse(),
             Ok(Program {
                 exprs: vec![Expr::Assign {
-                    lhs: boxed!(Expr::Ident(0..1, "a")),
+                    lhs: boxed!(Expr::Ident(Spanned(0..1, "a"))),
                     eq_token: Eq(2..3),
-                    value: boxed!(Expr::Int(4..5, 1)),
+                    value: boxed!(Expr::Int(Spanned(4..5, 1))),
                 }]
             })
         );
@@ -485,9 +487,9 @@ mod tests {
                     return_type_annotation: None,
                     equals: Eq(30..31),
                     body: boxed!(Expr::BinaryOperation {
-                        lhs: boxed!(Expr::Ident(32..33, "x")),
+                        lhs: boxed!(Expr::Ident((Spanned(32..33, "x")))),
                         operator: Operator(34..35, OperatorKind::Add),
-                        rhs: boxed!(Expr::Ident(36..37, "y"))
+                        rhs: boxed!(Expr::Ident(Spanned(36..37, "y")))
                     }),
                 }]
             })
@@ -520,9 +522,9 @@ mod tests {
                     return_type_annotation: Some(Spanned(33..36, TypeAnnotation::Int)),
                     equals: Eq(37..38),
                     body: boxed!(Expr::BinaryOperation {
-                        lhs: boxed!(Expr::Ident(39..40, "x")),
+                        lhs: boxed!(Expr::Ident(Spanned(39..40, "x"))),
                         operator: Operator(41..42, OperatorKind::Add),
-                        rhs: boxed!(Expr::Ident(43..44, "y"))
+                        rhs: boxed!(Expr::Ident(Spanned(43..44, "y")))
                     }),
                 }]
             })
@@ -538,9 +540,9 @@ mod tests {
         assert_eq!(
             ast,
             Some(Expr::Call {
-                callee: Box::new(Expr::Ident(0..4, "bilo")),
+                callee: Box::new(Expr::Ident(Spanned(0..4, "bilo"))),
                 lpt: LeftParenthesisToken(4..5),
-                arguments: vec![Expr::Ident(5..6, "a")],
+                arguments: vec![Expr::Ident(Spanned(5..6, "a"))],
                 rpt: RightParenthesisToken(6..7)
             })
         );

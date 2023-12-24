@@ -6,6 +6,16 @@ edition.workspace = true
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+frostbite-compiler = { path = "../frostbite-compiler" }
+frostbite-bytecode = { path = "../frostbite-bytecode" }
+frostbite-reports = { path = "../frostbite-reports", features = [
+    "diagnostic_printer",
+    "ariadne",
+    "std",
+] }
+frostbite-parser = { path = "../frostbite-parser" }
+
+clap = { version = "*", features = ["derive"] }
 color-eyre = { workspace = true }
 
 [lints]

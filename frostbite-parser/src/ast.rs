@@ -67,7 +67,9 @@ pub mod tokens {
         #[display(fmt = "not specified")]
         NotSpecified,
 
-        Other(&'a str),
+        Unit,
+
+        Object(&'a str),
     }
 
     token!(Eq);
@@ -111,10 +113,10 @@ pub struct Program<'a> {
 impl<'a> Spannable for Expr<'a> {
     fn span(&self) -> Span {
         match self {
-            Expr::Int(span, _)
-            | Expr::Float(span, _)
-            | Expr::Ident(span, _)
-            | Expr::String(span, _) => span.clone(),
+            Expr::Int(Spanned(span, _))
+            | Expr::Float(Spanned(span, _))
+            | Expr::Ident(Spanned(span, _))
+            | Expr::String(Spanned(span, _)) => span.clone(),
             Expr::BinaryOperation {
                 lhs,
                 operator: _,
@@ -140,10 +142,10 @@ impl<'a> Spannable for Expr<'a> {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Expr<'a> {
-    Int(Span, i32),
-    Float(Span, f32),
-    Ident(Span, &'a str),
-    String(Span, &'a str),
+    Int(Spanned<i32>),
+    Float(Spanned<f32>),
+    Ident(Spanned<&'a str>),
+    String(Spanned<&'a str>),
 
     BinaryOperation {
         lhs: Box<Self>,

@@ -2,31 +2,28 @@
 
 extern crate alloc;
 
-use alloc::{vec, vec::Vec};
+use alloc::vec::Vec;
 use codegen::CodegenBackend;
-use frostbite_parser::{
-    lexer::tokenize,
-    Parser,
-};
+use frostbite_parser::{lexer::tokenize, Parser};
 use frostbite_reports::{
     sourcemap::{SourceId, SourceMap},
     IntoReport, Report,
 };
-use frostbite_semantic::run_semantic_checks;
+use semantic::run_semantic_checks;
 
 pub mod codegen;
+pub mod hir;
+pub mod semantic;
 
-pub struct Compiler {
-    source_map: SourceMap,
-}
+pub struct Compiler;
 
 impl Compiler {
     pub fn compile_source<C: CodegenBackend>(
-        &mut self,
         source_id: SourceId,
-        source: impl AsRef<str>,
+        src_map: &mut SourceMap,
+        codegen: C,
     ) -> Result<C::Output, Vec<Report>> {
-        let source = source.as_ref();
+        let source = &src_map.get(source_id).unwrap().source_code;
 
         let token_stream = tokenize(source_id, source).map_err(|err| {
             err.into_iter()
@@ -43,31 +40,11 @@ impl Compiler {
                     .collect::<Vec<_>>()
             })?;
 
-        run_semantic_checks(source_id, &self.source_map, &ast)?;
+        let hir = run_semantic_checks(source_id, src_map, &ast)?;
 
-        let mut codegen_backend = C::default();
-        let mut codegen_errors = vec![];
-
-        for expr in ast.exprs.iter() {
-            if let Err(err) = codegen_backend.codegen(expr) {
-                codegen_errors.push(err);
-            }
-        }
-
-        if !codegen_errors.is_empty() {
-            return Err(codegen_errors
-                .into_iter()
-                .map(|error| error.into_report())
-                .collect());
-        }
-
-        if codegen_errors.is_empty() {
-            Ok(codegen_backend.finalize())
-        } else {
-            Err(codegen_errors
-                .into_iter()
-                .map(|error| error.into_report())
-                .collect())
+        match codegen.codegen(&hir) {
+            Ok(output) => Ok(output),
+            Err(errors) => Err(errors.into_iter().map(|err| err.into_report()).collect()),
         }
     }
 }

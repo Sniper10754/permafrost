@@ -7,10 +7,11 @@ edition.workspace = true
 
 
 [dependencies]
-frostbite-semantic = { path = "../frostbite-semantic" }
-frostbite-bytecode ={ path = "../frostbite-bytecode" }
+frostbite-bytecode = { path = "../frostbite-bytecode" }
 frostbite-reports = { path = "../frostbite-reports" }
 frostbite-parser = { path = "../frostbite-parser" }
+
+derive_more = { workspace = true }
 
 [lints]
 workspace = true
