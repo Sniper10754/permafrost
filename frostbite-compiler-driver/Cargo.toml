@@ -15,7 +15,7 @@ frostbite-reports = { path = "../frostbite-reports", features = [
 ] }
 frostbite-parser = { path = "../frostbite-parser" }
 
-clap = { version = "*", features = ["derive"] }
+clap = { version = "4", features = ["derive", "color"] }
 color-eyre = { workspace = true }
 
 [lints]

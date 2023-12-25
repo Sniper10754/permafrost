@@ -25,10 +25,11 @@ pub enum CliSubcommand {
 }
 
 fn main() -> eyre::Result<()> {
+    let args = CliArgs::try_parse()?;
+
     color_eyre::install()?;
 
-    let debug = env::var("DEBUG").is_ok();
-    let args = CliArgs::try_parse()?;
+    let _debug = env::var("DEBUG").is_ok();
 
     match args.subcommand {
         CliSubcommand::Compile { file, output_file } => {
@@ -51,7 +52,7 @@ fn main() -> eyre::Result<()> {
             );
 
             let CompilationResults {
-                hir,
+                hir: _,
                 codegen_output,
             } = match output {
                 Ok(output) => output,

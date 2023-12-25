@@ -1,11 +1,10 @@
-extern crate alloc;
 
-use alloc::vec::Vec;
+
+
 
 use frostbite_parser::ast::Program;
 use frostbite_reports::{
-    sourcemap::{SourceId, SourceMap},
-    IntoReport, Report, ReportContext,
+    sourcemap::{SourceId, SourceMap}, ReportContext,
 };
 
 use crate::hir::HirTree;

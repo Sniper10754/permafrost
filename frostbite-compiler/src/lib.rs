@@ -2,12 +2,11 @@
 
 extern crate alloc;
 
-use alloc::vec::Vec;
+
 use codegen::CodegenBackend;
 use frostbite_parser::{lexer::tokenize, Parser};
 use frostbite_reports::{
-    sourcemap::{SourceId, SourceMap},
-    IntoReport, Report, ReportContext,
+    sourcemap::{SourceId, SourceMap}, ReportContext,
 };
 use hir::HirTree;
 use semantic::run_semantic_checks;

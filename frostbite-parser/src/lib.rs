@@ -554,7 +554,7 @@ mod tests {
 
     #[test]
     fn test_parser_call() {
-        let (report_ctx, mut parsed) = parser!("bilo(a);");
+        let (report_ctx, parsed) = parser!("bilo(a);");
 
         assert!(report_ctx.is_empty());
 

@@ -213,19 +213,24 @@ impl<'ast> IntoReport for TypecheckError<'ast> {
     }
 }
 
-pub fn check_types<'ast>(
+pub fn check_types(
     report_ctx: &mut ReportContext,
     source_id: SourceId,
     _map: &SourceMap,
-    ast: &Program<'ast>,
+    ast: &Program<'_>,
     hir: &mut HirTree,
 ) {
-    let mut rts = RecursiveTypechecker::new(report_ctx);
+    let mut rts = RecursiveTypechecker::new();
 
     for expr in &ast.exprs {
         let mut hir_node = HirNode::Uninitialized;
 
-        rts.visit_expr(source_id, expr, &mut hir_node);
+        let result = rts.visit_expr(source_id, expr, &mut hir_node);
+
+        match result {
+            Ok(_) => {}
+            Err(error) => report_ctx.push(error.into_report()),
+        };
 
         hir.nodes.push(match hir_node {
             HirNode::Uninitialized => HirNode::Poisoned,
@@ -235,15 +240,13 @@ pub fn check_types<'ast>(
     }
 }
 
-struct RecursiveTypechecker<'report_ctx, 'ast> {
-    report_context: &'report_ctx mut ReportContext,
+struct RecursiveTypechecker<'ast> {
     scope_table: ScopeTable<'ast>,
 }
 
-impl<'report_context, 'ast> RecursiveTypechecker<'report_context, 'ast> {
-    fn new(report_context: &'report_context mut ReportContext) -> Self {
+impl<'ast> RecursiveTypechecker<'ast> {
+    fn new() -> Self {
         Self {
-            report_context,
             scope_table: vec![BTreeMap::new()],
         }
     }
