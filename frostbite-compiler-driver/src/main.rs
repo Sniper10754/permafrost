@@ -2,11 +2,11 @@ use std::{env, fs, io::Write, path::PathBuf, process};
 
 use clap::Parser;
 use color_eyre::eyre;
-use frostbite_compiler::{codegen::CodegenBackends, Compiler};
+use frostbite_compiler::{codegen::CodegenBackends, CompilationResults, Compiler};
 use frostbite_reports::{
     diagnostic_printer::{DefaultPrintBackend, DiagnosticPrinter},
     sourcemap::{SourceDescription, SourceMap},
-    ReportContext,
+    Report, ReportContext,
 };
 
 #[derive(clap::Parser)]
@@ -50,27 +50,22 @@ fn main() -> eyre::Result<()> {
                 CodegenBackends::bytecode_backend(),
             );
 
-            if output.is_err() {
-                
-            }
-
-            if debug {
-                println!("{hir}");
-            }
-
-            let module = match output {
+            let CompilationResults {
+                hir,
+                codegen_output,
+            } = match output {
                 Ok(output) => output,
-                Err(reports) => {
+                Err(_) => {
                     let mut buf = String::new();
 
-                    for report in reports {
+                    for report in report_ctx.iter() {
                         match report {
-                            frostbite_reports::Report::Diagnostic(diagnostic) => {
+                            Report::Diagnostic(diagnostic) => {
                                 DiagnosticPrinter::new(&mut buf)
                                     .print::<DefaultPrintBackend>(&source_map, &diagnostic)
                                     .unwrap();
                             }
-                            frostbite_reports::Report::Backtrace(_) => todo!(),
+                            Report::Backtrace(_) => unreachable!(),
                         }
                     }
 
@@ -82,7 +77,7 @@ fn main() -> eyre::Result<()> {
 
             let mut buf = vec![];
 
-            frostbite_bytecode::encode(&module, &mut buf);
+            frostbite_bytecode::encode(&codegen_output, &mut buf);
 
             let output_file = output_file.unwrap_or("./output".into());
 

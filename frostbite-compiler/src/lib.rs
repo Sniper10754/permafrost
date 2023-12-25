@@ -30,8 +30,8 @@ mod utils {
 
 #[derive(Debug)]
 pub struct CompilationResults<C: CodegenBackend> {
-    hir: HirTree,
-    codegen_output: C::Output,
+    pub hir: HirTree,
+    pub codegen_output: C::Output,
 }
 
 pub struct Compiler;
