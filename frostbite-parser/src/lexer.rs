@@ -1,6 +1,6 @@
 use alloc::{collections::VecDeque, vec, vec::Vec};
 
-use frostbite_reports::{sourcemap::SourceId, IntoReport, Level, Report};
+use frostbite_reports::{sourcemap::SourceId, IntoReport, Level, Report, ReportContext};
 use logos::{Logos, Span};
 
 use crate::ast::{tokens::OperatorKind, Spanned};
@@ -235,10 +235,13 @@ impl<'input> TokenStream<'input> {
     }
 }
 
-pub fn tokenize(source_id: SourceId, input: &str) -> Result<TokenStream<'_>, Vec<LexerError>> {
+pub fn tokenize<'input>(
+    report_ctx: &mut ReportContext,
+    source_id: SourceId,
+    input: &'input str,
+) -> TokenStream<'input> {
     let lexer = Token::lexer(input).spanned();
     let mut tokens = Vec::new();
-    let mut errors = vec![];
 
     for (token, span) in lexer {
         match token {
@@ -255,14 +258,10 @@ pub fn tokenize(source_id: SourceId, input: &str) -> Result<TokenStream<'_>, Vec
                     kind: error_kind,
                 };
 
-                errors.push(error);
+                report_ctx.push(error.into_report());
             }
         }
     }
 
-    if errors.is_empty() {
-        Ok(TokenStream::with_vec_deque(tokens))
-    } else {
-        Err(errors)
-    }
+    TokenStream::with_vec_deque(tokens)
 }

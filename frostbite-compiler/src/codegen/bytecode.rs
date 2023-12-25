@@ -2,8 +2,9 @@ use core::convert::Infallible;
 
 use alloc::{collections::BTreeMap, vec::Vec};
 use frostbite_bytecode::{BytecodeVersion, Manifest, Module};
+use frostbite_reports::ReportContext;
 
-use crate::hir::Hir;
+use crate::hir::HirTree;
 
 use super::CodegenBackend;
 
@@ -11,14 +12,17 @@ use super::CodegenBackend;
 pub struct BytecodeCodegenBackend;
 
 impl BytecodeCodegenBackend {
-    fn compile_program(&mut self, module: &mut Module) {}
+    fn compile_program(&mut self, _module: &mut Module) {}
 }
 
 impl CodegenBackend for BytecodeCodegenBackend {
     type Output = Module;
-    type Error = Infallible;
 
-    fn codegen(self, program: &Hir) -> Result<Self::Output, Vec<Self::Error>> {
+    fn codegen(
+        self,
+        report_ctx: &mut ReportContext,
+        _program: &HirTree,
+    ) -> Result<Self::Output, ()> {
         let module = Module {
             manifest: Manifest {
                 bytecode_version: BytecodeVersion::Number(0.1),

@@ -2,7 +2,7 @@
 
 extern crate alloc;
 
-use alloc::{boxed::Box, vec, vec::Vec};
+use alloc::{boxed::Box, vec};
 
 pub mod ast;
 pub mod error;
@@ -14,7 +14,7 @@ use ast::{
     Argument, Expr, Program, Spanned,
 };
 use error::ErrorKind;
-use frostbite_reports::sourcemap::SourceId;
+use frostbite_reports::{sourcemap::SourceId, ReportContext};
 use lexer::{Token, TokenStream};
 
 use crate::{ast::tokens::FunctionToken, error::Error};
@@ -23,61 +23,68 @@ mod utils {
     #[macro_export]
     macro_rules! consume_token {
         (parser: $parser:expr, token: $token:pat, description: $token_description:expr) => {
+
             match $parser.token_stream.next() {
                 Some(pattern @ Spanned(_, $token)) => Some(pattern),
                 Some(Spanned(span, _)) => {
-                    $parser.errors.push(error!(parser: $parser, ErrorKind::UnrecognizedToken {
+                    $parser.report_ctx.push(report!(parser: $parser, ErrorKind::UnrecognizedToken {
                         span,
                         expected: $token_description,
                     }));
-
                     None
                 }
                 None => {
-                    $parser.errors.push(error!(
+                    $parser.report_ctx.push(report!(
                         parser: $parser,
                         ErrorKind::UnrecognizedEof {
                             expected: &[$token_description],
                             previous_element_span: $parser.token_stream.previous().unwrap().0.clone(),
                         }
                     ));
-
                     None
                 }
             }
+
         };
     }
 
     #[macro_export]
-    macro_rules! error {
-        (parser: $parser:expr, $kind:expr) => {
+    macro_rules! report {
+        (parser: $parser:expr, $kind:expr) => {{
+            use frostbite_reports::IntoReport as _;
+
             Error {
                 kind: $kind,
                 source_id: $parser.source_id,
             }
-        };
+            .into_report()
+        }};
     }
 }
 
 /// A Backend-agnostic wrapper around lalrpop
 #[derive(Debug)]
-pub struct Parser<'input> {
+pub struct Parser<'report_context, 'input> {
     token_stream: TokenStream<'input>,
-    errors: Vec<Error>,
+    report_ctx: &'report_context mut ReportContext,
     source_id: SourceId,
 }
 
-impl<'input> Parser<'input> {
+impl<'report_context, 'input> Parser<'report_context, 'input> {
     #[must_use]
-    pub fn with_tokenstream(token_stream: TokenStream<'input>, source_id: SourceId) -> Self {
+    pub fn with_tokenstream(
+        report_context: &'report_context mut ReportContext,
+        token_stream: TokenStream<'input>,
+        source_id: SourceId,
+    ) -> Self {
         Self {
             token_stream,
-            errors: vec![],
+            report_ctx: report_context,
             source_id,
         }
     }
 
-    pub fn parse(mut self) -> Result<Program<'input>, Vec<Error>> {
+    pub fn parse(mut self) -> Program<'input> {
         let mut exprs = vec![];
 
         while self.token_stream.peek().is_some() {
@@ -107,11 +114,7 @@ impl<'input> Parser<'input> {
             }
         }
 
-        if self.errors.is_empty() {
-            Ok(Program { exprs })
-        } else {
-            Err(self.errors)
-        }
+        Program { exprs }
     }
 
     pub fn parse_expr(&mut self) -> Option<Expr<'input>> {
@@ -178,8 +181,8 @@ impl<'input> Parser<'input> {
                             Some(Spanned(_, _)) => {
                                 arguments.push(self.parse_expr()?);
                             }
-                            None => self.errors.push(
-                                error!(parser: self, ErrorKind::UnrecognizedEof {
+                            None => self.report_ctx.push(
+                                report!(parser: self, ErrorKind::UnrecognizedEof {
                                     expected: &["a comma", "an argument"],
                                     previous_element_span: self.token_stream.previous().unwrap().0.clone()
                                 }),
@@ -282,17 +285,18 @@ impl<'input> Parser<'input> {
                         }
                         Some(Spanned(_, Token::Comma)) => continue,
                         Some(Spanned(span, _)) => {
-                            self.errors
-                                .push(error!(parser: self, ErrorKind::UnrecognizedToken {
+                            self.report_ctx.push(
+                                report!(parser: self, ErrorKind::UnrecognizedToken {
                                     span,
                                     expected: "an identifier",
-                                }));
+                                }),
+                            );
 
                             return None;
                         }
                         None => {
-                            self.errors
-                                .push(error!(parser: self, ErrorKind::UnrecognizedEof {
+                            self.report_ctx
+                                .push(report!(parser: self, ErrorKind::UnrecognizedEof {
                                     expected: &["an identifier"],
                                     previous_element_span: self.token_stream.previous().unwrap().0.clone()
                                 }));
@@ -335,8 +339,8 @@ impl<'input> Parser<'input> {
             }
 
             Some(Spanned(span, _)) => {
-                self.errors
-                    .push(error!(parser: self, ErrorKind::UnrecognizedToken {
+                self.report_ctx
+                    .push(report!(parser: self, ErrorKind::UnrecognizedToken {
                         span,
                         expected: "Expression",
                     }));
@@ -345,8 +349,8 @@ impl<'input> Parser<'input> {
             }
 
             None => {
-                self.errors
-                    .push(error!(parser: self, ErrorKind::UnrecognizedEof {
+                self.report_ctx
+                    .push(report!(parser: self, ErrorKind::UnrecognizedEof {
                         expected: &["an expression"],
                         previous_element_span: self.token_stream.previous().unwrap().0.clone()
                     }));
@@ -367,7 +371,7 @@ impl<'input> Parser<'input> {
                 Some(Spanned(span, TypeAnnotation::Object(other)))
             }
             Some(Spanned(span, _)) => {
-                self.errors.push(error!(
+                self.report_ctx.push(report!(
                     parser: self,
                     ErrorKind::UnrecognizedToken {
                         span,
@@ -378,7 +382,7 @@ impl<'input> Parser<'input> {
                 None
             }
             None => {
-                self.errors.push(error!(
+                self.report_ctx.push(report!(
                     parser: self,
                     ErrorKind::UnrecognizedEof {
                         expected: &["type annotation"],
@@ -399,8 +403,6 @@ mod tests {
 
     use std::{boxed::Box, vec};
 
-    use logos::Span;
-
     use crate::ast::{
         tokens::{
             Arrow, Eq, FunctionToken, LeftParenthesisToken, Operator, OperatorKind,
@@ -410,13 +412,24 @@ mod tests {
     };
 
     macro_rules! parser {
-        ($text_to_parse:expr) => {
-            crate::Parser::with_tokenstream(
-                crate::lexer::tokenize(frostbite_reports::sourcemap::SourceId(0), $text_to_parse)
-                    .expect(alloc::format!("Failed to tokenize `{}`", { $text_to_parse }).as_str()),
+        ($text_to_parse:expr) => {{
+            let mut report_ctx = frostbite_reports::ReportContext::default();
+
+            let lexed = crate::lexer::tokenize(
+                &mut report_ctx,
+                frostbite_reports::sourcemap::SourceId(0),
+                $text_to_parse,
+            );
+
+            let program = crate::Parser::with_tokenstream(
+                &mut report_ctx,
+                lexed,
                 frostbite_reports::sourcemap::SourceId(0),
             )
-        };
+            .parse();
+
+            (report_ctx, program)
+        }};
     }
 
     macro_rules! boxed {
@@ -427,11 +440,13 @@ mod tests {
 
     #[test]
     fn test_parser_operation() {
-        let parser = parser!("1 + 2 + 3;");
+        let (report_ctx, program) = parser!("1 + 2 + 3");
+
+        assert!(report_ctx.is_empty());
 
         assert_eq!(
-            parser.parse(),
-            Ok(Program {
+            program,
+            Program {
                 exprs: vec![Expr::BinaryOperation {
                     lhs: boxed!(Expr::Int(Spanned(0..1, 1))),
                     operator: Operator(2..3, OperatorKind::Add),
@@ -441,33 +456,37 @@ mod tests {
                         rhs: boxed!(Expr::Int(Spanned(8..9, 3)))
                     }),
                 }]
-            })
+            }
         );
     }
 
     #[test]
     fn test_parser_assign() {
-        let parser = parser!("a = 1;");
+        let (report_ctx, parsed) = parser!("a = 1;");
+
+        assert!(report_ctx.is_empty());
 
         assert_eq!(
-            parser.parse(),
-            Ok(Program {
+            parsed,
+            Program {
                 exprs: vec![Expr::Assign {
                     lhs: boxed!(Expr::Ident(Spanned(0..1, "a"))),
                     eq_token: Eq(2..3),
                     value: boxed!(Expr::Int(Spanned(4..5, 1))),
                 }]
-            })
+            }
         );
     }
 
     #[test]
     fn test_parser_function() {
-        let parser = parser!("function test(x: int, y: int) = x + y;");
+        let (report_ctx, parsed) = parser!("function test(x: int, y: int) = x + y;");
+
+        assert!(report_ctx.is_empty());
 
         assert_eq!(
-            parser.parse(),
-            Ok(Program {
+            parsed,
+            Program {
                 exprs: vec![Expr::Function {
                     fn_token: FunctionToken(0..8),
                     name: Some(Spanned(9..13, "test")),
@@ -487,22 +506,24 @@ mod tests {
                     return_type_annotation: None,
                     equals: Eq(30..31),
                     body: boxed!(Expr::BinaryOperation {
-                        lhs: boxed!(Expr::Ident((Spanned(32..33, "x")))),
+                        lhs: boxed!(Expr::Ident(Spanned(32..33, "x"))),
                         operator: Operator(34..35, OperatorKind::Add),
                         rhs: boxed!(Expr::Ident(Spanned(36..37, "y")))
                     }),
                 }]
-            })
+            }
         );
     }
 
     #[test]
     fn test_parser_function_with_return() {
-        let parser = parser!("function test(x: int, y: int) -> int = x + y;");
+        let (report_ctx, parsed) = parser!("function test(x: int, y: int) -> int = (x * y) + y;");
+
+        assert!(report_ctx.is_empty());
 
         assert_eq!(
-            parser.parse(),
-            Ok(Program {
+            parsed,
+            Program {
                 exprs: vec![Expr::Function {
                     fn_token: FunctionToken(0..8),
                     name: Some(Spanned(9..13, "test")),
@@ -527,24 +548,26 @@ mod tests {
                         rhs: boxed!(Expr::Ident(Spanned(43..44, "y")))
                     }),
                 }]
-            })
+            }
         );
     }
 
     #[test]
     fn test_parser_call() {
-        let mut parser = parser!("bilo(a)");
+        let (report_ctx, mut parsed) = parser!("bilo(a);");
 
-        let ast = parser.parse_expr();
+        assert!(report_ctx.is_empty());
 
         assert_eq!(
-            ast,
-            Some(Expr::Call {
-                callee: Box::new(Expr::Ident(Spanned(0..4, "bilo"))),
-                lpt: LeftParenthesisToken(4..5),
-                arguments: vec![Expr::Ident(Spanned(5..6, "a"))],
-                rpt: RightParenthesisToken(6..7)
-            })
+            parsed,
+            Program {
+                exprs: vec![Expr::Call {
+                    callee: Box::new(Expr::Ident(Spanned(0..4, "bilo"))),
+                    lpt: LeftParenthesisToken(4..5),
+                    arguments: vec![Expr::Ident(Spanned(5..6, "a"))],
+                    rpt: RightParenthesisToken(6..7)
+                }]
+            }
         );
     }
 }

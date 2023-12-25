@@ -130,3 +130,37 @@ pub enum Position {
     Span(Range<usize>),
     Line(usize),
 }
+
+#[derive(Debug, Clone, Default)]
+pub struct ReportContext {
+    reports: Vec<Report>,
+}
+
+impl ReportContext {
+    pub fn has_errors(&self) -> bool {
+        self.reports.iter().any(|report| match report {
+            Report::Diagnostic(diagnostic) => diagnostic.level == Level::Error,
+            Report::Backtrace(_) => true,
+        })
+    }
+}
+
+impl core::ops::DerefMut for ReportContext {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.reports
+    }
+}
+
+impl core::ops::Deref for ReportContext {
+    type Target = Vec<Report>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.reports
+    }
+}
+
+impl Extend<Report> for ReportContext {
+    fn extend<T: IntoIterator<Item = Report>>(&mut self, iter: T) {
+        self.reports.extend(iter)
+    }
+}

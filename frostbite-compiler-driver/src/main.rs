@@ -1,9 +1,4 @@
-use std::{
-    fs,
-    io::{stdout, BufWriter, Write},
-    path::PathBuf,
-    process,
-};
+use std::{env, fs, io::Write, path::PathBuf, process};
 
 use clap::Parser;
 use color_eyre::eyre;
@@ -11,6 +6,7 @@ use frostbite_compiler::{codegen::CodegenBackends, Compiler};
 use frostbite_reports::{
     diagnostic_printer::{DefaultPrintBackend, DiagnosticPrinter},
     sourcemap::{SourceDescription, SourceMap},
+    ReportContext,
 };
 
 #[derive(clap::Parser)]
@@ -23,6 +19,7 @@ pub struct CliArgs {
 pub enum CliSubcommand {
     Compile {
         file: PathBuf,
+
         output_file: Option<PathBuf>,
     },
 }
@@ -30,6 +27,7 @@ pub enum CliSubcommand {
 fn main() -> eyre::Result<()> {
     color_eyre::install()?;
 
+    let debug = env::var("DEBUG").is_ok();
     let args = CliArgs::try_parse()?;
 
     match args.subcommand {
@@ -43,11 +41,24 @@ fn main() -> eyre::Result<()> {
                 source_code: src,
             });
 
-            let output = match Compiler::compile_source(
+            let mut report_ctx = ReportContext::default();
+
+            let output = Compiler::compile_source(
+                &mut report_ctx,
                 src_id,
                 &mut source_map,
                 CodegenBackends::bytecode_backend(),
-            ) {
+            );
+
+            if output.is_err() {
+                
+            }
+
+            if debug {
+                println!("{hir}");
+            }
+
+            let module = match output {
                 Ok(output) => output,
                 Err(reports) => {
                     let mut buf = String::new();
@@ -71,9 +82,16 @@ fn main() -> eyre::Result<()> {
 
             let mut buf = vec![];
 
-            frostbite_bytecode::encode(&output, &mut buf);
+            frostbite_bytecode::encode(&module, &mut buf);
 
-            let mut fs_writer = fs::File::open(output_file.unwrap_or("./output".into()))?;
+            let output_file = output_file.unwrap_or("./output".into());
+
+            let mut fs_writer = fs::OpenOptions::new()
+                .read(true)
+                .write(true)
+                .create(true)
+                .append(false)
+                .open(output_file)?;
 
             fs_writer.write_all(&buf)?;
         }

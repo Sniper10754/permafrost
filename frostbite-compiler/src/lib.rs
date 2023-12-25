@@ -7,44 +7,67 @@ use codegen::CodegenBackend;
 use frostbite_parser::{lexer::tokenize, Parser};
 use frostbite_reports::{
     sourcemap::{SourceId, SourceMap},
-    IntoReport, Report,
+    IntoReport, Report, ReportContext,
 };
+use hir::HirTree;
 use semantic::run_semantic_checks;
 
 pub mod codegen;
 pub mod hir;
 pub mod semantic;
 
+mod utils {
+    use frostbite_reports::ReportContext;
+
+    pub fn bail_on_errors(report_ctx: &ReportContext) -> Result<(), ()> {
+        if report_ctx.has_errors() {
+            Err(())
+        } else {
+            Ok(())
+        }
+    }
+}
+
+#[derive(Debug)]
+pub struct CompilationResults<C: CodegenBackend> {
+    hir: HirTree,
+    codegen_output: C::Output,
+}
+
 pub struct Compiler;
 
 impl Compiler {
     pub fn compile_source<C: CodegenBackend>(
+        report_ctx: &mut ReportContext,
         source_id: SourceId,
         src_map: &mut SourceMap,
         codegen: C,
-    ) -> Result<C::Output, Vec<Report>> {
+    ) -> Result<CompilationResults<C>, ()> {
         let source = &src_map.get(source_id).unwrap().source_code;
 
-        let token_stream = tokenize(source_id, source).map_err(|err| {
-            err.into_iter()
-                .map(|lex_err| lex_err.into_report())
-                .collect::<Vec<_>>()
-        })?;
+        let token_stream = tokenize(report_ctx, source_id, source);
 
-        let ast = Parser::with_tokenstream(token_stream, source_id)
-            .parse()
-            .map_err(|errors| {
-                errors
-                    .into_iter()
-                    .map(|error| error.into_report())
-                    .collect::<Vec<_>>()
-            })?;
+        utils::bail_on_errors(report_ctx)?;
 
-        let hir = run_semantic_checks(source_id, src_map, &ast)?;
+        let ast = Parser::with_tokenstream(report_ctx, token_stream, source_id).parse();
 
-        match codegen.codegen(&hir) {
-            Ok(output) => Ok(output),
-            Err(errors) => Err(errors.into_iter().map(|err| err.into_report()).collect()),
-        }
+        utils::bail_on_errors(report_ctx)?;
+
+        let mut hir = HirTree::default();
+
+        run_semantic_checks(report_ctx, source_id, src_map, &ast, &mut hir);
+
+        utils::bail_on_errors(report_ctx)?;
+
+        let codegen_output = C::codegen(codegen, report_ctx, &hir)?;
+
+        utils::bail_on_errors(report_ctx)?;
+
+        let compilation_results = CompilationResults {
+            codegen_output,
+            hir,
+        };
+
+        Ok(compilation_results)
     }
 }

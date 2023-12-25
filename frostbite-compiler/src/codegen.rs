@@ -1,17 +1,15 @@
-use alloc::vec::Vec;
-use frostbite_reports::IntoReport;
+use frostbite_reports::ReportContext;
 
 mod bytecode;
 
 pub use bytecode::BytecodeCodegenBackend;
 
-use crate::hir::Hir;
+use crate::hir::HirTree;
 
 pub trait CodegenBackend {
     type Output;
-    type Error: IntoReport;
 
-    fn codegen(self, program: &Hir) -> Result<Self::Output, Vec<Self::Error>>;
+    fn codegen(self, reports: &mut ReportContext, program: &HirTree) -> Result<Self::Output, ()>;
 }
 
 pub struct CodegenBackends;

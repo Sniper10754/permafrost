@@ -1,7 +1,8 @@
+function add(x: int, y: int) -> int = x + y + 1;
+
 x = 6;
 
 y = 2 * x;
 
-z = x * 10 * y * 2;
+z = x * 10 * y * 2 + add(y, z);
 
-print(z);
