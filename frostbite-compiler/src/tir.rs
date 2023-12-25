@@ -31,11 +31,11 @@ mod utils {
 
 /// A High level representation of the input
 #[derive(Debug, Default)]
-pub struct HirTree {
-    pub nodes: Vec<HirNode>,
+pub struct TirTree {
+    pub nodes: Vec<TirNode>,
 }
 
-impl Display for HirTree {
+impl Display for TirTree {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         for node in &self.nodes {
             writeln!(f, "{node}")?;
@@ -46,7 +46,7 @@ impl Display for HirTree {
 }
 
 #[derive(Debug)]
-pub enum HirNode {
+pub enum TirNode {
     Int(Spanned<i32>),
     Float(Spanned<f32>),
     Ident(Type, Spanned<String>),
@@ -81,16 +81,16 @@ pub enum HirNode {
     Uninitialized,
 }
 
-impl Display for HirNode {
+impl Display for TirNode {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         match self {
-            HirNode::Int(Spanned(_, value)) => write!(f, "{value}"),
-            HirNode::Float(Spanned(_, value)) => write!(f, "{value}"),
-            HirNode::Ident(r#type, Spanned(_, value)) => write!(f, "{value}: ({})", r#type),
-            HirNode::String(Spanned(_, value)) => write!(f, "{value}"),
-            HirNode::BinaryOperation { lhs, operator, rhs } => write!(f, "{lhs} {operator} {rhs}"),
-            HirNode::Assign { lhs, value } => write!(f, "{lhs} = {value}"),
-            HirNode::Function {
+            TirNode::Int(Spanned(_, value)) => write!(f, "{value}"),
+            TirNode::Float(Spanned(_, value)) => write!(f, "{value}"),
+            TirNode::Ident(r#type, Spanned(_, value)) => write!(f, "{value}: ({})", r#type),
+            TirNode::String(Spanned(_, value)) => write!(f, "{value}"),
+            TirNode::BinaryOperation { lhs, operator, rhs } => write!(f, "{lhs} {operator} {rhs}"),
+            TirNode::Assign { lhs, value } => write!(f, "{lhs} = {value}"),
+            TirNode::Function {
                 name,
                 arguments,
                 return_type,
@@ -109,7 +109,7 @@ impl Display for HirNode {
                     buf
                 }
             ),
-            HirNode::Call {
+            TirNode::Call {
                 callee,
                 arguments,
                 return_type,
@@ -129,8 +129,8 @@ impl Display for HirNode {
 
                 buf
             }),
-            HirNode::Poisoned => write!(f, "Poisoned tree branch (compilation error happened)"),
-            HirNode::Uninitialized => unreachable!(),
+            TirNode::Poisoned => write!(f, "Poisoned tree branch (compilation error happened)"),
+            TirNode::Uninitialized => unreachable!(),
         }
     }
 }
@@ -142,12 +142,12 @@ pub enum Assignable {
     Ident(Type, Spanned<String>),
 }
 
-impl TryFrom<HirNode> for Assignable {
+impl TryFrom<TirNode> for Assignable {
     type Error = ();
 
-    fn try_from(value: HirNode) -> Result<Self, Self::Error> {
+    fn try_from(value: TirNode) -> Result<Self, Self::Error> {
         match value {
-            HirNode::Ident(r#type, ident @ Spanned(..)) => Ok(Assignable::Ident(r#type, ident)),
+            TirNode::Ident(r#type, ident @ Spanned(..)) => Ok(Assignable::Ident(r#type, ident)),
 
             _ => Err(()),
         }

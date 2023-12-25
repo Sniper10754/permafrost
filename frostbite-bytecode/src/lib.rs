@@ -68,7 +68,6 @@ pub struct Module {
     pub manifest: Manifest,
     pub constants_pool: Pool<ConstantValue>,
     pub functions: Vec<Function>,
-    pub instructions: Vec<Instruction>,
     pub body: Vec<Instruction>,
 }
 

@@ -1,13 +1,10 @@
-
-
-
-
 use frostbite_parser::ast::Program;
 use frostbite_reports::{
-    sourcemap::{SourceId, SourceMap}, ReportContext,
+    sourcemap::{SourceId, SourceMap},
+    ReportContext,
 };
 
-use crate::hir::HirTree;
+use crate::tir::TirTree;
 
 use self::typecheck::check_types;
 
@@ -19,7 +16,7 @@ pub fn run_semantic_checks(
     source_id: SourceId,
     source_map: &SourceMap,
     ast: &Program<'_>,
-    hir: &mut HirTree,
+    t_ir: &mut TirTree,
 ) {
-    check_types(report_ctx, source_id, source_map, ast, hir);
+    check_types(report_ctx, source_id, source_map, ast, t_ir);
 }

@@ -1,8 +1,8 @@
 use alloc::{collections::BTreeMap, vec::Vec};
-use frostbite_bytecode::{BytecodeVersion, Manifest, Module};
+use frostbite_bytecode::{BytecodeVersion, Manifest, Module, Pool};
 use frostbite_reports::ReportContext;
 
-use crate::hir::{HirNode, HirTree};
+use crate::tir::{TirNode, TirTree};
 
 use super::CodegenBackend;
 
@@ -13,10 +13,10 @@ impl BytecodeCodegenBackend {
     fn compile_program(
         &self,
         report_ctx: &mut ReportContext,
-        hir: &mut HirTree,
+        t_ir: &mut TirTree,
         module: &mut Module,
     ) {
-        for node in &hir.nodes {
+        for node in &t_ir.nodes {
             self.compile_node(report_ctx, node, module);
         }
     }
@@ -24,31 +24,31 @@ impl BytecodeCodegenBackend {
     fn compile_node(
         &self,
         report_ctx: &mut ReportContext,
-        hir_node: &HirNode,
+        t_ir_node: &TirNode,
         module: &mut Module,
     ) {
-        match hir_node {
-            HirNode::Int(_) => {
-                module.constants_pool.insert(key, value);
+        match t_ir_node {
+            TirNode::Int(_) => {
+                // module.constants_pool.push();
             }
-            HirNode::Float(_) => todo!(),
-            HirNode::Ident(_, _) => todo!(),
-            HirNode::String(_) => todo!(),
-            HirNode::BinaryOperation { lhs, operator, rhs } => todo!(),
-            HirNode::Assign { lhs, value } => todo!(),
-            HirNode::Function {
+            TirNode::Float(_) => todo!(),
+            TirNode::Ident(_, _) => todo!(),
+            TirNode::String(_) => todo!(),
+            TirNode::BinaryOperation { lhs, operator, rhs } => todo!(),
+            TirNode::Assign { lhs, value } => todo!(),
+            TirNode::Function {
                 name,
                 arguments,
                 return_type,
                 body,
             } => todo!(),
-            HirNode::Call {
+            TirNode::Call {
                 callee,
                 arguments,
                 return_type,
             } => todo!(),
 
-            HirNode::Poisoned | HirNode::Uninitialized => unreachable!(),
+            TirNode::Poisoned | TirNode::Uninitialized => unreachable!(),
         }
     }
 }
@@ -59,15 +59,15 @@ impl CodegenBackend for BytecodeCodegenBackend {
     fn codegen(
         self,
         _report_ctx: &mut ReportContext,
-        _program: &HirTree,
+        _program: &TirTree,
     ) -> Result<Self::Output, ()> {
         let module = Module {
             manifest: Manifest {
                 bytecode_version: BytecodeVersion::Number(0.1),
             },
-            constants_pool: BTreeMap::new(),
+            constants_pool: Pool::new(),
             functions: Vec::new(),
-            instructions: Vec::new(),
+            body: Vec::new(),
         };
 
         Ok(module)

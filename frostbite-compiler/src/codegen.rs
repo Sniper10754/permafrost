@@ -4,12 +4,12 @@ mod bytecode;
 
 pub use bytecode::BytecodeCodegenBackend;
 
-use crate::hir::HirTree;
+use crate::tir::TirTree;
 
 pub trait CodegenBackend {
     type Output;
 
-    fn codegen(self, reports: &mut ReportContext, program: &HirTree) -> Result<Self::Output, ()>;
+    fn codegen(self, reports: &mut ReportContext, program: &TirTree) -> Result<Self::Output, ()>;
 }
 
 pub struct CodegenBackends;

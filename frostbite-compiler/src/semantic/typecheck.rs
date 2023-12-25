@@ -15,7 +15,7 @@ use frostbite_reports::{
     IntoReport, Level, Report, ReportContext,
 };
 
-use crate::hir::{HirNode, HirTree, Type};
+use crate::tir::{TirNode, TirTree, Type};
 
 type ScopeTable<'ast> = Vec<Scope<'ast>>;
 type Scope<'ast> = BTreeMap<&'ast str, Symbol<'ast>>;
@@ -218,22 +218,22 @@ pub fn check_types(
     source_id: SourceId,
     _map: &SourceMap,
     ast: &Program<'_>,
-    hir: &mut HirTree,
+    t_ir: &mut TirTree,
 ) {
     let mut rts = RecursiveTypechecker::new();
 
     for expr in &ast.exprs {
-        let mut hir_node = HirNode::Uninitialized;
+        let mut t_ir_node = TirNode::Uninitialized;
 
-        let result = rts.visit_expr(source_id, expr, &mut hir_node);
+        let result = rts.visit_expr(source_id, expr, &mut t_ir_node);
 
         match result {
             Ok(_) => {}
             Err(error) => report_ctx.push(error.into_report()),
         };
 
-        hir.nodes.push(match hir_node {
-            HirNode::Uninitialized => HirNode::Poisoned,
+        t_ir.nodes.push(match t_ir_node {
+            TirNode::Uninitialized => TirNode::Poisoned,
 
             node => node,
         });
@@ -363,19 +363,19 @@ impl<'ast> RecursiveTypechecker<'ast> {
         &mut self,
         source_id: SourceId,
         expr: &Expr<'ast>,
-        hir_node: &mut HirNode,
+        t_ir_node: &mut TirNode,
     ) -> Result<(), TypecheckError<'ast>> {
         match expr {
             Expr::Int(Spanned(span, value)) => {
-                *hir_node = HirNode::Int(Spanned(span.clone(), *value))
+                *t_ir_node = TirNode::Int(Spanned(span.clone(), *value))
             }
 
             Expr::Float(Spanned(span, value)) => {
-                *hir_node = HirNode::Float(Spanned(span.clone(), *value))
+                *t_ir_node = TirNode::Float(Spanned(span.clone(), *value))
             }
 
             Expr::String(Spanned(span, value)) => {
-                *hir_node = HirNode::String(Spanned(span.clone(), value.to_string()))
+                *t_ir_node = TirNode::String(Spanned(span.clone(), value.to_string()))
             }
 
             Expr::Ident(Spanned(span, ident)) => {
@@ -386,7 +386,7 @@ impl<'ast> RecursiveTypechecker<'ast> {
                 {
                     let symbol = scope[ident].clone();
 
-                    *hir_node = HirNode::Ident(
+                    *t_ir_node = TirNode::Ident(
                         symbol.into(),
                         Spanned(span.clone(), ident).map(ToString::to_string),
                     );
@@ -397,21 +397,21 @@ impl<'ast> RecursiveTypechecker<'ast> {
                     ));
                 }
 
-                *hir_node = HirNode::Ident(
+                *t_ir_node = TirNode::Ident(
                     self.infer_type(source_id, expr)?.into(),
                     Spanned(span.clone(), ident.to_string()),
                 )
             }
             Expr::BinaryOperation { lhs, operator, rhs } => {
-                let (mut hir_lhs, mut hir_rhs) = (HirNode::Poisoned, HirNode::Poisoned);
+                let (mut t_ir_lhs, mut t_ir_rhs) = (TirNode::Poisoned, TirNode::Poisoned);
 
-                self.visit_expr(source_id, lhs, &mut hir_lhs)?;
-                self.visit_expr(source_id, rhs, &mut hir_rhs)?;
+                self.visit_expr(source_id, lhs, &mut t_ir_lhs)?;
+                self.visit_expr(source_id, rhs, &mut t_ir_rhs)?;
 
-                *hir_node = HirNode::BinaryOperation {
-                    lhs: Box::new(hir_lhs),
+                *t_ir_node = TirNode::BinaryOperation {
+                    lhs: Box::new(t_ir_lhs),
                     operator: operator.clone(),
-                    rhs: Box::new(hir_rhs),
+                    rhs: Box::new(t_ir_rhs),
                 };
             }
             Expr::Assign {
@@ -428,16 +428,16 @@ impl<'ast> RecursiveTypechecker<'ast> {
                         .unwrap()
                         .insert(ident, inferred_type);
 
-                    let (mut hir_lhs, mut hir_value) = (HirNode::Poisoned, HirNode::Poisoned);
+                    let (mut t_ir_lhs, mut t_ir_value) = (TirNode::Poisoned, TirNode::Poisoned);
 
-                    self.visit_expr(source_id, lhs, &mut hir_lhs)?;
-                    self.visit_expr(source_id, value, &mut hir_value)?;
+                    self.visit_expr(source_id, lhs, &mut t_ir_lhs)?;
+                    self.visit_expr(source_id, value, &mut t_ir_value)?;
 
-                    *hir_node = HirNode::Assign {
-                        lhs: hir_lhs.try_into().expect(
+                    *t_ir_node = TirNode::Assign {
+                        lhs: t_ir_lhs.try_into().expect(
                             "Guaranteed to be a assignable since the match above guards it",
                         ),
-                        value: hir_value.into(),
+                        value: t_ir_value.into(),
                     };
                 }
 
@@ -456,7 +456,7 @@ impl<'ast> RecursiveTypechecker<'ast> {
                 equals: _,
                 body,
             } => {
-                let mut hir_arguments = BTreeMap::new();
+                let mut t_ir_arguments = BTreeMap::new();
 
                 for (name, argument_type) in arguments.iter().map(|argument| {
                     (
@@ -484,7 +484,7 @@ impl<'ast> RecursiveTypechecker<'ast> {
                         _ => (),
                     }
 
-                    hir_arguments.insert(name.to_string(), argument_type.1.into());
+                    t_ir_arguments.insert(name.to_string(), argument_type.1.into());
                 }
 
                 match return_type_annotation {
@@ -511,7 +511,7 @@ impl<'ast> RecursiveTypechecker<'ast> {
                         .insert(name, fn_symbol);
                 }
 
-                let mut hir_body = HirNode::Poisoned;
+                let mut t_ir_body = TirNode::Poisoned;
 
                 self.scope_table.first_mut().unwrap().extend(
                     arguments
@@ -519,7 +519,7 @@ impl<'ast> RecursiveTypechecker<'ast> {
                         .map(|arg| (arg.name.1, arg.type_annotation.1.into())),
                 );
 
-                self.visit_expr(source_id, body, &mut hir_body)?;
+                self.visit_expr(source_id, body, &mut t_ir_body)?;
 
                 let function_return_type_symbol = return_type_annotation
                     .as_ref()
@@ -539,19 +539,19 @@ impl<'ast> RecursiveTypechecker<'ast> {
                     });
                 }
 
-                *hir_node = HirNode::Function {
+                *t_ir_node = TirNode::Function {
                     name: name
                         .as_ref()
                         .cloned()
                         .map(|spanned_name| spanned_name.map(ToString::to_string)),
-                    arguments: hir_arguments,
+                    arguments: t_ir_arguments,
                     return_type: return_type_annotation
                         .as_ref()
                         .cloned()
                         .map(|Spanned(_, annotation)| annotation)
                         .unwrap_or(TypeAnnotation::NotSpecified)
                         .into(),
-                    body: Box::new(hir_body),
+                    body: Box::new(t_ir_body),
                 }
             }
             Expr::Call {
@@ -573,7 +573,7 @@ impl<'ast> RecursiveTypechecker<'ast> {
                             ));
                         }
 
-                        let mut hir_call_arguments = vec![];
+                        let mut t_ir_call_arguments = vec![];
 
                         let function_type = self
                             .scope_table
@@ -616,11 +616,11 @@ impl<'ast> RecursiveTypechecker<'ast> {
                                 }
 
                                 for argument in call_arguments {
-                                    let mut hir_node = HirNode::Poisoned;
+                                    let mut t_ir_node = TirNode::Poisoned;
 
-                                    self.visit_expr(source_id, argument, &mut hir_node)?;
+                                    self.visit_expr(source_id, argument, &mut t_ir_node)?;
 
-                                    hir_call_arguments.push(hir_node);
+                                    t_ir_call_arguments.push(t_ir_node);
                                 }
 
                                 let call_arguments_types = call_arguments
@@ -651,9 +651,9 @@ impl<'ast> RecursiveTypechecker<'ast> {
                                     }
                                 }
 
-                                *hir_node = HirNode::Call {
+                                *t_ir_node = TirNode::Call {
                                     callee: Spanned(callee_span.clone(), function_type.into()),
-                                    arguments: hir_call_arguments,
+                                    arguments: t_ir_call_arguments,
                                     return_type: self.infer_type(source_id, expr)?.into(),
                                 }
                             }

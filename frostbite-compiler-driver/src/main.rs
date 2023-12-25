@@ -52,7 +52,7 @@ fn main() -> eyre::Result<()> {
             );
 
             let CompilationResults {
-                hir: _,
+                t_ir: _,
                 codegen_output,
             } = match output {
                 Ok(output) => output,

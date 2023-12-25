@@ -2,18 +2,18 @@
 
 extern crate alloc;
 
-
 use codegen::CodegenBackend;
 use frostbite_parser::{lexer::tokenize, Parser};
 use frostbite_reports::{
-    sourcemap::{SourceId, SourceMap}, ReportContext,
+    sourcemap::{SourceId, SourceMap},
+    ReportContext,
 };
-use hir::HirTree;
 use semantic::run_semantic_checks;
+use tir::TirTree;
 
 pub mod codegen;
-pub mod hir;
 pub mod semantic;
+pub mod tir;
 
 mod utils {
     use frostbite_reports::ReportContext;
@@ -29,7 +29,7 @@ mod utils {
 
 #[derive(Debug)]
 pub struct CompilationResults<C: CodegenBackend> {
-    pub hir: HirTree,
+    pub t_ir: TirTree,
     pub codegen_output: C::Output,
 }
 
@@ -52,19 +52,19 @@ impl Compiler {
 
         utils::bail_on_errors(report_ctx)?;
 
-        let mut hir = HirTree::default();
+        let mut t_ir = TirTree::default();
 
-        run_semantic_checks(report_ctx, source_id, src_map, &ast, &mut hir);
+        run_semantic_checks(report_ctx, source_id, src_map, &ast, &mut t_ir);
 
         utils::bail_on_errors(report_ctx)?;
 
-        let codegen_output = C::codegen(codegen, report_ctx, &hir)?;
+        let codegen_output = C::codegen(codegen, report_ctx, &t_ir)?;
 
         utils::bail_on_errors(report_ctx)?;
 
         let compilation_results = CompilationResults {
             codegen_output,
-            hir,
+            t_ir,
         };
 
         Ok(compilation_results)
