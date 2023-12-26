@@ -63,7 +63,7 @@ fn main() -> eyre::Result<()> {
                         match report {
                             Report::Diagnostic(diagnostic) => {
                                 DiagnosticPrinter::new(&mut buf)
-                                    .print::<DefaultPrintBackend>(&source_map, &diagnostic)
+                                    .print::<DefaultPrintBackend>(&source_map, diagnostic)
                                     .unwrap();
                             }
                             Report::Backtrace(_) => unreachable!(),
