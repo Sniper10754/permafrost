@@ -6,22 +6,20 @@ use core::{
     ops::Range,
 };
 
-use alloc::{
-    borrow::ToOwned, boxed::Box, collections::BTreeMap, format, string::ToString, vec, vec::Vec,
-};
+use alloc::{boxed::Box, collections::BTreeMap, format, string::ToString, vec, vec::Vec};
 use frostbite_parser::ast::{tokens::TypeAnnotation, Expr, Program, Spannable, Spanned};
 use frostbite_reports::{
     sourcemap::{SourceId, SourceMap},
     IntoReport, Level, Report, ReportContext,
 };
 
-use crate::tir::{TirNode, TirTree, Type};
+use crate::tir::{self, TirNode, TirTree};
 
 type ScopeTable<'ast> = Vec<Scope<'ast>>;
-type Scope<'ast> = BTreeMap<&'ast str, Symbol<'ast>>;
+type Scope<'ast> = BTreeMap<&'ast str, Type<'ast>>;
 
 #[derive(Debug, derive_more::Display, Clone, PartialEq)]
-pub enum Symbol<'ast> {
+pub enum Type<'ast> {
     #[display(fmt = "int")]
     Int,
 
@@ -32,7 +30,7 @@ pub enum Symbol<'ast> {
     String,
 
     #[display(fmt = "class {_0}")]
-    Other(&'ast str),
+    Object(&'ast str),
 
     #[display(fmt = "function")]
     Function {
@@ -43,42 +41,65 @@ pub enum Symbol<'ast> {
     #[display(fmt = "unit")]
     Unit,
 
-    #[display(fmt = "(unknown)")]
-    NotSpecified,
+    #[display(fmt = "any")]
+    Any,
 }
 
-impl<'ast> From<TypeAnnotation<'ast>> for Symbol<'ast> {
-    fn from(value: TypeAnnotation<'ast>) -> Self {
+impl<'a> From<TypeAnnotation<'a>> for Type<'a> {
+    fn from(value: TypeAnnotation<'a>) -> Self {
         match value {
             TypeAnnotation::Int => Self::Int,
             TypeAnnotation::Float => Self::Float,
             TypeAnnotation::String => Self::String,
-            TypeAnnotation::NotSpecified => Self::NotSpecified,
-            TypeAnnotation::Object(other) => Self::Other(other),
+            TypeAnnotation::NotSpecified => Self::Any,
             TypeAnnotation::Unit => Self::Unit,
+            TypeAnnotation::Object(string) => Self::Object(string.into()),
         }
     }
 }
 
-impl<'a> From<Symbol<'a>> for Type {
-    fn from(value: Symbol<'a>) -> Self {
+impl<'a> From<&'a tir::Type> for Type<'a> {
+    fn from(value: &'a tir::Type) -> Self {
         match value {
-            Symbol::Int => Type::Int,
-            Symbol::Float => Type::Float,
-            Symbol::String => Type::String,
-            Symbol::Other(obj) => Type::Object(obj.to_owned()),
-            Symbol::Function {
+            tir::Type::Int => Type::Int,
+            tir::Type::Float => Type::Float,
+            tir::Type::String => Type::String,
+            tir::Type::Object(obj) => Type::Object(obj),
+            tir::Type::Function {
                 arguments,
                 return_type,
             } => Type::Function {
                 arguments: arguments
-                    .into_iter()
-                    .map(|(ident, r#type)| (ident.to_owned(), r#type.into()))
+                    .iter()
+                    .map(|(ident, r#type)| (ident.as_str(), Self::from(r#type)))
                     .collect(),
-                return_value: Box::new((*return_type).into()),
+                return_type: Box::new(Self::from(&**return_type)),
             },
-            Symbol::Unit => todo!(),
-            Symbol::NotSpecified => todo!(),
+            tir::Type::Unit => Type::Unit,
+            tir::Type::Any => Type::Any,
+        }
+    }
+}
+
+impl<'a> From<Type<'a>> for tir::Type {
+    fn from(value: Type<'a>) -> Self {
+        match value {
+            Type::Int => Self::Int,
+            Type::Float => Self::Float,
+            Type::String => Self::String,
+            Type::Object(string) => Self::Object(string.into()),
+            Type::Function {
+                arguments,
+                return_type,
+            } => Self::Function {
+                arguments: arguments
+                    .into_iter()
+                    .map(|(name, r#type)| (name.into(), r#type.into()))
+                    .collect(),
+                return_type: Box::new((*return_type).clone().into()),
+            },
+            Type::Unit => Self::Unit,
+            Type::Any => Self::Any,
         }
     }
 }
@@ -89,8 +110,8 @@ pub enum TypecheckError<'ast> {
         source_id: SourceId,
         span: Range<usize>,
 
-        expected: Symbol<'ast>,
-        found: Symbol<'ast>,
+        expected: Type<'ast>,
+        found: Type<'ast>,
     },
     SymbolNotFound(SourceId, Spanned<&'ast str>),
     IncompatibleOperands(SourceId, Range<usize>),
@@ -255,10 +276,10 @@ impl<'ast> RecursiveTypechecker<'ast> {
         &mut self,
         source_id: SourceId,
         expr: &Expr<'ast>,
-    ) -> Result<Symbol<'ast>, TypecheckError<'ast>> {
+    ) -> Result<Type<'ast>, TypecheckError<'ast>> {
         match expr {
-            Expr::Int(Spanned(_, _)) => Ok(Symbol::Int),
-            Expr::Float(Spanned(_, _)) => Ok(Symbol::Float),
+            Expr::Int(Spanned(_, value)) => Ok(Type::Int),
+            Expr::Float(Spanned(_, value)) => Ok(Type::Float),
             Expr::Ident(Spanned(span, ident)) => match self
                 .scope_table
                 .iter()
@@ -270,16 +291,16 @@ impl<'ast> RecursiveTypechecker<'ast> {
                     Spanned(span.clone(), ident),
                 )),
             },
-            Expr::String(Spanned(_, _)) => Ok(Symbol::String),
+            Expr::String(Spanned(_, string)) => Ok(Type::String),
             Expr::BinaryOperation { lhs, operator, rhs } => match (
                 self.infer_type(source_id, lhs)?,
                 operator,
                 self.infer_type(source_id, rhs)?,
             ) {
-                (Symbol::Int, _, Symbol::Int) => Ok(Symbol::Int),
-                (Symbol::Float, _, Symbol::Int) => Ok(Symbol::Float),
-                (Symbol::Int, _, Symbol::Float) => Ok(Symbol::Float),
-                (Symbol::Float, _, Symbol::Float) => Ok(Symbol::Float),
+                (Type::Int, _, Type::Int) => Ok(Type::Int),
+                (Type::Float, _, Type::Int) => Ok(Type::Float),
+                (Type::Int, _, Type::Float) => Ok(Type::Float),
+                (Type::Float, _, Type::Float) => Ok(Type::Float),
 
                 _ => Err(TypecheckError::IncompatibleOperands(source_id, expr.span())),
             },
@@ -287,7 +308,7 @@ impl<'ast> RecursiveTypechecker<'ast> {
                 lhs: _,
                 eq_token: _,
                 value: _,
-            } => Ok(Symbol::Unit),
+            } => Ok(Type::Unit),
             Expr::Function {
                 fn_token: _,
                 name,
@@ -300,24 +321,24 @@ impl<'ast> RecursiveTypechecker<'ast> {
                 body: _,
             } => {
                 if name.is_some() {
-                    Ok(Symbol::Function {
+                    Ok(Type::Function {
                         arguments: arguments
                             .iter()
                             .map(|argument| (argument.name.1, argument.type_annotation.clone()))
                             .map(|(name, Spanned(_, type_annotation))| {
-                                (name, Symbol::from(type_annotation))
+                                (name, type_annotation.into())
                             })
                             .collect(),
                         return_type: Box::new(
                             return_type_annotation
                                 .as_ref()
-                                .map_or(Symbol::NotSpecified, |Spanned(_, type_annotation)| {
-                                    Symbol::from(*type_annotation)
-                                }),
+                                .map(|annotation| annotation.1)
+                                .unwrap_or(TypeAnnotation::NotSpecified)
+                                .into(),
                         ),
                     })
                 } else {
-                    Ok(Symbol::NotSpecified)
+                    Ok(Type::Unit)
                 }
             }
             Expr::Call {
@@ -333,7 +354,7 @@ impl<'ast> RecursiveTypechecker<'ast> {
                         .find(|scope| scope.contains_key(ident))
                     {
                         Some(scope) => {
-                            if let Symbol::Function {
+                            if let Type::Function {
                                 arguments: _,
                                 return_type,
                             } = &scope[ident]
@@ -355,7 +376,7 @@ impl<'ast> RecursiveTypechecker<'ast> {
 
                 _ => Err(TypecheckError::CannotCallNonIdent(source_id, callee.span())),
             },
-            Expr::Poisoned => Ok(Symbol::NotSpecified),
+            Expr::Poisoned => Ok(Type::Unit),
         }
     }
 
@@ -386,10 +407,10 @@ impl<'ast> RecursiveTypechecker<'ast> {
                 {
                     let symbol = scope[ident].clone();
 
-                    *t_ir_node = TirNode::Ident(
-                        symbol.into(),
-                        Spanned(span.clone(), ident).map(ToString::to_string),
-                    );
+                    *t_ir_node = TirNode::Ident {
+                        r#type: symbol.into(),
+                        str_value: Spanned(span.clone(), ident).map(ToString::to_string),
+                    };
                 } else {
                     return Err(TypecheckError::SymbolNotFound(
                         source_id,
@@ -397,10 +418,10 @@ impl<'ast> RecursiveTypechecker<'ast> {
                     ));
                 }
 
-                *t_ir_node = TirNode::Ident(
-                    self.infer_type(source_id, expr)?.into(),
-                    Spanned(span.clone(), ident.to_string()),
-                )
+                *t_ir_node = TirNode::Ident {
+                    r#type: self.infer_type(source_id, expr)?.into(),
+                    str_value: Spanned(span.clone(), ident.to_string()),
+                }
             }
             Expr::BinaryOperation { lhs, operator, rhs } => {
                 let (mut t_ir_lhs, mut t_ir_rhs) = (TirNode::Poisoned, TirNode::Poisoned);
@@ -463,12 +484,12 @@ impl<'ast> RecursiveTypechecker<'ast> {
                         argument.name.1,
                         Spanned(
                             argument.type_annotation.span(),
-                            Symbol::from(argument.type_annotation.1),
+                            Type::from(argument.type_annotation.1),
                         ),
                     )
                 }) {
                     match argument_type {
-                        Spanned(span, Symbol::Other(identifier)) => {
+                        Spanned(span, Type::Object(identifier)) => {
                             if !self
                                 .scope_table
                                 .iter()
@@ -585,7 +606,7 @@ impl<'ast> RecursiveTypechecker<'ast> {
                         let call_arguments_span = (lpt.0.start)..(rpt.0.end);
 
                         match &function_type {
-                            Symbol::Function {
+                            Type::Function {
                                 arguments: function_arguments,
                                 return_type: _,
                             } => {

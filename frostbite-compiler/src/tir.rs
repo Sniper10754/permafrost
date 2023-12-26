@@ -49,8 +49,13 @@ impl Display for TirTree {
 pub enum TirNode {
     Int(Spanned<i32>),
     Float(Spanned<f32>),
-    Ident(Type, Spanned<String>),
     String(Spanned<String>),
+
+    Ident {
+        r#type: Type,
+
+        str_value: Spanned<String>,
+    },
 
     BinaryOperation {
         lhs: Box<Self>,
@@ -86,7 +91,10 @@ impl Display for TirNode {
         match self {
             TirNode::Int(Spanned(_, value)) => write!(f, "{value}"),
             TirNode::Float(Spanned(_, value)) => write!(f, "{value}"),
-            TirNode::Ident(r#type, Spanned(_, value)) => write!(f, "{value}: ({})", r#type),
+            TirNode::Ident {
+                r#type,
+                str_value: Spanned(_, value),
+            } => write!(f, "{value}: ({})", r#type),
             TirNode::String(Spanned(_, value)) => write!(f, "{value}"),
             TirNode::BinaryOperation { lhs, operator, rhs } => write!(f, "{lhs} {operator} {rhs}"),
             TirNode::Assign { lhs, value } => write!(f, "{lhs} = {value}"),
@@ -147,14 +155,17 @@ impl TryFrom<TirNode> for Assignable {
 
     fn try_from(value: TirNode) -> Result<Self, Self::Error> {
         match value {
-            TirNode::Ident(r#type, ident @ Spanned(..)) => Ok(Assignable::Ident(r#type, ident)),
+            TirNode::Ident {
+                r#type,
+                str_value: ident @ Spanned(..),
+            } => Ok(Assignable::Ident(r#type, ident)),
 
             _ => Err(()),
         }
     }
 }
 
-#[derive(Debug, derive_more::Display)]
+#[derive(Debug, Clone, derive_more::Display)]
 pub enum Type {
     #[display(fmt = "int")]
     Int,
@@ -175,11 +186,11 @@ pub enum Type {
 
             buf
         }",
-        "return_value"
+        "return_type"
     )]
     Function {
         arguments: BTreeMap<String, Self>,
-        return_value: Box<Self>,
+        return_type: Box<Self>,
     },
 
     #[display(fmt = "()")]
@@ -187,6 +198,9 @@ pub enum Type {
 
     #[display(fmt = "class {_0}")]
     Object(String),
+
+    #[display(fmt = "any")]
+    Any,
 }
 
 impl<'a> From<TypeAnnotation<'a>> for Type {

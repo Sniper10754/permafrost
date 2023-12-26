@@ -10,7 +10,9 @@ use self::tokens::{
 pub type Span = Range<usize>;
 
 pub mod tokens {
+
     use derive_more::Display;
+    use num_traits::Num;
 
     use super::{Span, Spannable};
 
@@ -53,6 +55,17 @@ pub mod tokens {
         Mul,
         #[display(fmt = "/")]
         Div,
+    }
+
+    impl OperatorKind {
+        pub fn calculate_binary_op<N: Num>(self, lhs: N, rhs: N) -> N {
+            match self {
+                OperatorKind::Add => lhs + rhs,
+                OperatorKind::Sub => lhs - rhs,
+                OperatorKind::Mul => lhs * rhs,
+                OperatorKind::Div => lhs / rhs,
+            }
+        }
     }
 
     #[derive(Debug, Clone, Copy, PartialEq, Display)]

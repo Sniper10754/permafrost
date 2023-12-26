@@ -1,5 +1,6 @@
 use alloc::{collections::BTreeMap, vec::Vec};
-use frostbite_bytecode::{BytecodeVersion, Manifest, Module, Pool};
+use frostbite_bytecode::{BytecodeVersion, Globals, Instruction, Manifest, Module, Pool};
+use frostbite_parser::ast::Spanned;
 use frostbite_reports::ReportContext;
 
 use crate::tir::{TirNode, TirTree};
@@ -14,26 +15,45 @@ impl BytecodeCodegenBackend {
         &self,
         report_ctx: &mut ReportContext,
         t_ir: &mut TirTree,
-        module: &mut Module,
+        globals: &mut Module,
     ) {
+        let body = &mut globals.body;
+        let globals = &mut globals.globals;
+
         for node in &t_ir.nodes {
-            self.compile_node(report_ctx, node, module);
+            self.compile_node(report_ctx, body, globals, node);
         }
     }
 
     fn compile_node(
         &self,
-        report_ctx: &mut ReportContext,
+        _report_ctx: &mut ReportContext,
+        instructions: &mut Vec<Instruction>,
+        globals: &mut Globals,
         t_ir_node: &TirNode,
-        module: &mut Module,
     ) {
+        let mut instruction = None;
+
         match t_ir_node {
-            TirNode::Int(_) => {
-                // module.constants_pool.push();
+            TirNode::Int(Spanned(_, value)) => {
+                let idx = globals.constants_pool.insert((*value).into());
+
+                instruction = Some(Instruction::Load(idx))
             }
-            TirNode::Float(_) => todo!(),
-            TirNode::Ident(_, _) => todo!(),
-            TirNode::String(_) => todo!(),
+            TirNode::Float(Spanned(_, value)) => {
+                let idx = globals.constants_pool.insert((*value).into());
+
+                instruction = Some(Instruction::Load(idx))
+            }
+            TirNode::String(Spanned(_, value)) => {
+                let idx = globals.constants_pool.insert(value.clone().into());
+
+                instruction = Some(Instruction::Load(idx))
+            }
+            TirNode::Ident {
+                r#type: a,
+                str_value: b,
+            } => {}
             TirNode::BinaryOperation { lhs, operator, rhs } => todo!(),
             TirNode::Assign { lhs, value } => todo!(),
             TirNode::Function {
@@ -50,6 +70,10 @@ impl BytecodeCodegenBackend {
 
             TirNode::Poisoned | TirNode::Uninitialized => unreachable!(),
         }
+
+        if let Some(i) = instruction {
+            instructions.push(i)
+        }
     }
 }
 
@@ -65,8 +89,7 @@ impl CodegenBackend for BytecodeCodegenBackend {
             manifest: Manifest {
                 bytecode_version: BytecodeVersion::Number(0.1),
             },
-            constants_pool: Pool::new(),
-            functions: Vec::new(),
+            globals: Globals::default(),
             body: Vec::new(),
         };
 

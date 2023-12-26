@@ -2,28 +2,28 @@
 
 extern crate alloc;
 
-use alloc::{collections::BTreeMap, string::String, vec::Vec};
+use alloc::{string::String, vec::Vec};
+use ciborium::de::Error;
 use core::fmt::Debug;
+use slab::Slab;
 
 /// !: https://github.com/near/borsh#specification
-use borsh::{BorshDeserialize, BorshSerialize};
+use serde::{Deserialize, Serialize};
 
 pub type PoolIndex = usize;
-pub type Pool<T> = BTreeMap<PoolIndex, T>;
+pub type Pool<T> = Slab<T>;
 
-#[derive(Debug, Clone, BorshSerialize, BorshDeserialize)]
-#[borsh(use_discriminant = true)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum BytecodeVersion {
     Number(f32),
 }
 
-#[derive(Debug, Clone, BorshSerialize, BorshDeserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Manifest {
     pub bytecode_version: BytecodeVersion,
 }
 
-#[derive(Debug, Clone, BorshSerialize, BorshDeserialize)]
-#[borsh(use_discriminant = true)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[repr(u8)]
 pub enum Instruction {
     /// Loads a constant element into the stack from the constants pool
@@ -51,39 +51,46 @@ pub enum Instruction {
     Nop,
 }
 
-#[derive(Debug, Clone, BorshSerialize, BorshDeserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, derive_more::From)]
 pub enum ConstantValue {
     Int(i32),
     Float(f32),
     String(String),
 }
 
-#[derive(Debug, Clone, BorshSerialize, BorshDeserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Function {
     pub body: Vec<Instruction>,
 }
 
-#[derive(Debug, Clone, BorshSerialize, BorshDeserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Module {
     pub manifest: Manifest,
+    pub globals: Globals,
+    pub body: Vec<Instruction>,
+}
+
+#[derive(Debug, Default, Clone, Serialize, Deserialize)]
+pub struct Globals {
     pub constants_pool: Pool<ConstantValue>,
     pub functions: Vec<Function>,
-    pub body: Vec<Instruction>,
 }
 
 #[derive(Debug, Clone, Copy)]
 pub struct DeserializationError;
 
-impl From<borsh::io::Error> for DeserializationError {
-    fn from(_value: borsh::io::Error) -> Self {
+impl<T> From<Error<T>> for DeserializationError {
+    fn from(_: Error<T>) -> Self {
         Self
     }
 }
 
 pub fn encode(module: &Module, buf: &mut Vec<u8>) {
-    BorshSerialize::serialize(module, buf).expect("writing to a vec should not fail");
+    ciborium::into_writer(module, buf).unwrap();
 }
 
-pub fn decode(bytes: &mut &[u8]) -> Result<Module, DeserializationError> {
-    BorshDeserialize::deserialize(bytes).map_err(|err| err.into())
+pub fn decode(bytes: &[u8]) -> Result<Module, DeserializationError> {
+    let module = ciborium::from_reader(bytes)?;
+
+    Ok(module)
 }
