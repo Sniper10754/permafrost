@@ -278,8 +278,8 @@ impl<'ast> RecursiveTypechecker<'ast> {
         expr: &Expr<'ast>,
     ) -> Result<Type<'ast>, TypecheckError<'ast>> {
         match expr {
-            Expr::Int(Spanned(_, value)) => Ok(Type::Int),
-            Expr::Float(Spanned(_, value)) => Ok(Type::Float),
+            Expr::Int(Spanned(_, _value)) => Ok(Type::Int),
+            Expr::Float(Spanned(_, _value)) => Ok(Type::Float),
             Expr::Ident(Spanned(span, ident)) => match self
                 .scope_table
                 .iter()
@@ -291,7 +291,7 @@ impl<'ast> RecursiveTypechecker<'ast> {
                     Spanned(span.clone(), ident),
                 )),
             },
-            Expr::String(Spanned(_, string)) => Ok(Type::String),
+            Expr::String(Spanned(_, _string)) => Ok(Type::String),
             Expr::BinaryOperation { lhs, operator, rhs } => match (
                 self.infer_type(source_id, lhs)?,
                 operator,

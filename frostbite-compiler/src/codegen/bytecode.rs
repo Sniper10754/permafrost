@@ -1,5 +1,5 @@
-use alloc::{collections::BTreeMap, vec::Vec};
-use frostbite_bytecode::{BytecodeVersion, Globals, Instruction, Manifest, Module, Pool};
+use alloc::vec::Vec;
+use frostbite_bytecode::{BytecodeVersion, Globals, Instruction, Manifest, Module};
 use frostbite_parser::ast::Spanned;
 use frostbite_reports::ReportContext;
 
@@ -14,7 +14,7 @@ impl BytecodeCodegenBackend {
     fn compile_program(
         &self,
         report_ctx: &mut ReportContext,
-        t_ir: &mut TirTree,
+        t_ir: &TirTree,
         globals: &mut Module,
     ) {
         let body = &mut globals.body;
@@ -51,21 +51,25 @@ impl BytecodeCodegenBackend {
                 instruction = Some(Instruction::Load(idx))
             }
             TirNode::Ident {
-                r#type: a,
-                str_value: b,
+                r#type: _a,
+                str_value: _b,
             } => {}
-            TirNode::BinaryOperation { lhs, operator, rhs } => todo!(),
-            TirNode::Assign { lhs, value } => todo!(),
+            TirNode::BinaryOperation {
+                lhs: _,
+                operator: _,
+                rhs: _,
+            } => todo!(),
+            TirNode::Assign { lhs: _, value: _ } => todo!(),
             TirNode::Function {
-                name,
-                arguments,
-                return_type,
-                body,
+                name: _,
+                arguments: _,
+                return_type: _,
+                body: _,
             } => todo!(),
             TirNode::Call {
-                callee,
-                arguments,
-                return_type,
+                callee: _,
+                arguments: _,
+                return_type: _,
             } => todo!(),
 
             TirNode::Poisoned | TirNode::Uninitialized => unreachable!(),
@@ -82,16 +86,18 @@ impl CodegenBackend for BytecodeCodegenBackend {
 
     fn codegen(
         self,
-        _report_ctx: &mut ReportContext,
-        _program: &TirTree,
+        report_ctx: &mut ReportContext,
+        t_ir_tree: &TirTree,
     ) -> Result<Self::Output, ()> {
-        let module = Module {
+        let mut module = Module {
             manifest: Manifest {
                 bytecode_version: BytecodeVersion::Number(0.1),
             },
             globals: Globals::default(),
             body: Vec::new(),
         };
+
+        self.compile_program(report_ctx, t_ir_tree, &mut module);
 
         Ok(module)
     }
