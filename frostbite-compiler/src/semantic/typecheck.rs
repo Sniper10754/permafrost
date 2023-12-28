@@ -1,108 +1,27 @@
 #![allow(clippy::single_match)]
 
 extern crate std;
+
 use core::{
     cmp::Ordering::{Equal, Greater, Less},
     ops::Range,
 };
 
-use alloc::{boxed::Box, collections::BTreeMap, format, string::ToString, vec, vec::Vec};
-use frostbite_parser::ast::{tokens::TypeAnnotation, Expr, Program, Spannable, Spanned};
+use alloc::{
+    boxed::Box,
+    collections::BTreeMap,
+    format,
+    string::{String, ToString},
+    vec,
+    vec::Vec,
+};
+use frostbite_parser::ast::{tokens::TypeAnnotation, Argument, Expr, Program, Spannable, Spanned};
 use frostbite_reports::{
     sourcemap::{SourceId, SourceMap},
     IntoReport, Level, Report, ReportContext,
 };
 
-use crate::tir::{self, TirNode, TirTree};
-
-type ScopeTable<'ast> = Vec<Scope<'ast>>;
-type Scope<'ast> = BTreeMap<&'ast str, Type<'ast>>;
-
-#[derive(Debug, derive_more::Display, Clone, PartialEq)]
-pub enum Type<'ast> {
-    #[display(fmt = "int")]
-    Int,
-
-    #[display(fmt = "float")]
-    Float,
-
-    #[display(fmt = "str")]
-    String,
-
-    #[display(fmt = "class {_0}")]
-    Object(&'ast str),
-
-    #[display(fmt = "function")]
-    Function {
-        arguments: BTreeMap<&'ast str, Self>,
-        return_type: Box<Self>,
-    },
-
-    #[display(fmt = "unit")]
-    Unit,
-
-    #[display(fmt = "any")]
-    Any,
-}
-
-impl<'a> From<TypeAnnotation<'a>> for Type<'a> {
-    fn from(value: TypeAnnotation<'a>) -> Self {
-        match value {
-            TypeAnnotation::Int => Self::Int,
-            TypeAnnotation::Float => Self::Float,
-            TypeAnnotation::String => Self::String,
-            TypeAnnotation::NotSpecified => Self::Any,
-            TypeAnnotation::Unit => Self::Unit,
-            TypeAnnotation::Object(string) => Self::Object(string.into()),
-        }
-    }
-}
-
-impl<'a> From<&'a tir::Type> for Type<'a> {
-    fn from(value: &'a tir::Type) -> Self {
-        match value {
-            tir::Type::Int => Type::Int,
-            tir::Type::Float => Type::Float,
-            tir::Type::String => Type::String,
-            tir::Type::Object(obj) => Type::Object(obj),
-            tir::Type::Function {
-                arguments,
-                return_type,
-            } => Type::Function {
-                arguments: arguments
-                    .iter()
-                    .map(|(ident, r#type)| (ident.as_str(), Self::from(r#type)))
-                    .collect(),
-                return_type: Box::new(Self::from(&**return_type)),
-            },
-            tir::Type::Unit => Type::Unit,
-            tir::Type::Any => Type::Any,
-        }
-    }
-}
-
-impl<'a> From<Type<'a>> for tir::Type {
-    fn from(value: Type<'a>) -> Self {
-        match value {
-            Type::Int => Self::Int,
-            Type::Float => Self::Float,
-            Type::String => Self::String,
-            Type::Object(string) => Self::Object(string.into()),
-            Type::Function {
-                arguments,
-                return_type,
-            } => Self::Function {
-                arguments: arguments
-                    .into_iter()
-                    .map(|(name, r#type)| (name.into(), r#type.into()))
-                    .collect(),
-                return_type: Box::new((*return_type).clone().into()),
-            },
-            Type::Unit => Self::Unit,
-            Type::Any => Self::Any,
-        }
-    }
-}
+use crate::tir::{Assignable, Callable, RefersTo, TirFunction, TirNode, TirTree, Type, TypeIndex};
 
 #[derive(Debug)]
 pub enum TypecheckError<'ast> {
@@ -110,8 +29,8 @@ pub enum TypecheckError<'ast> {
         source_id: SourceId,
         span: Range<usize>,
 
-        expected: Type<'ast>,
-        found: Type<'ast>,
+        expected: Type,
+        found: Type,
     },
     SymbolNotFound(SourceId, Spanned<&'ast str>),
     IncompatibleOperands(SourceId, Range<usize>),
@@ -147,7 +66,7 @@ impl<'ast> IntoReport for TypecheckError<'ast> {
                 span,
                 source_id,
                 "Type mismatch",
-                Some(format!("Expected type {expected}, found type {found}")),
+                Some(format!("Expected type {expected:?}, found type {found:?}")),
                 [],
                 [],
             ),
@@ -246,12 +165,9 @@ pub fn check_types(
     for expr in &ast.exprs {
         let mut t_ir_node = TirNode::Uninitialized;
 
-        let result = rts.visit_expr(source_id, expr, &mut t_ir_node);
-
-        match result {
-            Ok(_) => {}
-            Err(error) => report_ctx.push(error.into_report()),
-        };
+        if let Err(report) = rts.visit_expr(source_id, report_ctx, expr, &mut t_ir_node, t_ir) {
+            report_ctx.push(report.into_report())
+        }
 
         t_ir.nodes.push(match t_ir_node {
             TirNode::Uninitialized => TirNode::Poisoned,
@@ -261,14 +177,14 @@ pub fn check_types(
     }
 }
 
-struct RecursiveTypechecker<'ast> {
-    scope_table: ScopeTable<'ast>,
+struct RecursiveTypechecker {
+    scopes: Vec<BTreeMap<String, RefersTo>>,
 }
 
-impl<'ast> RecursiveTypechecker<'ast> {
+impl<'ast> RecursiveTypechecker {
     fn new() -> Self {
         Self {
-            scope_table: vec![BTreeMap::new()],
+            scopes: vec![BTreeMap::new()],
         }
     }
 
@@ -276,39 +192,55 @@ impl<'ast> RecursiveTypechecker<'ast> {
         &mut self,
         source_id: SourceId,
         expr: &Expr<'ast>,
-    ) -> Result<Type<'ast>, TypecheckError<'ast>> {
+        t_ir_tree: &mut TirTree,
+    ) -> Result<TypeIndex, TypecheckError<'ast>> {
         match expr {
-            Expr::Int(Spanned(_, _value)) => Ok(Type::Int),
-            Expr::Float(Spanned(_, _value)) => Ok(Type::Float),
-            Expr::Ident(Spanned(span, ident)) => match self
-                .scope_table
-                .iter()
-                .find(|scope| scope.contains_key(ident))
-            {
-                Some(scope) => Ok(scope[ident].clone()),
-                None => Err(TypecheckError::SymbolNotFound(
-                    source_id,
-                    Spanned(span.clone(), ident),
-                )),
-            },
-            Expr::String(Spanned(_, _string)) => Ok(Type::String),
-            Expr::BinaryOperation { lhs, operator, rhs } => match (
-                self.infer_type(source_id, lhs)?,
-                operator,
-                self.infer_type(source_id, rhs)?,
-            ) {
-                (Type::Int, _, Type::Int) => Ok(Type::Int),
-                (Type::Float, _, Type::Int) => Ok(Type::Float),
-                (Type::Int, _, Type::Float) => Ok(Type::Float),
-                (Type::Float, _, Type::Float) => Ok(Type::Float),
+            Expr::Int(_) => Ok(t_ir_tree.types_arena.insert(Type::Int)),
+            Expr::Float(_) => Ok(t_ir_tree.types_arena.insert(Type::Float)),
+            Expr::String(_) => Ok(t_ir_tree.types_arena.insert(Type::String)),
+            Expr::Ident(spanned_str) => {
+                let Some(referred_to) = self
+                    .scopes
+                    .iter()
+                    .find(|scope| scope.contains_key(spanned_str.1))
+                    .map(|scope| scope[spanned_str.1])
+                else {
+                    return Err(TypecheckError::SymbolNotFound(
+                        source_id,
+                        spanned_str.clone(),
+                    ));
+                };
 
-                _ => Err(TypecheckError::IncompatibleOperands(source_id, expr.span())),
-            },
+                match referred_to {
+                    RefersTo::Local(local_index) => Ok(t_ir_tree.locals[local_index]),
+                    RefersTo::Type(type_index) => Ok(type_index),
+                }
+            }
+            Expr::BinaryOperation { lhs, operator: _, rhs } => {
+                let (lhs_type_idx, rhs_type_idx) = (
+                    self.infer_type(source_id, lhs, t_ir_tree)?,
+                    self.infer_type(source_id, rhs, t_ir_tree)?,
+                );
+
+                match (
+                    &t_ir_tree.types_arena[lhs_type_idx],
+                    &t_ir_tree.types_arena[rhs_type_idx],
+                ) {
+                    (Type::Int, Type::Int) => Ok(t_ir_tree.types_arena.insert(Type::Int)),
+                    (Type::Float, Type::Float)
+                    | (Type::Float, Type::Int)
+                    | (Type::Int, Type::Float) => Ok(t_ir_tree.types_arena.insert(Type::Float)),
+
+                    _ => {
+                        return Err(TypecheckError::IncompatibleOperands(source_id, expr.span()));
+                    }
+                }
+            }
             Expr::Assign {
                 lhs: _,
                 eq_token: _,
                 value: _,
-            } => Ok(Type::Unit),
+            } => Ok(t_ir_tree.types_arena.insert(Type::Unit)),
             Expr::Function {
                 fn_token: _,
                 name,
@@ -321,151 +253,164 @@ impl<'ast> RecursiveTypechecker<'ast> {
                 body: _,
             } => {
                 if name.is_some() {
-                    Ok(Type::Function {
+                    Ok(Type::Unit)
+                } else {
+                    Ok(Type::Function(TirFunction {
                         arguments: arguments
-                            .iter()
-                            .map(|argument| (argument.name.1, argument.type_annotation.clone()))
-                            .map(|(name, Spanned(_, type_annotation))| {
-                                (name, type_annotation.into())
+                            .into_iter()
+                            .map(|argument| {
+                                (
+                                    argument.name.1.into(),
+                                    t_ir_tree
+                                        .types_arena
+                                        .insert(argument.type_annotation.1.into()),
+                                )
                             })
                             .collect(),
-                        return_type: Box::new(
+                        return_type: t_ir_tree.types_arena.insert(
                             return_type_annotation
                                 .as_ref()
-                                .map(|annotation| annotation.1)
-                                .unwrap_or(TypeAnnotation::NotSpecified)
+                                .cloned()
+                                .map(|Spanned(_, ty)| ty)
+                                .unwrap_or(TypeAnnotation::Unit)
                                 .into(),
                         ),
-                    })
-                } else {
-                    Ok(Type::Unit)
+                    }))
                 }
             }
+            .map(|ty| t_ir_tree.types_arena.insert(ty)),
             Expr::Call {
                 callee,
                 lpt: _,
                 arguments: _,
                 rpt: _,
-            } => match &**callee {
-                Expr::Ident(Spanned(_, ident)) => {
-                    match self
-                        .scope_table
-                        .iter()
-                        .find(|scope| scope.contains_key(ident))
-                    {
-                        Some(scope) => {
-                            if let Type::Function {
-                                arguments: _,
-                                return_type,
-                            } = &scope[ident]
-                            {
-                                Ok((**return_type).clone())
-                            } else {
-                                Err(TypecheckError::CannotCallNonFunction(
-                                    source_id,
-                                    callee.span(),
-                                ))
-                            }
-                        }
-                        None => Err(TypecheckError::SymbolNotFound(
-                            source_id,
-                            Spanned(callee.span(), ident),
-                        )),
-                    }
-                }
+            } => {
+                match &**callee {
+                    Expr::Ident(spanned_str) => {
+                        let Some(referred_to) = self.scopes.iter().find_map(|scope| {
+                            scope.get(spanned_str.1).copied()
+                        }) else {
+                            return Err(TypecheckError::SymbolNotFound(
+                                source_id,
+                                spanned_str.clone(),
+                            ));
+                        };
 
-                _ => Err(TypecheckError::CannotCallNonIdent(source_id, callee.span())),
-            },
-            Expr::Poisoned => Ok(Type::Unit),
+                        let type_index = match referred_to {
+                            RefersTo::Local(local) => t_ir_tree.locals[local],
+                            RefersTo::Type(type_idx) => type_idx,
+                        };
+
+                        if matches!(
+                            &t_ir_tree.types_arena[type_index],
+                            Type::Function(TirFunction {
+                                arguments: _,
+                                return_type: _,
+                            }),
+                        ) {
+                            Ok(type_index)
+                        } else {
+                            Err(TypecheckError::CannotCallNonFunction(
+                                source_id,
+                                callee.span(),
+                            ))
+                        }
+                    }
+
+                    _ => Err(TypecheckError::CannotCallNonIdent(source_id, callee.span())),
+                }
+            }
+
+            Expr::Poisoned => unreachable!(),
         }
     }
 
     fn visit_expr(
         &mut self,
         source_id: SourceId,
+        report_ctx: &mut ReportContext,
         expr: &Expr<'ast>,
-        t_ir_node: &mut TirNode,
+        t_ir_node_ptr: &mut TirNode,
+        t_ir_tree: &mut TirTree,
     ) -> Result<(), TypecheckError<'ast>> {
-        match expr {
-            Expr::Int(Spanned(span, value)) => {
-                *t_ir_node = TirNode::Int(Spanned(span.clone(), *value))
-            }
-
-            Expr::Float(Spanned(span, value)) => {
-                *t_ir_node = TirNode::Float(Spanned(span.clone(), *value))
-            }
-
-            Expr::String(Spanned(span, value)) => {
-                *t_ir_node = TirNode::String(Spanned(span.clone(), value.to_string()))
-            }
-
-            Expr::Ident(Spanned(span, ident)) => {
-                if let Some(scope) = self
-                    .scope_table
+        let t_ir_node = match expr {
+            Expr::Int(value) => TirNode::Int(value.as_ref().map(|value| *value)),
+            Expr::Float(value) => TirNode::Float(value.as_ref().map(|value| *value)),
+            Expr::String(value) => TirNode::String(value.as_ref().map(|value| (*value).into())),
+            Expr::Ident(spanned_ident) => {
+                let Some(refers_to) = self
+                    .scopes
                     .iter()
-                    .find(|scope| scope.contains_key(ident))
-                {
-                    let symbol = scope[ident].clone();
-
-                    *t_ir_node = TirNode::Ident {
-                        r#type: symbol.into(),
-                        str_value: Spanned(span.clone(), ident).map(ToString::to_string),
-                    };
-                } else {
+                    .find_map(|scope| scope.get(spanned_ident.1).map(|value| *value))
+                else {
                     return Err(TypecheckError::SymbolNotFound(
                         source_id,
-                        Spanned(span.clone(), ident),
+                        spanned_ident.clone(),
                     ));
-                }
+                };
 
-                *t_ir_node = TirNode::Ident {
-                    r#type: self.infer_type(source_id, expr)?.into(),
-                    str_value: Spanned(span.clone(), ident.to_string()),
+                let r#type = match refers_to {
+                    RefersTo::Local(local_idx) => t_ir_tree.locals[local_idx],
+                    RefersTo::Type(type_idx) => type_idx,
+                };
+
+                TirNode::Ident {
+                    r#type,
+                    refers_to,
+                    str_value: spanned_ident.clone().map(|str| str.into()),
                 }
             }
             Expr::BinaryOperation { lhs, operator, rhs } => {
-                let (mut t_ir_lhs, mut t_ir_rhs) = (TirNode::Poisoned, TirNode::Poisoned);
+                match (&**lhs, &**rhs) {
+                    (Expr::Int(Spanned(_, _)), Expr::Int(Spanned(_, _))) => (),
+                    (Expr::Float(Spanned(_, _)), Expr::Float(Spanned(_, _))) => (),
+                    (Expr::Float(Spanned(_, _)), Expr::Int(Spanned(_, _))) => (),
+                    (Expr::Int(Spanned(_, _)), Expr::Float(Spanned(_, _))) => (),
 
-                self.visit_expr(source_id, lhs, &mut t_ir_lhs)?;
-                self.visit_expr(source_id, rhs, &mut t_ir_rhs)?;
+                    _ => {
+                        return Err(TypecheckError::IncompatibleOperands(source_id, expr.span()));
+                    }
+                };
 
-                *t_ir_node = TirNode::BinaryOperation {
+                let (t_ir_lhs, t_ir_rhs) = (TirNode::Uninitialized, TirNode::Uninitialized);
+
+                self.visit_expr(source_id, report_ctx, lhs, t_ir_node_ptr, t_ir_tree)?;
+                self.visit_expr(source_id, report_ctx, rhs, t_ir_node_ptr, t_ir_tree)?;
+
+                TirNode::BinaryOperation {
                     lhs: Box::new(t_ir_lhs),
                     operator: operator.clone(),
                     rhs: Box::new(t_ir_rhs),
-                };
+                }
             }
             Expr::Assign {
                 lhs,
                 eq_token: _,
                 value,
-            } => match &**lhs {
-                Expr::Ident(Spanned(_, ident)) => {
-                    extern crate std;
-                    let inferred_type = self.infer_type(source_id, value)?;
+            } => {
+                let (t_ir_lhs, t_ir_value) = (TirNode::Uninitialized, TirNode::Uninitialized);
 
-                    self.scope_table
-                        .first_mut()
-                        .unwrap()
-                        .insert(ident, inferred_type);
+                self.visit_expr(source_id, report_ctx, lhs, t_ir_node_ptr, t_ir_tree)?;
+                self.visit_expr(source_id, report_ctx, value, t_ir_node_ptr, t_ir_tree)?;
 
-                    let (mut t_ir_lhs, mut t_ir_value) = (TirNode::Poisoned, TirNode::Poisoned);
+                let Ok(assignable) = Assignable::try_from(t_ir_lhs) else {
+                    return Err(TypecheckError::CannotAssignTo(source_id, lhs.span()));
+                };
 
-                    self.visit_expr(source_id, lhs, &mut t_ir_lhs)?;
-                    self.visit_expr(source_id, value, &mut t_ir_value)?;
+                match &assignable {
+                    Assignable::Ident(r#type, str_value) => {
+                        self.scopes
+                            .first_mut()
+                            .unwrap()
+                            .insert(str_value.1.clone(), RefersTo::Type(*r#type));
 
-                    *t_ir_node = TirNode::Assign {
-                        lhs: t_ir_lhs.try_into().expect(
-                            "Guaranteed to be a assignable since the match above guards it",
-                        ),
-                        value: t_ir_value.into(),
-                    };
+                        TirNode::Assign {
+                            lhs: assignable,
+                            value: Box::new(t_ir_value),
+                        }
+                    }
                 }
-
-                _ => {
-                    return Err(TypecheckError::CannotAssignTo(source_id, expr.span()));
-                }
-            },
+            }
             Expr::Function {
                 fn_token: _,
                 name,
@@ -475,225 +420,126 @@ impl<'ast> RecursiveTypechecker<'ast> {
                 return_type_token: _,
                 return_type_annotation,
                 equals: _,
-                body,
+                body: _,
             } => {
-                let mut t_ir_arguments = BTreeMap::new();
+                let fn_type = self.infer_type(source_id, expr, t_ir_tree)?;
 
-                for (name, argument_type) in arguments.iter().map(|argument| {
-                    (
-                        argument.name.1,
-                        Spanned(
-                            argument.type_annotation.span(),
-                            Type::from(argument.type_annotation.1),
-                        ),
+                match name {
+                    Some(Spanned(_, name)) => {
+                        self.scopes
+                            .first_mut()
+                            .unwrap()
+                            .insert((*name).into(), RefersTo::Type(fn_type));
+                    }
+                    None => {}
+                }
+
+                let arguments = arguments
+                    .iter()
+                    .map(
+                        |Argument {
+                             name: Spanned(_, arg_name),
+                             type_annotation,
+                         }| {
+                            (arg_name.to_string(), Type::from(type_annotation.1))
+                        },
                     )
-                }) {
-                    match argument_type {
-                        Spanned(span, Type::Object(identifier)) => {
-                            if !self
-                                .scope_table
-                                .iter()
-                                .any(|scope| scope.contains_key(identifier))
-                            {
-                                return Err(TypecheckError::SymbolNotFound(
-                                    source_id,
-                                    Spanned(span, identifier),
-                                ));
-                            }
-                        }
+                    .map(|(name, ty)| (name, t_ir_tree.types_arena.insert(ty)))
+                    .collect();
 
-                        _ => (),
-                    }
-
-                    t_ir_arguments.insert(name.to_string(), argument_type.1.into());
-                }
-
-                match return_type_annotation {
-                    Some(Spanned(span, TypeAnnotation::Object(object))) => {
-                        if !self
-                            .scope_table
-                            .iter()
-                            .any(|scope| scope.contains_key(object))
-                        {
-                            return Err(TypecheckError::SymbolNotFound(
-                                source_id,
-                                Spanned(span.clone(), object),
-                            ));
-                        }
-                    }
-                    _ => (),
-                }
-
-                if let Some(Spanned(_, name)) = name {
-                    let fn_symbol = self.infer_type(source_id, expr)?;
-                    self.scope_table
-                        .first_mut()
-                        .unwrap()
-                        .insert(name, fn_symbol);
-                }
-
-                let mut t_ir_body = TirNode::Poisoned;
-
-                self.scope_table.first_mut().unwrap().extend(
-                    arguments
-                        .iter()
-                        .map(|arg| (arg.name.1, arg.type_annotation.1.into())),
+                let return_type = Type::from(
+                    return_type_annotation
+                        .as_ref()
+                        .cloned()
+                        .map(|Spanned(_, ret)| ret)
+                        .unwrap_or(TypeAnnotation::Unit),
                 );
 
-                self.visit_expr(source_id, body, &mut t_ir_body)?;
+                let return_type = t_ir_tree.types_arena.insert(return_type);
 
-                let function_return_type_symbol = return_type_annotation
-                    .as_ref()
-                    .map(|Spanned(_, type_annotation)| *type_annotation)
-                    .unwrap_or(TypeAnnotation::Unit)
-                    .into();
+                let mut body = TirNode::Uninitialized;
 
-                if self.infer_type(source_id, body)? != function_return_type_symbol {
-                    return Err(TypecheckError::TypeMismatch {
-                        source_id,
-                        span: return_type_annotation
-                            .as_ref()
-                            .map(|Spanned(span, _)| span.clone())
-                            .unwrap_or(body.span()),
-                        expected: function_return_type_symbol,
-                        found: self.infer_type(source_id, body)?,
-                    });
-                }
+                self.visit_expr(source_id, report_ctx, expr, &mut body, t_ir_tree)?;
 
-                *t_ir_node = TirNode::Function {
+                TirNode::Function {
                     name: name
                         .as_ref()
-                        .cloned()
-                        .map(|spanned_name| spanned_name.map(ToString::to_string)),
-                    arguments: t_ir_arguments,
-                    return_type: return_type_annotation
-                        .as_ref()
-                        .cloned()
-                        .map(|Spanned(_, annotation)| annotation)
-                        .unwrap_or(TypeAnnotation::NotSpecified)
-                        .into(),
-                    body: Box::new(t_ir_body),
+                        .map(|spanned_str| spanned_str.as_ref().map(ToString::to_string)),
+                    arguments,
+                    return_type,
+                    body: Box::new(body),
                 }
             }
             Expr::Call {
                 callee,
-                lpt,
+                lpt: _,
                 arguments: call_arguments,
-                rpt,
-            } => {
-                match &**callee {
-                    Expr::Ident(Spanned(callee_span, ident)) => {
-                        if !self
-                            .scope_table
-                            .iter()
-                            .any(|scope| scope.contains_key(ident))
-                        {
-                            return Err(TypecheckError::SymbolNotFound(
+                rpt: _,
+            } => match &**callee {
+                Expr::Ident(spanned_str) => {
+                    let Some(refers_to) = self
+                        .scopes
+                        .iter()
+                        .find_map(|scope| scope.get(spanned_str.1).cloned())
+                    else {
+                        return Err(TypecheckError::SymbolNotFound(
+                            source_id,
+                            spanned_str.clone(),
+                        ));
+                    };
+
+                    let type_idx = match refers_to {
+                        RefersTo::Local(local_idx) => t_ir_tree.locals[local_idx],
+                        RefersTo::Type(type_idx) => type_idx,
+                    };
+
+                    let Type::Function(function) = &t_ir_tree.types_arena[type_idx] else {
+                        return Err(TypecheckError::CannotCallNonFunction(
+                            source_id,
+                            callee.span(),
+                        ));
+                    };
+
+                    let (call_arguments_len, function_arguments_len) =
+                        (call_arguments.len(), function.arguments.len());
+
+                    match call_arguments_len.cmp(&function_arguments_len) {
+                        Greater => {
+                            return Err(TypecheckError::TooManyArguments {
                                 source_id,
-                                Spanned(callee_span.clone(), ident),
-                            ));
+                                span: expr.span(),
+                                call_arguments_len,
+                                function_arguments_len,
+                            })
                         }
-
-                        let mut t_ir_call_arguments = vec![];
-
-                        let function_type = self
-                            .scope_table
-                            .iter_mut()
-                            .find(|scope| scope.contains_key(ident))
-                            .unwrap()[ident]
-                            .clone();
-
-                        let call_arguments_span = (lpt.0.start)..(rpt.0.end);
-
-                        match &function_type {
-                            Type::Function {
-                                arguments: function_arguments,
-                                return_type: _,
-                            } => {
-                                let call_arguments_len = call_arguments.len();
-                                let function_arguments_len = function_arguments.len();
-
-                                match call_arguments_len.cmp(&function_arguments_len) {
-                                    // The call has more arguments than the function expects
-                                    Greater => {
-                                        return Err(TypecheckError::TooManyArguments {
-                                            source_id,
-                                            span: call_arguments_span,
-                                            call_arguments_len,
-                                            function_arguments_len,
-                                        })
-                                    }
-                                    // The call has less arguments than the function expects
-                                    Less => {
-                                        return Err(TypecheckError::NotEnoughArguments {
-                                            source_id,
-                                            span: call_arguments_span,
-                                            call_arguments_len,
-                                            function_arguments_len,
-                                        })
-                                    }
-                                    // The call has the right amount of arguments
-                                    Equal => (),
-                                }
-
-                                for argument in call_arguments {
-                                    let mut t_ir_node = TirNode::Poisoned;
-
-                                    self.visit_expr(source_id, argument, &mut t_ir_node)?;
-
-                                    t_ir_call_arguments.push(t_ir_node);
-                                }
-
-                                let call_arguments_types = call_arguments
-                                    .iter()
-                                    .map(|argument| {
-                                        self.infer_type(source_id, argument).map(
-                                            |inferred_argument| {
-                                                Spanned(argument.span(), inferred_argument)
-                                            },
-                                        )
-                                    })
-                                    .collect::<Result<Vec<_>, _>>()?;
-
-                                for (
-                                    Spanned(call_argument_span, call_argument_type),
-                                    function_argument_type,
-                                ) in Iterator::zip(
-                                    call_arguments_types.into_iter(),
-                                    function_arguments.values(),
-                                ) {
-                                    if !(call_argument_type == *function_argument_type) {
-                                        return Err(TypecheckError::TypeMismatch {
-                                            source_id,
-                                            span: call_argument_span,
-                                            expected: call_argument_type,
-                                            found: function_argument_type.clone(),
-                                        });
-                                    }
-                                }
-
-                                *t_ir_node = TirNode::Call {
-                                    callee: Spanned(callee_span.clone(), function_type.into()),
-                                    arguments: t_ir_call_arguments,
-                                    return_type: self.infer_type(source_id, expr)?.into(),
-                                }
-                            }
-
-                            _ => {
-                                return Err(TypecheckError::CannotCallNonFunction(
-                                    source_id,
-                                    callee_span.clone(),
-                                ))
-                            }
+                        Equal => {}
+                        Less => {
+                            return Err(TypecheckError::NotEnoughArguments {
+                                source_id,
+                                span: expr.span(),
+                                call_arguments_len,
+                                function_arguments_len,
+                            })
                         }
                     }
 
-                    _ => (),
-                }
-            }
+                    let arguments = vec![];
 
-            Expr::Poisoned => unreachable!(),
+                    let return_type = function.return_type;
+
+                    TirNode::Call {
+                        callee: Callable::Ident(type_idx, spanned_str.clone().map(Into::into)),
+                        arguments,
+                        return_type,
+                    }
+                }
+
+                _ => return Err(TypecheckError::CannotCallNonIdent(source_id, callee.span())),
+            },
+            Expr::Poisoned => todo!(),
         };
+
+        *t_ir_node_ptr = t_ir_node;
 
         Ok(())
     }

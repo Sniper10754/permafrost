@@ -77,11 +77,16 @@ pub mod tokens {
         #[display(fmt = "str")]
         String,
 
+        #[display(fmt = "any")]
+        Any,
+
         #[display(fmt = "not specified")]
         NotSpecified,
 
+        #[display(fmt = "()")]
         Unit,
 
+        #[display(fmt = "object {_0}")]
         Object(&'a str),
     }
 
@@ -104,6 +109,14 @@ impl<T> Spanned<T> {
         Self(span, t)
     }
 
+    pub fn as_ref(&self) -> Spanned<&T> {
+        Spanned(self.0.clone(), &self.1)
+    }
+
+    pub fn as_mut(&mut self) -> Spanned<&mut T> {
+        Spanned(self.0.clone(), &mut self.1)
+    }
+
     pub fn map<U, F>(self, f: F) -> Spanned<U>
     where
         F: FnOnce(T) -> U,
@@ -115,6 +128,12 @@ impl<T> Spanned<T> {
 impl<T> Spannable for Spanned<T> {
     fn span(&self) -> Span {
         self.0.clone()
+    }
+}
+
+impl<T> From<(&Span, T)> for Spanned<T> {
+    fn from((span, value): (&Span, T)) -> Self {
+        Self(span.clone(), value)
     }
 }
 
@@ -142,13 +161,14 @@ impl<'a> Spannable for Expr<'a> {
             } => (lhs.span().start)..(value.span().end),
 
             Expr::Function { fn_token, body, .. } => (fn_token.span().start)..(body.span().end),
-            Expr::Poisoned => Span::default(),
             Expr::Call {
                 callee,
                 arguments: _,
                 lpt: _,
                 rpt,
             } => (callee.span().start)..(rpt.span().end),
+
+            Expr::Poisoned => unreachable!(),
         }
     }
 }

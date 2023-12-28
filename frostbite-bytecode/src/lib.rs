@@ -1,19 +1,27 @@
 #![no_std]
 
+#[cfg(feature = "std")]
+extern crate std;
+
 extern crate alloc;
 
 use alloc::{string::String, vec::Vec};
-use ciborium::de::Error;
 use core::fmt::Debug;
-use slab::Slab;
+use slotmap::{new_key_type, SlotMap};
 
-/// !: https://github.com/near/borsh#specification
+use ciborium::de::Error;
 use serde::{Deserialize, Serialize};
+use variant_name::VariantName;
+use variant_name_derive::VariantName;
 
-pub type PoolIndex = usize;
-pub type Pool<T> = Slab<T>;
+new_key_type! {
+    pub struct ConstantIndex;
+    pub struct FunctionIndex;
+}
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+pub mod text_repr;
+
+#[derive(Debug, Clone, derive_more::Display, Serialize, Deserialize)]
 pub enum BytecodeVersion {
     Number(f32),
 }
@@ -23,17 +31,17 @@ pub struct Manifest {
     pub bytecode_version: BytecodeVersion,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, VariantName, Serialize, Deserialize)]
 #[repr(u8)]
 pub enum Instruction {
     /// Loads a constant element into the stack from the constants pool
-    Load(PoolIndex) = 1,
+    Load(ConstantIndex) = 1,
 
     /// Removes an element from the stack
     Pop = 2,
 
     /// Calls a function
-    Call(PoolIndex) = 3,
+    Call(ConstantIndex) = 3,
 
     /// Returns from a function
     Return,
@@ -51,7 +59,7 @@ pub enum Instruction {
     Nop,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, derive_more::From)]
+#[derive(Debug, Clone, derive_more::Display, Serialize, Deserialize, derive_more::From)]
 pub enum ConstantValue {
     Int(i32),
     Float(f32),
@@ -72,11 +80,12 @@ pub struct Module {
 
 #[derive(Debug, Default, Clone, Serialize, Deserialize)]
 pub struct Globals {
-    pub constants_pool: Pool<ConstantValue>,
-    pub functions: Vec<Function>,
+    pub constants_pool: SlotMap<ConstantIndex, ConstantValue>,
+    pub functions: SlotMap<FunctionIndex, Function>,
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, derive_more::Display)]
+#[cfg_attr(feature = "std", derive(derive_more::Error))]
 pub struct DeserializationError;
 
 impl<T> From<Error<T>> for DeserializationError {

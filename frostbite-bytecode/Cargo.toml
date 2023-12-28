@@ -5,12 +5,19 @@ edition.workspace = true
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
+[features]
+std = []
+
 [dependencies]
 ciborium = { version = "0.2.1", default-features = false }
+variant_name = "0"
+variant_name_derive = "0"
 
-derive_more = { workspace = true }
 serde = { version = "1.0.193", default-features = false, features = ["derive"] }
-slab = { version = "0.4.9", default-features = false, features = ["serde"] }
+
+slotmap = { workspace = true }
+derive_more = { workspace = true }
+color-eyre = { workspace = true }
 
 [lints]
 workspace = true

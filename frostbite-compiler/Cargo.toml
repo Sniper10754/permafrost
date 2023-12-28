@@ -12,6 +12,7 @@ frostbite-reports = { path = "../frostbite-reports" }
 frostbite-parser = { path = "../frostbite-parser" }
 
 derive_more = { workspace = true }
+slotmap = { workspace = true }
 
 [lints]
 workspace = true

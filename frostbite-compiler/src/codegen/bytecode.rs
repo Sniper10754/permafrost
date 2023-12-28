@@ -32,27 +32,26 @@ impl BytecodeCodegenBackend {
         globals: &mut Globals,
         t_ir_node: &TirNode,
     ) {
-        let mut instruction = None;
-
         match t_ir_node {
             TirNode::Int(Spanned(_, value)) => {
                 let idx = globals.constants_pool.insert((*value).into());
 
-                instruction = Some(Instruction::Load(idx))
+                instructions.push(Instruction::Load(idx))
             }
             TirNode::Float(Spanned(_, value)) => {
                 let idx = globals.constants_pool.insert((*value).into());
 
-                instruction = Some(Instruction::Load(idx))
+                instructions.push(Instruction::Load(idx))
             }
             TirNode::String(Spanned(_, value)) => {
                 let idx = globals.constants_pool.insert(value.clone().into());
 
-                instruction = Some(Instruction::Load(idx))
+                instructions.push(Instruction::Load(idx))
             }
             TirNode::Ident {
-                r#type: _a,
-                str_value: _b,
+                r#type: _,
+                refers_to: _t_ir_node,
+                str_value: _,
             } => {}
             TirNode::BinaryOperation {
                 lhs: _,
@@ -73,10 +72,6 @@ impl BytecodeCodegenBackend {
             } => todo!(),
 
             TirNode::Poisoned | TirNode::Uninitialized => unreachable!(),
-        }
-
-        if let Some(i) = instruction {
-            instructions.push(i)
         }
     }
 }

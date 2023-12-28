@@ -1,13 +1,9 @@
-use core::fmt::Display;
-
 use alloc::{boxed::Box, collections::BTreeMap, string::String, vec::Vec};
 use frostbite_parser::ast::{
     tokens::{Operator, TypeAnnotation},
     Spanned,
 };
-
-#[derive(Debug, derive_more::From, derive_more::Into)]
-pub struct Typed<T>(Type, T);
+use slotmap::{new_key_type, SlotMap};
 
 mod utils {
     pub fn write_map_as_kvs<I, A, B>(map: I, f: &mut dyn core::fmt::Write) -> core::fmt::Result
@@ -29,31 +25,31 @@ mod utils {
     }
 }
 
+new_key_type! {
+    pub struct LocalIndex;
+    pub struct TypeIndex;
+}
+
+#[derive(Debug, derive_more::From, derive_more::Into)]
+pub struct Typed<T>(TypeIndex, T);
+
 /// A High level representation of the input
 #[derive(Debug, Default)]
 pub struct TirTree {
     pub nodes: Vec<TirNode>,
+    pub locals: SlotMap<LocalIndex, TypeIndex>,
+    pub types_arena: SlotMap<TypeIndex, Type>,
 }
 
-impl Display for TirTree {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        for node in &self.nodes {
-            writeln!(f, "{node}")?;
-        }
-
-        Ok(())
-    }
-}
-
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum TirNode {
     Int(Spanned<i32>),
     Float(Spanned<f32>),
     String(Spanned<String>),
 
     Ident {
-        r#type: Type,
-
+        r#type: TypeIndex,
+        refers_to: RefersTo,
         str_value: Spanned<String>,
     },
 
@@ -71,83 +67,36 @@ pub enum TirNode {
 
     Function {
         name: Option<Spanned<String>>,
-        arguments: BTreeMap<String, Type>,
-        return_type: Type,
+        arguments: BTreeMap<String, TypeIndex>,
+        return_type: TypeIndex,
         body: Box<Self>,
     },
 
     Call {
-        callee: Spanned<Type>,
+        callee: Callable,
         arguments: Vec<Self>,
-        return_type: Type,
+        return_type: TypeIndex,
     },
 
     Poisoned,
     Uninitialized,
 }
 
-impl Display for TirNode {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        match self {
-            TirNode::Int(Spanned(_, value)) => write!(f, "{value}"),
-            TirNode::Float(Spanned(_, value)) => write!(f, "{value}"),
-            TirNode::Ident {
-                r#type,
-                str_value: Spanned(_, value),
-            } => write!(f, "{value}: ({})", r#type),
-            TirNode::String(Spanned(_, value)) => write!(f, "{value}"),
-            TirNode::BinaryOperation { lhs, operator, rhs } => write!(f, "{lhs} {operator} {rhs}"),
-            TirNode::Assign { lhs, value } => write!(f, "{lhs} = {value}"),
-            TirNode::Function {
-                name,
-                arguments,
-                return_type,
-                body,
-            } => write!(
-                f,
-                "function {}({}) -> {return_type} = {body}",
-                name.as_ref()
-                    .map(|Spanned(_, name)| name.as_str())
-                    .unwrap_or(""),
-                {
-                    let mut buf = String::new();
+#[derive(Debug, Clone)]
+pub enum Callable {
+    Ident(TypeIndex, Spanned<String>),
+}
 
-                    utils::write_map_as_kvs(arguments.iter(), &mut buf)?;
-
-                    buf
-                }
-            ),
-            TirNode::Call {
-                callee,
-                arguments,
-                return_type,
-            } => write!(f, "({})({}) -> {return_type}", callee.1, {
-                use core::fmt::Write as _;
-
-                let mut buf = String::new();
-
-                let mut iter = arguments.iter();
-                if let Some(arg) = iter.next() {
-                    write!(buf, "{}", arg)?;
-
-                    for arg in iter {
-                        write!(buf, ", {}", arg)?;
-                    }
-                }
-
-                buf
-            }),
-            TirNode::Poisoned => write!(f, "Poisoned tree branch (compilation error happened)"),
-            TirNode::Uninitialized => unreachable!(),
-        }
-    }
+#[derive(Debug, Clone, Copy)]
+pub enum RefersTo {
+    Local(LocalIndex),
+    Type(TypeIndex),
 }
 
 #[non_exhaustive]
-#[derive(Debug, derive_more::Display)]
+#[derive(Debug, Clone)]
 pub enum Assignable {
-    #[display(fmt = "{}: ({})", "&_1.1", "_0")]
-    Ident(Type, Spanned<String>),
+    Ident(TypeIndex, Spanned<String>),
 }
 
 impl TryFrom<TirNode> for Assignable {
@@ -157,7 +106,8 @@ impl TryFrom<TirNode> for Assignable {
         match value {
             TirNode::Ident {
                 r#type,
-                str_value: ident @ Spanned(..),
+                refers_to: _,
+                str_value: ident,
             } => Ok(Assignable::Ident(r#type, ident)),
 
             _ => Err(()),
@@ -165,41 +115,25 @@ impl TryFrom<TirNode> for Assignable {
     }
 }
 
-#[derive(Debug, Clone, derive_more::Display)]
+#[derive(Debug, Clone)]
+pub struct TirFunction {
+    pub arguments: BTreeMap<String, TypeIndex>,
+
+    pub return_type: TypeIndex,
+}
+
+#[derive(Debug, Clone)]
 pub enum Type {
-    #[display(fmt = "int")]
     Int,
-    #[display(fmt = "float")]
     Float,
-    #[display(fmt = "str")]
     String,
 
-    #[display(
-        fmt = "fn {} -> {}",
-        "{
-            let mut buf = String::new();
-            
-            utils::write_map_as_kvs(
-                arguments.iter(),
-                &mut buf
-            )?;
+    Function(TirFunction),
 
-            buf
-        }",
-        "return_type"
-    )]
-    Function {
-        arguments: BTreeMap<String, Self>,
-        return_type: Box<Self>,
-    },
-
-    #[display(fmt = "()")]
     Unit,
 
-    #[display(fmt = "class {_0}")]
     Object(String),
 
-    #[display(fmt = "any")]
     Any,
 }
 
@@ -209,6 +143,7 @@ impl<'a> From<TypeAnnotation<'a>> for Type {
             TypeAnnotation::Int => Self::Int,
             TypeAnnotation::Float => Self::Float,
             TypeAnnotation::String => Self::String,
+            TypeAnnotation::Any => Self::Any,
             TypeAnnotation::NotSpecified => Self::Unit,
             TypeAnnotation::Unit => Self::Unit,
             TypeAnnotation::Object(obj) => Self::Object(obj.into()),

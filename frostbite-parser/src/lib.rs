@@ -367,6 +367,7 @@ impl<'report_context, 'input> Parser<'report_context, 'input> {
                 Some(Spanned(span, TypeAnnotation::Float))
             }
             Some(Spanned(span, Token::Ident("str"))) => Some(Spanned(span, TypeAnnotation::String)),
+            Some(Spanned(span, Token::Ident("any"))) => Some(Spanned(span, TypeAnnotation::Any)),
             Some(Spanned(span, Token::Ident(other))) => {
                 Some(Spanned(span, TypeAnnotation::Object(other)))
             }
