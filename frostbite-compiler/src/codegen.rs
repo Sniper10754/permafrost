@@ -6,10 +6,13 @@ pub use bytecode::BytecodeCodegenBackend;
 
 use crate::tir::TirTree;
 
+#[derive(Debug, Clone, Copy, Default, Hash, PartialEq, Eq, PartialOrd, Ord)]
+pub struct CodegenError;
+
 pub trait CodegenBackend {
     type Output;
 
-    fn codegen(self, reports: &mut ReportContext, program: &TirTree) -> Result<Self::Output, ()>;
+    fn codegen(self, reports: &mut ReportContext, program: &TirTree) -> Result<Self::Output, CodegenError>;
 }
 
 pub struct CodegenBackends;

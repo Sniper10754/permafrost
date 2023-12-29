@@ -39,19 +39,21 @@ mod utils {
     pub struct SourceMapCache<'src_map> {
         fn_cache:
             FnCache<SourceId, Box<dyn Fn(&SourceId) -> Result<String, Box<dyn Debug>> + 'src_map>>,
+        src_map: &'src_map SourceMap,
     }
 
     impl<'src_map> SourceMapCache<'src_map> {
-        pub fn new(source_map: &'src_map SourceMap) -> Self {
+        pub fn new(src_map: &'src_map SourceMap) -> Self {
             Self {
                 fn_cache: FnCache::new(Box::new(|id: &_| {
-                    let Some((_, source)) = source_map.iter().find(|(src_id, _)| *src_id == id)
-                    else {
+                    let Some((_, source)) = src_map.iter().find(|(src_id, _)| *src_id == id) else {
                         unreachable!()
                     };
 
                     Ok(source.source_code.to_owned())
                 }) as Box<_>),
+
+                src_map,
             }
         }
     }
@@ -62,7 +64,7 @@ mod utils {
         }
 
         fn display<'a>(&self, id: &'a SourceId) -> Option<Box<dyn fmt::Display + 'a>> {
-            self.fn_cache.display(id)
+            Some(Box::new(self.src_map.get(*id).unwrap().url.clone()) as Box<_>)
         }
     }
 }
@@ -89,14 +91,17 @@ impl PrintBackend for AriadnePrintBackend {
         let mut report_builder =
             ariadne::Report::build(report_kind, report_source_id, span.start).with_message(title);
 
-        if let Some(desc) = &description {
-            let mut report_description =
-                ariadne::Label::new((report_source_id, span.clone())).with_order(1);
+        let mut report_description =
+            ariadne::Label::new((report_source_id, span.clone())).with_order(1);
 
-            report_description = report_description.with_message(desc);
+        report_description = report_description.with_message(
+            description
+                .as_ref()
+                .map(|string| string.as_ref())
+                .unwrap_or("Here"),
+        );
 
-            report_builder.add_label(report_description);
-        }
+        report_builder.add_label(report_description);
 
         for label in Iterator::chain(infos.iter(), helps.iter()) {
             report_builder.add_label(

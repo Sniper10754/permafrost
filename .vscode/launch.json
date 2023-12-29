@@ -4,21 +4,23 @@
         {
             "type": "lldb",
             "request": "launch",
-            "name": "Debug executable 'frostbite-runtime-desktop'",
+            "name": "Debug executable 'frostbite-compiler-driver'",
             "cargo": {
                 "args": [
                     "build",
-                    "--bin=frostbite-runtime-desktop",
-                    "--package=frostbite-runtime-desktop"
+                    "--bin=frostbite-compiler-driver",
+                    "--package=frostbite-compiler-driver"
                 ],
                 "filter": {
-                    "name": "frostbite-runtime-desktop",
+                    "name": "frostbite-compiler-driver",
                     "kind": "bin"
                 }
             },
-            "args": ["run", "examples/math.fsb"],
+            "args": [
+                "compile",
+                "examples/example.fsb"
+            ],
             "cwd": "${workspaceFolder}"
-            
         }
     ]
 }

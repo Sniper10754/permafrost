@@ -5,7 +5,7 @@ use frostbite_reports::ReportContext;
 
 use crate::tir::{TirNode, TirTree};
 
-use super::CodegenBackend;
+use super::{CodegenBackend, CodegenError};
 
 #[derive(Debug, Default)]
 pub struct BytecodeCodegenBackend;
@@ -83,7 +83,7 @@ impl CodegenBackend for BytecodeCodegenBackend {
         self,
         report_ctx: &mut ReportContext,
         t_ir_tree: &TirTree,
-    ) -> Result<Self::Output, ()> {
+    ) -> Result<Self::Output, CodegenError> {
         let mut module = Module {
             manifest: Manifest {
                 bytecode_version: BytecodeVersion::Number(0.1),

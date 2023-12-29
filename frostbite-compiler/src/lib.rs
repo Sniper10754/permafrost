@@ -2,7 +2,7 @@
 
 extern crate alloc;
 
-use codegen::CodegenBackend;
+use codegen::{CodegenBackend, CodegenError};
 use frostbite_parser::{lexer::tokenize, Parser};
 use frostbite_reports::{
     sourcemap::{SourceId, SourceMap},
@@ -18,9 +18,11 @@ pub mod tir;
 mod utils {
     use frostbite_reports::ReportContext;
 
-    pub fn bail_on_errors(report_ctx: &ReportContext) -> Result<(), ()> {
+    use crate::codegen::CodegenError;
+
+    pub fn bail_on_errors(report_ctx: &ReportContext) -> Result<(), CodegenError> {
         if report_ctx.has_errors() {
-            Err(())
+            Err(CodegenError)
         } else {
             Ok(())
         }
@@ -41,7 +43,7 @@ impl Compiler {
         source_id: SourceId,
         src_map: &mut SourceMap,
         codegen: C,
-    ) -> Result<CompilationResults<C>, ()> {
+    ) -> Result<CompilationResults<C>, CodegenError> {
         let source = &src_map.get(source_id).unwrap().source_code;
 
         let token_stream = tokenize(report_ctx, source_id, source);

@@ -67,14 +67,14 @@ impl Index<SourceId> for SourceMap {
 
 pub struct SourceId(pub usize);
 
-#[derive(Debug, derive_more::Display)]
+#[derive(Debug, Clone, derive_more::Display)]
 #[display(fmt = "{url}")]
 pub struct SourceDescription {
     pub url: SourceUrl,
     pub source_code: String,
 }
 
-#[derive(Debug, derive_more::Display, derive_more::From)]
+#[derive(Debug, Clone, derive_more::Display, derive_more::From)]
 pub enum SourceUrl {
     #[cfg(feature = "std")]
     #[display(fmt = "{}", "_0.display()")]

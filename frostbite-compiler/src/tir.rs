@@ -5,26 +5,6 @@ use frostbite_parser::ast::{
 };
 use slotmap::{new_key_type, SlotMap};
 
-mod utils {
-    pub fn write_map_as_kvs<I, A, B>(map: I, f: &mut dyn core::fmt::Write) -> core::fmt::Result
-    where
-        I: IntoIterator<Item = (A, B)>,
-        A: core::fmt::Display,
-        B: core::fmt::Display,
-    {
-        let mut iter = map.into_iter();
-
-        if let Some((k, v)) = iter.next() {
-            core::write!(f, "{}: {}", k, v)?;
-
-            for (k, v) in iter {
-                core::write!(f, ", {}: {}", k, v)?;
-            }
-        }
-        Ok(())
-    }
-}
-
 new_key_type! {
     pub struct LocalIndex;
     pub struct TypeIndex;
@@ -87,10 +67,19 @@ pub enum Callable {
     Ident(TypeIndex, Spanned<String>),
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, derive_more::From)]
 pub enum RefersTo {
     Local(LocalIndex),
     Type(TypeIndex),
+}
+
+impl RefersTo {
+    pub fn into_type(self, t_ir_tree: &TirTree) -> TypeIndex {
+        match self {
+            RefersTo::Local(local_index) => t_ir_tree.locals[local_index],
+            RefersTo::Type(type_index) => type_index,
+        }
+    }
 }
 
 #[non_exhaustive]
@@ -115,14 +104,14 @@ impl TryFrom<TirNode> for Assignable {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct TirFunction {
     pub arguments: BTreeMap<String, TypeIndex>,
 
     pub return_type: TypeIndex,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Type {
     Int,
     Float,
