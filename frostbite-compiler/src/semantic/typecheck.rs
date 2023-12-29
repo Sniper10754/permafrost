@@ -8,6 +8,7 @@ use core::{
 };
 
 use alloc::{
+    borrow::Cow,
     boxed::Box,
     collections::BTreeMap,
     format,
@@ -18,10 +19,13 @@ use alloc::{
 use frostbite_parser::ast::{tokens::TypeAnnotation, Argument, Expr, Program, Spannable, Spanned};
 use frostbite_reports::{
     sourcemap::{SourceId, SourceMap},
-    IntoReport, Level, Report, ReportContext,
+    IntoReport, Label, Level, Report, ReportContext,
 };
 
-use crate::tir::{Assignable, Callable, RefersTo, TirFunction, TirNode, TirTree, Type, TypeIndex};
+use crate::tir::{
+    display::display_type, Assignable, Callable, RefersTo, TirFunction, TirNode, TirTree, Type,
+    TypeIndex,
+};
 
 #[derive(Debug)]
 pub enum TypecheckError<'ast> {
@@ -29,11 +33,17 @@ pub enum TypecheckError<'ast> {
         source_id: SourceId,
         span: Range<usize>,
 
-        expected: Type,
-        found: Type,
+        expected: Cow<'ast, str>,
+        found: Cow<'ast, str>,
     },
     SymbolNotFound(SourceId, Spanned<&'ast str>),
-    IncompatibleOperands(SourceId, Range<usize>),
+    IncompatibleOperands {
+        source_id: SourceId,
+        span: Range<usize>,
+
+        left: Cow<'static, str>,
+        right: Cow<'static, str>,
+    },
     CannotAssignTo(SourceId, Range<usize>),
     CannotCallNonIdent(SourceId, Range<usize>),
     CannotCallNonFunction(SourceId, Range<usize>),
@@ -81,13 +91,16 @@ impl<'ast> IntoReport for TypecheckError<'ast> {
                     [],
                 )
             }
-            TypecheckError::IncompatibleOperands(source_id, span) => Report::new_diagnostic(
+            TypecheckError::IncompatibleOperands { source_id, span, left, right } => Report::new_diagnostic(
                 Level::Error,
-                span,
+                span.clone(),
                 source_id,
                 "Incompatible operands",
                 None::<&str>,
-                [],
+                [
+                    Label::new(format!("Left type is {left}"), span.clone(), source_id),
+                    Label::new(format!("Right type is {right}"), span.clone(), source_id),
+                ],
                 [],
             ),
             TypecheckError::CannotAssignTo(source_id, span) => Report::new_diagnostic(
@@ -235,9 +248,12 @@ impl<'ast> RecursiveTypechecker {
                     | (Type::Float, Type::Int)
                     | (Type::Int, Type::Float) => Ok(t_ir_tree.types_arena.insert(Type::Float)),
 
-                    _ => {
-                        return Err(TypecheckError::IncompatibleOperands(source_id, expr.span()));
-                    }
+                    _ => Err(TypecheckError::IncompatibleOperands {
+                        source_id,
+                        span: expr.span(),
+                        left: display_type(lhs_type_idx, t_ir_tree),
+                        right: display_type(rhs_type_idx, t_ir_tree),
+                    }),
                 }
             }
             Expr::Assign {
@@ -300,14 +316,12 @@ impl<'ast> RecursiveTypechecker {
 
                     let type_index = referred_to.into_type(t_ir_tree);
 
-                    if matches!(
-                        &t_ir_tree.types_arena[type_index],
-                        Type::Function(TirFunction {
-                            arguments: _,
-                            return_type: _,
-                        }),
-                    ) {
-                        Ok(type_index)
+                    if let Type::Function(TirFunction {
+                        arguments: _,
+                        return_type,
+                    }) = &t_ir_tree.types_arena[type_index]
+                    {
+                        Ok(*return_type)
                     } else {
                         Err(TypecheckError::CannotCallNonFunction(
                             source_id,
@@ -371,7 +385,12 @@ impl<'ast> RecursiveTypechecker {
                     (Type::Int, Type::Float) => (),
 
                     _ => {
-                        return Err(TypecheckError::IncompatibleOperands(source_id, expr.span()));
+                        return Err(TypecheckError::IncompatibleOperands {
+                            source_id,
+                            span: expr.span(),
+                            left: display_type(inferred_lhs, t_ir_tree),
+                            right: display_type(inferred_rhs, t_ir_tree),
+                        });
                     }
                 };
 

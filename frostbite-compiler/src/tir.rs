@@ -10,6 +10,58 @@ new_key_type! {
     pub struct TypeIndex;
 }
 
+pub mod display {
+
+    use alloc::{borrow::Cow, format, string::String};
+    use core::fmt::{Display, Write as _};
+
+    use super::{TirFunction, TirTree, TypeIndex};
+    use crate::tir::Type::*;
+
+    fn join_map_into_string<K, V>(mut map: impl Iterator<Item = (K, V)>) -> String
+    where
+        K: Display,
+        V: Display,
+    {
+        let mut buffer = String::new();
+
+        if let Some((k, v)) = map.next() {
+            write!(buffer, "{k}: {v}").expect("Unreachable");
+
+            for (k, v) in map {
+                write!(buffer, ", {k}: {v}").expect("Unreachable");
+            }
+        }
+
+        buffer
+    }
+
+    pub fn display_type(type_index: TypeIndex, t_ir_tree: &TirTree) -> Cow<'static, str> {
+        match &t_ir_tree.types_arena[type_index] {
+            Int => "int".into(),
+            Float => "float".into(),
+            String => "str".into(),
+            Function(TirFunction {
+                arguments,
+                return_type,
+            }) => {
+                format!(
+                    "fn ({}) -> {}",
+                    join_map_into_string(arguments.iter().map(|(name, type_idx)| (
+                        name.as_str(),
+                        display_type(*type_idx, t_ir_tree)
+                    ))),
+                    display_type(*return_type, t_ir_tree)
+                )
+                .into()
+            }
+            Unit => "()".into(),
+            Object(object_name) => format!("object {object_name}").into(),
+            Any => "any".into(),
+        }
+    }
+}
+
 #[derive(Debug, derive_more::From, derive_more::Into)]
 pub struct Typed<T>(TypeIndex, T);
 
@@ -94,7 +146,7 @@ impl TryFrom<TirNode> for Assignable {
     fn try_from(value: TirNode) -> Result<Self, Self::Error> {
         match value {
             TirNode::Ident {
-                ty: ty,
+                ty,
                 refers_to: _,
                 str_value: ident,
             } => Ok(Assignable::Ident(ty, ident)),
