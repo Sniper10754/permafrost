@@ -64,7 +64,10 @@ mod utils {
         }
 
         fn display<'a>(&self, id: &'a SourceId) -> Option<Box<dyn fmt::Display + 'a>> {
-            Some(Box::new(self.src_map.get(*id).unwrap().url.clone()) as Box<_>)
+            self.src_map
+                .get(*id)
+                .map(|source_description| Box::new(source_description.url.clone()))
+                .map(|boxed| boxed as Box<_>)
         }
     }
 }

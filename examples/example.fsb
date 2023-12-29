@@ -4,5 +4,9 @@ x = 6;
 
 y = 2 * x;
 
+<<<<<<< Updated upstream:examples/example.fsb
 z = x * 10 * y * 2 + add(x, y);
+=======
+z = x+ * 10 * y * 2 + add(y, z);
+>>>>>>> Stashed changes:examples/math.fsb
 
