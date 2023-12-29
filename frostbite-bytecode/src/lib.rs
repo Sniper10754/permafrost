@@ -23,7 +23,7 @@ pub mod text_repr;
 
 #[derive(Debug, Clone, derive_more::Display, Serialize, Deserialize)]
 pub enum BytecodeVersion {
-    Number(f32),
+    Experimental(),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

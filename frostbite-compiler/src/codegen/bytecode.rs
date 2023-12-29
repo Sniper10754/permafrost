@@ -86,7 +86,7 @@ impl CodegenBackend for BytecodeCodegenBackend {
     ) -> Result<Self::Output, CodegenError> {
         let mut module = Module {
             manifest: Manifest {
-                bytecode_version: BytecodeVersion::Number(0.1),
+                bytecode_version: BytecodeVersion::Experimental(),
             },
             globals: Globals::default(),
             body: Vec::new(),
