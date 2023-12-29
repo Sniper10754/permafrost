@@ -49,7 +49,7 @@ impl BytecodeCodegenBackend {
                 instructions.push(Instruction::Load(idx))
             }
             TirNode::Ident {
-                r#type: _,
+                ty: _,
                 refers_to: _t_ir_node,
                 str_value: _,
             } => {}

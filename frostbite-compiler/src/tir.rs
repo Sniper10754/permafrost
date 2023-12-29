@@ -28,7 +28,7 @@ pub enum TirNode {
     String(Spanned<String>),
 
     Ident {
-        r#type: TypeIndex,
+        ty: TypeIndex,
         refers_to: RefersTo,
         str_value: Spanned<String>,
     },
@@ -94,10 +94,10 @@ impl TryFrom<TirNode> for Assignable {
     fn try_from(value: TirNode) -> Result<Self, Self::Error> {
         match value {
             TirNode::Ident {
-                r#type,
+                ty: ty,
                 refers_to: _,
                 str_value: ident,
-            } => Ok(Assignable::Ident(r#type, ident)),
+            } => Ok(Assignable::Ident(ty, ident)),
 
             _ => Err(()),
         }

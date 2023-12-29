@@ -12,7 +12,11 @@ pub struct CodegenError;
 pub trait CodegenBackend {
     type Output;
 
-    fn codegen(self, reports: &mut ReportContext, program: &TirTree) -> Result<Self::Output, CodegenError>;
+    fn codegen(
+        self,
+        reports: &mut ReportContext,
+        tree: &TirTree,
+    ) -> Result<Self::Output, CodegenError>;
 }
 
 pub struct CodegenBackends;

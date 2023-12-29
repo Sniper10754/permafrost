@@ -298,10 +298,7 @@ impl<'ast> RecursiveTypechecker {
                         ));
                     };
 
-                    let type_index = match referred_to {
-                        RefersTo::Local(local) => t_ir_tree.locals[local],
-                        RefersTo::Type(type_idx) => type_idx,
-                    };
+                    let type_index = referred_to.into_type(t_ir_tree);
 
                     if matches!(
                         &t_ir_tree.types_arena[type_index],
@@ -350,13 +347,10 @@ impl<'ast> RecursiveTypechecker {
                     ));
                 };
 
-                let r#type = match refers_to {
-                    RefersTo::Local(local_idx) => t_ir_tree.locals[local_idx],
-                    RefersTo::Type(type_idx) => type_idx,
-                };
+                let type_idx = refers_to.into_type(t_ir_tree);
 
                 TirNode::Ident {
-                    r#type,
+                    ty: type_idx,
                     refers_to,
                     str_value: spanned_ident.clone().map(|name| name.into()),
                 }
@@ -522,12 +516,9 @@ impl<'ast> RecursiveTypechecker {
                         ));
                     };
 
-                    let type_idx = match refers_to {
-                        RefersTo::Local(local_idx) => t_ir_tree.locals[local_idx],
-                        RefersTo::Type(type_idx) => type_idx,
-                    };
+                    let type_idx = refers_to.into_type(t_ir_tree);
 
-                    let Type::Function(function) = &t_ir_tree.types_arena[type_idx] else {
+                    let Type::Function(function) = &t_ir_tree.types_arena[type_idx].clone() else {
                         return Err(TypecheckError::CannotCallNonFunction(
                             source_id,
                             callee.span(),
@@ -557,14 +548,20 @@ impl<'ast> RecursiveTypechecker {
                         }
                     }
 
-                    let arguments = vec![];
+                    let mut arguments = vec![];
 
-                    let return_type = function.return_type;
+                    for call_arg in call_arguments.iter() {
+                        let mut node = TirNode::Uninitialized;
+
+                        self.visit_expr(source_id, _report_ctx, call_arg, &mut node, t_ir_tree)?;
+
+                        arguments.push(node);
+                    }
 
                     TirNode::Call {
                         callee: Callable::Ident(type_idx, spanned_str.clone().map(Into::into)),
                         arguments,
-                        return_type,
+                        return_type: function.return_type,
                     }
                 }
 
