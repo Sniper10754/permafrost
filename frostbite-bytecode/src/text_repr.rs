@@ -5,15 +5,20 @@ use variant_name::VariantName;
 use crate::{Instruction, Module};
 
 const INSTRUCTION_PADDING: usize = 15;
-const NUM_PADDING: usize = usize::ilog10(usize::MAX) as _;
+const CONSTANT_PADDING: usize = 20;
 
 pub fn print_bytecode<W>(w: &mut W, module: &Module) -> fmt::Result
 where
     W: fmt::Write,
 {
-    writeln!(w, "Bytecode version {}", module.manifest.bytecode_version)?;
+    writeln!(
+        w,
+        "Bytecode version {}",
+        module.manifest.bytecode_version.yellow()
+    )?;
 
     writeln!(w)?;
+    writeln!(w, "{}", "Global Constants".bold().underline())?;
 
     module
         .globals
@@ -22,7 +27,7 @@ where
         .try_for_each(|(index, constant)| {
             writeln!(
                 w,
-                "{:>INSTRUCTION_PADDING$} -> {:>NUM_PADDING$}",
+                "{:>CONSTANT_PADDING$} -> {}",
                 index.cyan(),
                 constant.yellow()
             )
@@ -45,7 +50,7 @@ where
             function
                 .body
                 .iter()
-                .try_for_each(|instruction| print_instruction(w, instruction))?;
+                .try_for_each(|instruction| print_instruction(w, instruction, module))?;
 
             Ok(())
         })?;
@@ -56,20 +61,20 @@ where
     module
         .body
         .iter()
-        .try_for_each(|instruction| print_instruction(w, instruction))?;
+        .try_for_each(|instruction| print_instruction(w, instruction, module))?;
 
     Ok(())
 }
 
-fn print_instruction<W>(w: &mut W, instruction: &Instruction) -> fmt::Result
+fn print_instruction<W>(w: &mut W, instruction: &Instruction, module: &Module) -> fmt::Result
 where
     W: fmt::Write,
 {
-    writeln!(
-        w,
-        "# {:>INSTRUCTION_PADDING$}",
-        instruction.description().bright_white().underline()
-    )?;
+    // writeln!(
+    //     w,
+    //     "# {:>INSTRUCTION_PADDING$}",
+    //     instruction.description().bright_white().underline()
+    // )?;
 
     write!(
         w,
@@ -78,7 +83,12 @@ where
     )?;
 
     match instruction {
-        Instruction::LoadConstant(index) => write!(w, "{}", index.cyan())?,
+        Instruction::LoadConstant(index) => write!(
+            w,
+            "{} // {}",
+            index.cyan(),
+            module.globals.constants_pool[*index]
+        )?,
         Instruction::Call(index) => write!(w, "{}", index.cyan())?,
         Instruction::StoreName(name) => write!(w, "{:?}", name.bright_yellow())?,
         Instruction::LoadName(name) => write!(w, "{:?}", name.bright_yellow())?,

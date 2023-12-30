@@ -57,13 +57,13 @@ pub enum Instruction {
     /// Returns from a function
     Return,
 
-    /// Perform an `Add` operation on the last top two elements on the stack, pushes the result to the top of the stack
+    /// Perform an `Add` operation on the last top two elements on the stack, overwrites the top element on the stack with the result
     Add,
-    /// Perform an `Sub` operation on the last top two elements on the stack, pushes the result to the top of the stack
+    /// Perform an `Sub` operation on the last top two elements on the stack, overwrites the top element on the stack with the result
     Subtract,
-    /// Perform an `Mul` operation on the last top two elements on the stack, pushes the result to the top of the stack
+    /// Perform an `Mul` operation on the last top two elements on the stack, overwrites the top element on the stack with the result
     Multiply,
-    /// Perform an `Div` operation on the last top two elements on the stack, pushes the result to the top of the stack
+    /// Perform an `Div` operation on the last top two elements on the stack, overwrites the top element on the stack with the result
     Divide,
 
     /// Does nothing
@@ -71,7 +71,7 @@ pub enum Instruction {
 }
 
 impl Instruction {
-    fn description(&self) -> &'static str {
+    pub fn description(&self) -> &'static str {
         match self {
             Instruction::LoadConstant(_) => "Loads constant from the constants map",
             Instruction::StoreName(_) => "Stores the value as the name",
@@ -79,10 +79,10 @@ impl Instruction {
             Instruction::Pop => "Pops an element from the stack",
             Instruction::Call(_) => "Calls a function",
             Instruction::Return => "Returns from the function",
-            Instruction::Add => "Adds the top two elements on the stack, pushes the result to the top of the stack",
-            Instruction::Subtract => "Subtracts the top two elements on the stack, pushes the result to the top of the stack",
-            Instruction::Multiply => "Multiplies the top two elements on the stack, pushes the result to the top of the stack",
-            Instruction::Divide => "Divides the top two elements on the stack, pushes the result to the top of the stack",
+            Instruction::Add => "Adds the top two elements on the stack, overwrites the top element on the stack with the result",
+            Instruction::Subtract => "Subtracts the top two elements on the stack, overwrites the top element on the stack with the result",
+            Instruction::Multiply => "Multiplies the top two elements on the stack, overwrites the top element on the stack with the result",
+            Instruction::Divide => "Divides the top two elements on the stack, overwrites the top element on the stack with the result",
             Instruction::Nop => "Does no operation",
         }
     }

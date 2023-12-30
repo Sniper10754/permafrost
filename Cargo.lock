@@ -277,7 +277,6 @@ name = "frostbite-bytecode"
 version = "0.1.0"
 dependencies = [
  "ciborium",
- "color-eyre",
  "derive_more",
  "owo-colors 4.0.0",
  "serde",
@@ -307,6 +306,16 @@ dependencies = [
  "frostbite-compiler",
  "frostbite-parser",
  "frostbite-reports",
+]
+
+[[package]]
+name = "frostbite-disassembler"
+version = "0.1.0"
+dependencies = [
+ "clap",
+ "color-eyre",
+ "frostbite-bytecode",
+ "owo-colors 4.0.0",
 ]
 
 [[package]]

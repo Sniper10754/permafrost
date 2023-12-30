@@ -2,11 +2,11 @@ use alloc::vec::Vec;
 use frostbite_bytecode::{
     BytecodeVersion, Function, FunctionIndex, Globals, Instruction, Manifest, Module,
 };
-use frostbite_parser::ast::{tokens::OperatorKind, Spanned};
+use frostbite_parser::ast::Spanned;
 use frostbite_reports::ReportContext;
 use slotmap::SecondaryMap;
 
-use crate::tir::{self, Assignable, TirNode, TirTree, TypeIndex};
+use crate::tir::{self, TirNode, TirTree, TypeIndex};
 
 use super::{CodegenBackend, CodegenError};
 
@@ -20,12 +20,10 @@ impl BytecodeCodegenBackend {
         &mut self,
         report_ctx: &mut ReportContext,
         t_ir: &TirTree,
-        globals: &mut Module,
+        module: &mut Module,
     ) {
-        let body = &mut globals.body;
-        let globals = &mut globals.globals;
-
-        extern crate std;
+        let body = &mut module.body;
+        let globals = &mut module.globals;
 
         for node in &t_ir.nodes {
             self.compile_node(report_ctx, t_ir, body, globals, node);
@@ -58,33 +56,24 @@ impl BytecodeCodegenBackend {
             }
             TirNode::Ident {
                 type_index: _,
-                refers_to,
+                refers_to: _,
                 str_value: Spanned(_, name),
-            } => match refers_to {
-                tir::RefersTo::Local(_) => instructions.push(Instruction::LoadName(name.into())),
-                tir::RefersTo::Type(_) => (),
-            },
+            } => {
+                instructions.push(Instruction::LoadName(name.into()));
+            }
             TirNode::BinaryOperation { lhs, operator, rhs } => {
-                self.compile_node(_report_ctx, _t_ir, instructions, globals, lhs);
-                self.compile_node(_report_ctx, _t_ir, instructions, globals, rhs);
-
-                instructions.push(match operator.1 {
-                    OperatorKind::Add => Instruction::Add,
-                    OperatorKind::Sub => Instruction::Subtract,
-                    OperatorKind::Mul => Instruction::Multiply,
-                    OperatorKind::Div => Instruction::Divide,
-                });
+                
             }
             TirNode::Assign {
+                local_index: _,
                 lhs,
                 value,
-                local_index: _,
             } => {
                 self.compile_node(_report_ctx, _t_ir, instructions, globals, value);
 
                 match lhs {
-                    Assignable::Ident(_, Spanned(_, name)) => {
-                        instructions.push(Instruction::StoreName(name.into()))
+                    tir::Assignable::Ident(_, Spanned(_, name)) => {
+                        instructions.push(Instruction::StoreName(name.into()));
                     }
                 }
             }
@@ -93,34 +82,40 @@ impl BytecodeCodegenBackend {
                 name: _,
                 arguments: _,
                 return_type: _,
-                body,
+                body: function_body,
             } => {
-                let mut body_instructions = Vec::new();
+                let mut bytecode_function_body = Vec::new();
 
-                self.compile_node(_report_ctx, _t_ir, &mut body_instructions, globals, body);
+                self.compile_node(
+                    _report_ctx,
+                    _t_ir,
+                    &mut bytecode_function_body,
+                    globals,
+                    function_body,
+                );
 
-                body_instructions.push(Instruction::Return);
-
-                let fn_index = globals.functions.insert(Function {
-                    body: body_instructions,
+                let function_index = globals.functions.insert(Function {
+                    body: bytecode_function_body,
                 });
 
-                self.functions.insert(*type_index, fn_index);
+                self.functions.insert(*type_index, function_index);
             }
             TirNode::Call {
                 callee,
                 arguments,
                 return_type: _,
             } => {
-                arguments.iter().for_each(|arg| {
-                    self.compile_node(_report_ctx, _t_ir, instructions, globals, arg);
+                // Push arguments onto the stack
+
+                arguments.iter().for_each(|argument| {
+                    self.compile_node(_report_ctx, _t_ir, instructions, globals, argument);
                 });
 
                 match callee {
-                    tir::Callable::Ident(type_index, _) => {
-                        let fn_index = self.functions[*type_index];
+                    tir::Callable::Ident(type_index, ..) => {
+                        let function_index = self.functions[*type_index];
 
-                        instructions.push(Instruction::Call(fn_index));
+                        instructions.push(Instruction::Call(function_index));
                     }
                 }
             }
