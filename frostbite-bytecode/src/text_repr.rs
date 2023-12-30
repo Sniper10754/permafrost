@@ -89,7 +89,7 @@ where
             index.cyan(),
             module.globals.constants_pool[*index]
         )?,
-        Instruction::Call(index) => write!(w, "{}", index.cyan())?,
+        Instruction::CallIf(index) | Instruction::Call(index) => write!(w, "{}", index.cyan())?,
         Instruction::StoreName(name) => write!(w, "{:?}", name.bright_yellow())?,
         Instruction::LoadName(name) => write!(w, "{:?}", name.bright_yellow())?,
 
@@ -99,6 +99,7 @@ where
         | Instruction::Subtract
         | Instruction::Multiply
         | Instruction::Divide
+        | Instruction::Cmp
         | Instruction::Nop => (),
     }
 

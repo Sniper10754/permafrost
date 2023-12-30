@@ -66,26 +66,14 @@ pub enum Instruction {
     /// Perform an `Div` operation on the last top two elements on the stack, overwrites the top element on the stack with the result
     Divide,
 
+    /// Compares the top two elements on the stack, stores the result as a boolean in the `CR` register
+    Cmp,
+
+    /// Jumps to determinate function if the `CR` register is set to 1 | true
+    CallIf(FunctionIndex),
+
     /// Does nothing
     Nop,
-}
-
-impl Instruction {
-    pub fn description(&self) -> &'static str {
-        match self {
-            Instruction::LoadConstant(_) => "Loads constant from the constants map",
-            Instruction::StoreName(_) => "Stores the value as the name",
-            Instruction::LoadName(_) => "Loads onto the stack the value of the name specified",
-            Instruction::Pop => "Pops an element from the stack",
-            Instruction::Call(_) => "Calls a function",
-            Instruction::Return => "Returns from the function",
-            Instruction::Add => "Adds the top two elements on the stack, overwrites the top element on the stack with the result",
-            Instruction::Subtract => "Subtracts the top two elements on the stack, overwrites the top element on the stack with the result",
-            Instruction::Multiply => "Multiplies the top two elements on the stack, overwrites the top element on the stack with the result",
-            Instruction::Divide => "Divides the top two elements on the stack, overwrites the top element on the stack with the result",
-            Instruction::Nop => "Does no operation",
-        }
-    }
 }
 
 #[derive(Debug, Clone, derive_more::Display, Serialize, Deserialize, derive_more::From)]
@@ -93,6 +81,7 @@ pub enum ConstantValue {
     Int(i32),
     Float(f32),
     String(String),
+    Bool(bool),
 
     Unit,
 }

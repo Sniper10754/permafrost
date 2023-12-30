@@ -215,6 +215,9 @@ impl<'report_context, 'input> Parser<'report_context, 'input> {
             Some(Spanned(span, Token::Ident(value))) => Some(Expr::Ident(Spanned(span, value))),
             Some(Spanned(span, Token::String(value))) => Some(Expr::String(Spanned(span, value))),
 
+            Some(Spanned(span, Token::True)) => Some(Expr::Bool(Spanned(span, true))),
+            Some(Spanned(span, Token::False)) => Some(Expr::Bool(Spanned(span, false))),
+
             Some(Spanned(_, Token::LParen)) => {
                 let expr = self.parse_expr()?;
 
@@ -370,10 +373,12 @@ impl<'report_context, 'input> Parser<'report_context, 'input> {
                 Some(Spanned(span, TypeAnnotation::Float))
             }
             Some(Spanned(span, Token::Ident("str"))) => Some(Spanned(span, TypeAnnotation::String)),
+            Some(Spanned(span, Token::Ident("bool"))) => Some(Spanned(span, TypeAnnotation::Bool)),
             Some(Spanned(span, Token::Ident("any"))) => Some(Spanned(span, TypeAnnotation::Any)),
             Some(Spanned(span, Token::Ident(other))) => {
                 Some(Spanned(span, TypeAnnotation::Object(other)))
             }
+
             Some(Spanned(span, _)) => {
                 self.report_ctx.push(report!(
                     parser: self,
@@ -409,7 +414,7 @@ mod tests {
 
     use crate::ast::{
         tokens::{
-            Arrow, Eq, FunctionToken, LeftParenthesisToken, Operator, OperatorKind,
+            Arrow, BinaryOperatorKind, Eq, FunctionToken, LeftParenthesisToken, Operator,
             RightParenthesisToken, TypeAnnotation,
         },
         Argument, Expr, Program, Spanned,
@@ -455,13 +460,13 @@ mod tests {
                     lhs: boxed!(Expr::Int(Spanned(0..1, 1))),
                     operator: Operator {
                         span: 2..3,
-                        kind: OperatorKind::Add
+                        kind: BinaryOperatorKind::Add
                     },
                     rhs: boxed!(Expr::BinaryOperation {
                         lhs: boxed!(Expr::Int(Spanned(4..5, 2))),
                         operator: Operator {
                             span: 6..7,
-                            kind: OperatorKind::Add
+                            kind: BinaryOperatorKind::Add
                         },
                         rhs: boxed!(Expr::Int(Spanned(8..9, 3)))
                     }),
@@ -519,7 +524,7 @@ mod tests {
                         lhs: boxed!(Expr::Ident(Spanned(32..33, "x"))),
                         operator: Operator {
                             span: 34..35,
-                            kind: OperatorKind::Add
+                            kind: BinaryOperatorKind::Add
                         },
                         rhs: boxed!(Expr::Ident(Spanned(36..37, "y")))
                     }),
@@ -559,7 +564,7 @@ mod tests {
                         lhs: boxed!(Expr::Ident(Spanned(39..40, "x"))),
                         operator: Operator {
                             span: 41..42,
-                            kind: OperatorKind::Add
+                            kind: BinaryOperatorKind::Add
                         },
                         rhs: boxed!(Expr::Ident(Spanned(43..44, "y")))
                     }),

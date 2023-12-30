@@ -3,13 +3,13 @@ use alloc::{collections::VecDeque, vec, vec::Vec};
 use frostbite_reports::{sourcemap::SourceId, IntoReport, Level, Report, ReportContext};
 use logos::{Logos, Span};
 
-use crate::ast::{tokens::OperatorKind, Spanned};
+use crate::ast::{tokens::BinaryOperatorKind, Spanned};
 
 mod helpers {
     use logos::Lexer;
     use num_traits::Num;
 
-    use crate::ast::tokens::OperatorKind;
+    use crate::ast::tokens::BinaryOperatorKind;
 
     use super::{LexerErrorKind, Token};
 
@@ -22,12 +22,13 @@ mod helpers {
             .map_err(|_| LexerErrorKind::NumberTooBig { span: lexer.span() })
     }
 
-    pub fn parse_operator<'input>(lexer: &Lexer<'input, Token<'input>>) -> OperatorKind {
+    pub fn parse_operator<'input>(lexer: &Lexer<'input, Token<'input>>) -> BinaryOperatorKind {
         match lexer.slice() {
-            "+" => OperatorKind::Add,
-            "-" => OperatorKind::Sub,
-            "*" => OperatorKind::Mul,
-            "/" => OperatorKind::Div,
+            "+" => BinaryOperatorKind::Add,
+            "-" => BinaryOperatorKind::Sub,
+            "*" => BinaryOperatorKind::Mul,
+            "/" => BinaryOperatorKind::Div,
+            "==" => BinaryOperatorKind::Equal,
 
             _ => unreachable!("Caller must guarantee that the current slice of text is a operator"),
         }
@@ -116,6 +117,12 @@ pub enum Token<'input> {
     #[regex(r#""(\\[\\"]|[^"])*""#, helpers::unquote_str)]
     String(&'input str),
 
+    #[token("true")]
+    True,
+
+    #[token("false")]
+    False,
+
     #[token("(")]
     LParen,
 
@@ -137,8 +144,8 @@ pub enum Token<'input> {
     #[token(",")]
     Comma,
 
-    #[regex(r#"[\+\-\*/]"#, helpers::parse_operator)]
-    BinaryOperator(OperatorKind),
+    #[regex(r#"(\+|\-|\*/|==|)"#, helpers::parse_operator)]
+    BinaryOperator(BinaryOperatorKind),
 
     #[token(":")]
     Colon,

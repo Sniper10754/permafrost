@@ -57,6 +57,7 @@ pub mod display {
             Unit => "()".into(),
             Object(object_name) => format!("object {object_name}").into(),
             Any => "any".into(),
+            Bool => "bool".into(),
         }
     }
 }
@@ -76,6 +77,7 @@ pub struct TirTree {
 pub enum TirNode {
     Int(Spanned<i32>),
     Float(Spanned<f32>),
+    Bool(Spanned<bool>),
     String(Spanned<String>),
 
     Ident {
@@ -168,6 +170,7 @@ pub enum Type {
     Int,
     Float,
     String,
+    Bool,
 
     Function(TirFunction),
 
@@ -188,6 +191,7 @@ impl<'a> From<TypeAnnotation<'a>> for Type {
             TypeAnnotation::NotSpecified => Self::Unit,
             TypeAnnotation::Unit => Self::Unit,
             TypeAnnotation::Object(obj) => Self::Object(obj.into()),
+            TypeAnnotation::Bool => Self::Bool,
         }
     }
 }

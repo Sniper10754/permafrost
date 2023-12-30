@@ -12,7 +12,6 @@ pub type Span = Range<usize>;
 pub mod tokens {
 
     use derive_more::Display;
-    use num_traits::Num;
 
     use super::{Span, Spannable};
 
@@ -39,7 +38,7 @@ pub mod tokens {
     #[display(fmt = "{kind}")]
     pub struct Operator {
         pub span: Span,
-        pub kind: OperatorKind,
+        pub kind: BinaryOperatorKind,
     }
 
     impl Spannable for Operator {
@@ -49,7 +48,7 @@ pub mod tokens {
     }
 
     #[derive(Debug, Clone, Copy, PartialEq, Display)]
-    pub enum OperatorKind {
+    pub enum BinaryOperatorKind {
         #[display(fmt = "+")]
         Add,
         #[display(fmt = "-")]
@@ -58,17 +57,8 @@ pub mod tokens {
         Mul,
         #[display(fmt = "/")]
         Div,
-    }
-
-    impl OperatorKind {
-        pub fn calculate_binary_op<N: Num>(self, lhs: N, rhs: N) -> N {
-            match self {
-                OperatorKind::Add => lhs + rhs,
-                OperatorKind::Sub => lhs - rhs,
-                OperatorKind::Mul => lhs * rhs,
-                OperatorKind::Div => lhs / rhs,
-            }
-        }
+        #[display(fmt = "==")]
+        Equal,
     }
 
     #[derive(Debug, Clone, Copy, PartialEq, Display)]
@@ -79,6 +69,8 @@ pub mod tokens {
         Float,
         #[display(fmt = "str")]
         String,
+        #[display(fmt = "bool")]
+        Bool,
 
         #[display(fmt = "any")]
         Any,
@@ -152,6 +144,9 @@ impl<'a> Spannable for Expr<'a> {
             | Expr::Float(Spanned(span, _))
             | Expr::Ident(Spanned(span, _))
             | Expr::String(Spanned(span, _)) => span.clone(),
+
+            Expr::Bool(Spanned(span, _)) => span.clone(),
+
             Expr::BinaryOperation {
                 lhs,
                 operator: _,
@@ -181,6 +176,7 @@ pub enum Expr<'a> {
     Int(Spanned<i32>),
     Float(Spanned<f32>),
     Ident(Spanned<&'a str>),
+    Bool(Spanned<bool>),
     String(Spanned<&'a str>),
 
     BinaryOperation {

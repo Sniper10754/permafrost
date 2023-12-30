@@ -2,7 +2,7 @@ use alloc::vec::Vec;
 use frostbite_bytecode::{
     BytecodeVersion, ConstantValue, Function, FunctionIndex, Globals, Instruction, Manifest, Module,
 };
-use frostbite_parser::ast::{tokens::OperatorKind, Spanned};
+use frostbite_parser::ast::{tokens::BinaryOperatorKind, Spanned};
 use frostbite_reports::ReportContext;
 use slotmap::SecondaryMap;
 
@@ -32,7 +32,7 @@ impl BytecodeCodegenBackend {
         t_ir_node: &TirNode,
     ) {
         match t_ir_node {
-            TirNode::Int(..) | TirNode::Float(..) | TirNode::String(..) => {
+            TirNode::Int(..) | TirNode::Float(..) | TirNode::Bool(..) | TirNode::String(..) => {
                 self.compile_constant(instructions, globals, t_ir_node)
             }
             TirNode::Ident {
@@ -79,6 +79,7 @@ impl BytecodeCodegenBackend {
             TirNode::Int(Spanned(_, constant)) => (*constant).into(),
             TirNode::Float(Spanned(_, constant)) => (*constant).into(),
             TirNode::String(Spanned(_, constant)) => constant.clone().into(),
+            TirNode::Bool(Spanned(_, bool)) => (*bool).into(),
 
             _ => unreachable!(),
         });
@@ -91,18 +92,41 @@ impl BytecodeCodegenBackend {
         instructions: &mut Vec<Instruction>,
         globals: &mut Globals,
         lhs: &TirNode,
-        operator: OperatorKind,
+        operator: BinaryOperatorKind,
         rhs: &TirNode,
     ) {
         self.compile_node(instructions, globals, rhs);
         self.compile_node(instructions, globals, lhs);
 
-        instructions.push(match operator {
-            OperatorKind::Add => Instruction::Add,
-            OperatorKind::Sub => Instruction::Subtract,
-            OperatorKind::Mul => Instruction::Multiply,
-            OperatorKind::Div => Instruction::Divide,
-        });
+        match operator {
+            BinaryOperatorKind::Add => instructions.push(Instruction::Add),
+            BinaryOperatorKind::Sub => instructions.push(Instruction::Subtract),
+            BinaryOperatorKind::Mul => instructions.push(Instruction::Multiply),
+            BinaryOperatorKind::Div => instructions.push(Instruction::Divide),
+            BinaryOperatorKind::Equal => {
+                instructions.push(Instruction::Cmp);
+
+                // binary operations must produce the result on the stack
+
+                {
+                    let true_temp_function =
+                        self.compile_function(globals, &TirNode::Bool(Spanned(0..0, true)));
+
+                    let true_temp_function_index = globals.functions.insert(true_temp_function);
+
+                    instructions.push(Instruction::CallIf(true_temp_function_index))
+                }
+
+                {
+                    let false_temp_function =
+                        self.compile_function(globals, &TirNode::Bool(Spanned(0..0, false)));
+
+                    let false_temp_function_index = globals.functions.insert(false_temp_function);
+
+                    instructions.push(Instruction::Call(false_temp_function_index));
+                }
+            }
+        };
     }
 
     fn compile_assignment(
@@ -127,6 +151,18 @@ impl BytecodeCodegenBackend {
         function_body: &TirNode,
         type_index: TypeIndex,
     ) {
+        let function = self.compile_function(globals, function_body);
+
+        let function_index = globals.functions.insert(function);
+
+        self.functions.insert(type_index, function_index);
+    }
+
+    fn compile_function(
+        &mut self,
+        globals: &mut Globals,
+        function_body: &TirNode,
+    ) -> frostbite_bytecode::Function {
         let mut bytecode_function_body = Vec::new();
 
         let unit_constant_index = globals.constants_pool.insert(ConstantValue::Unit);
@@ -137,11 +173,9 @@ impl BytecodeCodegenBackend {
 
         bytecode_function_body.push(Instruction::Return);
 
-        let function_index = globals.functions.insert(Function {
+        Function {
             body: bytecode_function_body,
-        });
-
-        self.functions.insert(type_index, function_index);
+        }
     }
 
     fn compile_function_call(
