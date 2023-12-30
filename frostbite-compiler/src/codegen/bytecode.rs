@@ -165,10 +165,6 @@ impl BytecodeCodegenBackend {
     ) -> frostbite_bytecode::Function {
         let mut bytecode_function_body = Vec::new();
 
-        let unit_constant_index = globals.constants_pool.insert(ConstantValue::Unit);
-
-        bytecode_function_body.push(Instruction::LoadConstant(unit_constant_index));
-
         self.compile_node(&mut bytecode_function_body, globals, function_body);
 
         bytecode_function_body.push(Instruction::Return);

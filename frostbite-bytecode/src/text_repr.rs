@@ -52,10 +52,11 @@ where
                 .iter()
                 .try_for_each(|instruction| print_instruction(w, instruction, module))?;
 
+            writeln!(w)?;
+
             Ok(())
         })?;
 
-    writeln!(w)?;
     writeln!(w, "{}", "Program body".bold().underline())?;
 
     module
