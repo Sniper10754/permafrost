@@ -23,6 +23,6 @@ pub struct CodegenBackends;
 
 impl CodegenBackends {
     pub fn bytecode_backend() -> BytecodeCodegenBackend {
-        BytecodeCodegenBackend
+        BytecodeCodegenBackend::default()
     }
 }

@@ -73,14 +73,14 @@ pub struct TirTree {
     pub types_arena: SlotMap<TypeIndex, Type>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, derive_more::IsVariant)]
 pub enum TirNode {
     Int(Spanned<i32>),
     Float(Spanned<f32>),
     String(Spanned<String>),
 
     Ident {
-        ty: TypeIndex,
+        type_index: TypeIndex,
         refers_to: RefersTo,
         str_value: Spanned<String>,
     },
@@ -92,12 +92,13 @@ pub enum TirNode {
     },
 
     Assign {
+        local_index: LocalIndex,
         lhs: Assignable,
-
         value: Box<Self>,
     },
 
     Function {
+        type_index: TypeIndex,
         name: Option<Spanned<String>>,
         arguments: BTreeMap<String, TypeIndex>,
         return_type: TypeIndex,
@@ -119,7 +120,7 @@ pub enum Callable {
     Ident(TypeIndex, Spanned<String>),
 }
 
-#[derive(Debug, Clone, Copy, derive_more::From)]
+#[derive(Debug, Clone, Copy)]
 pub enum RefersTo {
     Local(LocalIndex),
     Type(TypeIndex),
@@ -146,7 +147,7 @@ impl TryFrom<TirNode> for Assignable {
     fn try_from(value: TirNode) -> Result<Self, Self::Error> {
         match value {
             TirNode::Ident {
-                ty,
+                type_index: ty,
                 refers_to: _,
                 str_value: ident,
             } => Ok(Assignable::Ident(ty, ident)),

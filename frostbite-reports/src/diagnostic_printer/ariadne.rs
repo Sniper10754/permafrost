@@ -1,10 +1,10 @@
 use std::fmt;
 
-use crate::{diagnostic_printer, sourcemap::SourceMap, Diagnostic, Level};
-
 use self::utils::SourceMapCache;
 
-use super::PrintBackend;
+use crate::{
+    diagnostic_printer, diagnostic_printer::PrintBackend, sourcemap::SourceMap, Diagnostic, Level,
+};
 
 pub struct AriadnePrintBackend;
 
@@ -46,9 +46,7 @@ mod utils {
         pub fn new(src_map: &'src_map SourceMap) -> Self {
             Self {
                 fn_cache: FnCache::new(Box::new(|id: &_| {
-                    let Some((_, source)) = src_map.iter().find(|(src_id, _)| *src_id == id) else {
-                        unreachable!()
-                    };
+                    let (_, source) = src_map.iter().find(|(src_id, _)| **src_id == *id).unwrap();
 
                     Ok(source.source_code.to_owned())
                 }) as Box<_>),

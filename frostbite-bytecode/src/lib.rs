@@ -15,7 +15,12 @@ use variant_name::VariantName;
 use variant_name_derive::VariantName;
 
 new_key_type! {
+    #[derive(derive_more::Display)]
+    #[display(fmt = "constant #{}", "_0.as_ffi() as u32")]
     pub struct ConstantIndex;
+
+    #[derive(derive_more::Display)]
+    #[display(fmt = "function #{}", "_0.as_ffi() as u32")]
     pub struct FunctionIndex;
 }
 
@@ -35,28 +40,52 @@ pub struct Manifest {
 #[repr(u8)]
 pub enum Instruction {
     /// Loads a constant element into the stack from the constants pool
-    Load(ConstantIndex) = 1,
+    LoadConstant(ConstantIndex),
+
+    /// Stores the last value onto the stack as name
+    StoreName(String),
+
+    /// Loads the value from name
+    LoadName(String),
 
     /// Removes an element from the stack
-    Pop = 2,
+    Pop,
 
     /// Calls a function
-    Call(ConstantIndex) = 3,
+    Call(FunctionIndex),
 
     /// Returns from a function
     Return,
 
-    /// Perform an `Add` operation on the last two elements on the stack.
+    /// Perform an `Add` operation on the last top two elements on the stack, pushes the result to the top of the stack
     Add,
-    /// Perform an `Sub` operation on the last two elements on the stack.
-    Sub,
-    /// Perform an `Mul` operation on the last two elements on the stack.
-    Mul,
-    /// Perform an `Div` operation on the last two elements on the stack.
-    Div,
+    /// Perform an `Sub` operation on the last top two elements on the stack, pushes the result to the top of the stack
+    Subtract,
+    /// Perform an `Mul` operation on the last top two elements on the stack, pushes the result to the top of the stack
+    Multiply,
+    /// Perform an `Div` operation on the last top two elements on the stack, pushes the result to the top of the stack
+    Divide,
 
     /// Does nothing
     Nop,
+}
+
+impl Instruction {
+    fn description(&self) -> &'static str {
+        match self {
+            Instruction::LoadConstant(_) => "Loads constant from the constants map",
+            Instruction::StoreName(_) => "Stores the value as the name",
+            Instruction::LoadName(_) => "Loads onto the stack the value of the name specified",
+            Instruction::Pop => "Pops an element from the stack",
+            Instruction::Call(_) => "Calls a function",
+            Instruction::Return => "Returns from the function",
+            Instruction::Add => "Adds the top two elements on the stack, pushes the result to the top of the stack",
+            Instruction::Subtract => "Subtracts the top two elements on the stack, pushes the result to the top of the stack",
+            Instruction::Multiply => "Multiplies the top two elements on the stack, pushes the result to the top of the stack",
+            Instruction::Divide => "Divides the top two elements on the stack, pushes the result to the top of the stack",
+            Instruction::Nop => "Does no operation",
+        }
+    }
 }
 
 #[derive(Debug, Clone, derive_more::Display, Serialize, Deserialize, derive_more::From)]

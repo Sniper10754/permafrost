@@ -13,6 +13,7 @@ members = ["frostbite-*"]
 [workspace.dependencies]
 derive_more = "0"
 cfg-if = "1"
+owo-colors = "4"
 
 [workspace.dependencies.slotmap]
 default-features = false
