@@ -17,9 +17,12 @@ pub struct CliArgs {
 
 #[derive(clap::Subcommand)]
 pub enum CliSubcommand {
+    #[command(about = "Compile a file")]
     Compile {
+        #[arg(help = "File to compile")]
         file: PathBuf,
 
+        #[arg(short = 'o', long = "output")]
         output_file: Option<PathBuf>,
     },
 }

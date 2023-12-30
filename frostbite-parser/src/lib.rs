@@ -73,13 +73,13 @@ pub struct Parser<'report_context, 'input> {
 impl<'report_context, 'input> Parser<'report_context, 'input> {
     #[must_use]
     pub fn with_tokenstream(
-        report_context: &'report_context mut ReportContext,
+        report_ctx: &'report_context mut ReportContext,
         token_stream: TokenStream<'input>,
         source_id: SourceId,
     ) -> Self {
         Self {
             token_stream,
-            report_ctx: report_context,
+            report_ctx,
             source_id,
         }
     }

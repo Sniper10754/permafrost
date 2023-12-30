@@ -11,7 +11,6 @@ new_key_type! {
 }
 
 pub mod display {
-
     use alloc::{borrow::Cow, format, string::String};
     use core::fmt::{Display, Write as _};
 

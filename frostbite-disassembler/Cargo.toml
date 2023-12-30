@@ -10,7 +10,7 @@ color-eyre = { workspace = true }
 owo-colors = { workspace = true }
 clap = { workspace = true }
 
-frostbite-bytecode ={ path = "../frostbite-bytecode" }
+frostbite-bytecode = { path = "../frostbite-bytecode", features = ["std"] }
 
 [lints]
 workspace = true
