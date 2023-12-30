@@ -93,6 +93,8 @@ pub enum ConstantValue {
     Int(i32),
     Float(f32),
     String(String),
+
+    Unit,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

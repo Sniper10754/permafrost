@@ -123,7 +123,10 @@ impl<'report_context, 'input> Parser<'report_context, 'input> {
         loop {
             match self.token_stream.peek() {
                 Some(Spanned(op_span, Token::BinaryOperator(operator))) => {
-                    let operator = Operator(op_span.clone(), *operator);
+                    let operator = Operator {
+                        span: op_span.clone(),
+                        kind: *operator,
+                    };
 
                     self.token_stream.skip_token();
 
@@ -450,10 +453,16 @@ mod tests {
             Program {
                 exprs: vec![Expr::BinaryOperation {
                     lhs: boxed!(Expr::Int(Spanned(0..1, 1))),
-                    operator: Operator(2..3, OperatorKind::Add),
+                    operator: Operator {
+                        span: 2..3,
+                        kind: OperatorKind::Add
+                    },
                     rhs: boxed!(Expr::BinaryOperation {
                         lhs: boxed!(Expr::Int(Spanned(4..5, 2))),
-                        operator: Operator(6..7, OperatorKind::Add),
+                        operator: Operator {
+                            span: 6..7,
+                            kind: OperatorKind::Add
+                        },
                         rhs: boxed!(Expr::Int(Spanned(8..9, 3)))
                     }),
                 }]
@@ -508,7 +517,10 @@ mod tests {
                     equals: Eq(30..31),
                     body: boxed!(Expr::BinaryOperation {
                         lhs: boxed!(Expr::Ident(Spanned(32..33, "x"))),
-                        operator: Operator(34..35, OperatorKind::Add),
+                        operator: Operator {
+                            span: 34..35,
+                            kind: OperatorKind::Add
+                        },
                         rhs: boxed!(Expr::Ident(Spanned(36..37, "y")))
                     }),
                 }]
@@ -545,7 +557,10 @@ mod tests {
                     equals: Eq(37..38),
                     body: boxed!(Expr::BinaryOperation {
                         lhs: boxed!(Expr::Ident(Spanned(39..40, "x"))),
-                        operator: Operator(41..42, OperatorKind::Add),
+                        operator: Operator {
+                            span: 41..42,
+                            kind: OperatorKind::Add
+                        },
                         rhs: boxed!(Expr::Ident(Spanned(43..44, "y")))
                     }),
                 }]

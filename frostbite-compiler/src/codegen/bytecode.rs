@@ -1,8 +1,8 @@
 use alloc::vec::Vec;
 use frostbite_bytecode::{
-    BytecodeVersion, Function, FunctionIndex, Globals, Instruction, Manifest, Module,
+    BytecodeVersion, ConstantValue, Function, FunctionIndex, Globals, Instruction, Manifest, Module,
 };
-use frostbite_parser::ast::Spanned;
+use frostbite_parser::ast::{tokens::OperatorKind, Spanned};
 use frostbite_reports::ReportContext;
 use slotmap::SecondaryMap;
 
@@ -16,24 +16,17 @@ pub struct BytecodeCodegenBackend {
 }
 
 impl BytecodeCodegenBackend {
-    fn compile_program(
-        &mut self,
-        report_ctx: &mut ReportContext,
-        t_ir: &TirTree,
-        module: &mut Module,
-    ) {
+    fn compile_program(&mut self, t_ir: &TirTree, module: &mut Module) {
         let body = &mut module.body;
         let globals = &mut module.globals;
 
         for node in &t_ir.nodes {
-            self.compile_node(report_ctx, t_ir, body, globals, node);
+            self.compile_node(body, globals, node);
         }
     }
 
     fn compile_node(
         &mut self,
-        _report_ctx: &mut ReportContext,
-        _t_ir: &TirTree,
         instructions: &mut Vec<Instruction>,
         globals: &mut Globals,
         t_ir_node: &TirNode,
@@ -42,17 +35,17 @@ impl BytecodeCodegenBackend {
             TirNode::Int(Spanned(_, value)) => {
                 let idx = globals.constants_pool.insert((*value).into());
 
-                instructions.push(Instruction::LoadConstant(idx))
+                instructions.push(Instruction::LoadConstant(idx));
             }
             TirNode::Float(Spanned(_, value)) => {
                 let idx = globals.constants_pool.insert((*value).into());
 
-                instructions.push(Instruction::LoadConstant(idx))
+                instructions.push(Instruction::LoadConstant(idx));
             }
             TirNode::String(Spanned(_, value)) => {
                 let idx = globals.constants_pool.insert(value.clone().into());
 
-                instructions.push(Instruction::LoadConstant(idx))
+                instructions.push(Instruction::LoadConstant(idx));
             }
             TirNode::Ident {
                 type_index: _,
@@ -62,14 +55,22 @@ impl BytecodeCodegenBackend {
                 instructions.push(Instruction::LoadName(name.into()));
             }
             TirNode::BinaryOperation { lhs, operator, rhs } => {
-                
+                self.compile_node(instructions, globals, rhs);
+                self.compile_node(instructions, globals, lhs);
+
+                instructions.push(match operator.kind {
+                    OperatorKind::Add => Instruction::Add,
+                    OperatorKind::Sub => Instruction::Subtract,
+                    OperatorKind::Mul => Instruction::Multiply,
+                    OperatorKind::Div => Instruction::Divide,
+                });
             }
             TirNode::Assign {
                 local_index: _,
                 lhs,
                 value,
             } => {
-                self.compile_node(_report_ctx, _t_ir, instructions, globals, value);
+                self.compile_node(instructions, globals, value);
 
                 match lhs {
                     tir::Assignable::Ident(_, Spanned(_, name)) => {
@@ -86,13 +87,13 @@ impl BytecodeCodegenBackend {
             } => {
                 let mut bytecode_function_body = Vec::new();
 
-                self.compile_node(
-                    _report_ctx,
-                    _t_ir,
-                    &mut bytecode_function_body,
-                    globals,
-                    function_body,
-                );
+                let unit_constant_index = globals.constants_pool.insert(ConstantValue::Unit);
+
+                bytecode_function_body.push(Instruction::LoadConstant(unit_constant_index));
+
+                self.compile_node(&mut bytecode_function_body, globals, function_body);
+
+                bytecode_function_body.push(Instruction::Return);
 
                 let function_index = globals.functions.insert(Function {
                     body: bytecode_function_body,
@@ -108,7 +109,7 @@ impl BytecodeCodegenBackend {
                 // Push arguments onto the stack
 
                 arguments.iter().for_each(|argument| {
-                    self.compile_node(_report_ctx, _t_ir, instructions, globals, argument);
+                    self.compile_node(instructions, globals, argument);
                 });
 
                 match callee {
@@ -130,7 +131,7 @@ impl CodegenBackend for BytecodeCodegenBackend {
 
     fn codegen(
         mut self,
-        report_ctx: &mut ReportContext,
+        _report_ctx: &mut ReportContext,
         t_ir_tree: &TirTree,
     ) -> Result<Self::Output, CodegenError> {
         let mut module = Module {
@@ -141,7 +142,7 @@ impl CodegenBackend for BytecodeCodegenBackend {
             body: Vec::new(),
         };
 
-        self.compile_program(report_ctx, t_ir_tree, &mut module);
+        self.compile_program(t_ir_tree, &mut module);
 
         Ok(module)
     }

@@ -36,12 +36,15 @@ pub mod tokens {
     }
 
     #[derive(Debug, Clone, PartialEq, Display)]
-    #[display(fmt = "{_1}")]
-    pub struct Operator(pub Span, pub OperatorKind);
+    #[display(fmt = "{kind}")]
+    pub struct Operator {
+        pub span: Span,
+        pub kind: OperatorKind,
+    }
 
     impl Spannable for Operator {
         fn span(&self) -> Span {
-            self.0.clone()
+            self.span.clone()
         }
     }
 

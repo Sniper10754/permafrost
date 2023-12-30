@@ -1,6 +1,8 @@
-function add(a: int, b: int) -> int = a + b + 1;
+function add(a: int, b: int) -> int = a + b + 1 + 2 + 5 + 2;
 
 x = 5;
 y = 2;
 
 z = add(x, y);
+
+print(z);
