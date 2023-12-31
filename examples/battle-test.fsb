@@ -6,3 +6,5 @@ x = 5;
 y = 2;
 
 z = add(x, y);
+
+recurse();
