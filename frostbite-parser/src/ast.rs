@@ -166,6 +166,13 @@ impl<'a> Spannable for Expr<'a> {
                 rpt,
             } => (callee.span().start)..(rpt.span().end),
 
+            Expr::Block {
+                expressions: _,
+                span,
+            } => span.clone(),
+
+            Expr::Return(expr) => expr.span(),
+
             Expr::Poisoned => unreachable!(),
         }
     }
@@ -186,7 +193,7 @@ pub enum Expr<'a> {
     },
 
     Assign {
-        lhs: Box<Expr<'a>>,
+        lhs: Box<Self>,
         eq_token: tokens::Eq,
         value: Box<Self>,
     },
@@ -200,7 +207,7 @@ pub enum Expr<'a> {
         return_type_token: Option<Arrow>,
         return_type_annotation: Option<Spanned<TypeAnnotation<'a>>>,
         equals: Eq,
-        body: Box<Expr<'a>>,
+        body: Box<Self>,
     },
 
     Call {
@@ -209,6 +216,13 @@ pub enum Expr<'a> {
         arguments: Vec<Expr<'a>>,
         rpt: RightParenthesisToken,
     },
+
+    Block {
+        span: Span,
+        expressions: Vec<Self>,
+    },
+
+    Return(Box<Self>),
 
     Poisoned,
 }
