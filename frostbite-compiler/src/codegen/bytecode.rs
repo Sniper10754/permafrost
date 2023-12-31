@@ -1,6 +1,6 @@
 use alloc::vec::Vec;
 use frostbite_bytecode::{
-    BytecodeVersion, ConstantValue, Function, FunctionIndex, Globals, Instruction, Manifest, Module,
+    BytecodeVersion, Function, FunctionIndex, Globals, Instruction, Manifest, Module,
 };
 use frostbite_parser::ast::{tokens::BinaryOperatorKind, Spanned};
 use frostbite_reports::ReportContext;
