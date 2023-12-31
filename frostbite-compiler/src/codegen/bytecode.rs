@@ -1,4 +1,4 @@
-use alloc::vec::Vec;
+use alloc::{vec, vec::Vec};
 use frostbite_bytecode::{
     BytecodeVersion, Function, FunctionIndex, Globals, Instruction, Manifest, Module,
 };
@@ -84,6 +84,7 @@ impl BytecodeCodegenBackend {
         let constant_index = globals.constants_pool.insert(match node {
             tir::TirNode::Int(Spanned(_, constant)) => (*constant).into(),
             tir::TirNode::Float(Spanned(_, constant)) => (*constant).into(),
+            tir::TirNode::Bool(Spanned(_, bool)) => (*bool).into(),
             tir::TirNode::String(Spanned(_, constant)) => constant.clone().into(),
 
             _ => unreachable!(),
@@ -156,11 +157,11 @@ impl BytecodeCodegenBackend {
         function_body: &tir::TirNode,
         type_index: tir::TypeIndex,
     ) {
-        let function = self.compile_function(globals, function_body);
+        let dummy_function_index = globals.functions.insert(Function { body: vec![] });
 
-        let function_index = globals.functions.insert(function);
+        self.functions.insert(type_index, dummy_function_index);
 
-        self.functions.insert(type_index, function_index);
+        globals.functions[dummy_function_index] = self.compile_function(globals, function_body);
     }
 
     fn compile_function(
