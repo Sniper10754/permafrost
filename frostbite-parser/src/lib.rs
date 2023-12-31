@@ -268,7 +268,7 @@ impl<'report_context, 'input> Parser<'report_context, 'input> {
                             let name = Spanned(name_span, name);
 
                             let mut type_annotation =
-                                Spanned(name.0.clone(), TypeAnnotation::NotSpecified);
+                                Spanned(name.0.clone(), TypeAnnotation::Any);
 
                             if matches!(self.token_stream.peek(), Some(Spanned(_, Token::Colon))) {
                                 consume_token!(

@@ -113,6 +113,7 @@ impl BytecodeCodegenBackend {
                 instructions.push(Instruction::Cmp);
 
                 // binary operations must produce the result on the stack
+                // we can achieve this using function calls pushing a result on the stack
 
                 {
                     let true_temp_function =
@@ -130,6 +131,17 @@ impl BytecodeCodegenBackend {
                     let false_temp_function_index = globals.functions.insert(false_temp_function);
 
                     instructions.push(Instruction::Call(false_temp_function_index));
+                }
+
+                {
+                    let true_temp_function = self.compile_function(
+                        globals,
+                        &tir::TirNode::Bool(Spanned(Default::default(), true)),
+                    );
+
+                    let true_temp_function_index = globals.functions.insert(true_temp_function);
+
+                    instructions.push(Instruction::CallIf(true_temp_function_index));
                 }
             }
         };

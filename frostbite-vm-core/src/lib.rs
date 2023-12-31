@@ -2,9 +2,15 @@
 
 extern crate alloc;
 
-use alloc::{collections::BTreeMap, string::String, vec, vec::Vec};
+use alloc::{borrow::Cow, vec, vec::Vec};
 
-use frostbite_bytecode::{ConstantValue, Instruction, Module};
+use frostbite_bytecode::{ConstantIndex, FunctionIndex, Instruction, Module};
+
+mod frames;
+mod stack_value;
+
+use frames::Frame;
+use stack_value::StackValue;
 
 pub struct FrostbiteVm {
     frames: Vec<Frame>,
@@ -30,72 +36,99 @@ impl FrostbiteVm {
     fn run_instruction(&mut self, instruction: &Instruction, bytecode: &Module) {
         match instruction {
             Instruction::LoadConstant(constant_index) => {
-                let constant_value = bytecode.globals.constants_pool[*constant_index].clone();
-
-                self.stack.push(StackValue::from(constant_value));
+                self.load_constant(bytecode, *constant_index);
             }
-            Instruction::StoreName(name) => {
-                let value = self.stack.first().unwrap().clone();
-
-                self.frames
-                    .first_mut()
-                    .unwrap()
-                    .names
-                    .insert(name.clone(), value);
-            }
-            Instruction::LoadName(name) => {
-                let value = self
-                    .frames
-                    .iter()
-                    .find_map(|frame| frame.names.get(name))
-                    .unwrap();
-
-                self.stack.push(value.clone());
-            }
-            Instruction::Pop => {
-                self.stack.pop();
-            }
-            Instruction::Call(function_index) => {
-                let function = bytecode.globals.functions[*function_index].clone();
-
-                self.frames.push(Frame::default());
-
-                function
-                    .body
-                    .iter()
-                    .for_each(|i| self.run_instruction(i, bytecode));
-            }
-            Instruction::Return => {
-                self.frames.pop();
-            }
+            Instruction::StoreName(name) => self.store_name(name),
+            Instruction::LoadName(name) => self.load_name(name),
+            Instruction::Pop => self.pop_stack(),
+            Instruction::Call(function_index) => self.call_function(bytecode, *function_index),
+            Instruction::CallIf(function_index) => self.call_function_if(bytecode, *function_index),
+            Instruction::Return => self.handle_return(),
             Instruction::Add
             | Instruction::Subtract
             | Instruction::Multiply
-            | Instruction::Divide => {
-                let [.., lhs, rhs] = self.stack.as_mut_slice() else {
-                    unreachable!()
-                };
-
-                let result = match instruction {
-                    Instruction::Add => lhs.clone() + rhs.clone(),
-                    Instruction::Subtract => lhs.clone() - rhs.clone(),
-                    Instruction::Multiply => lhs.clone() * rhs.clone(),
-                    Instruction::Divide => lhs.clone() / rhs.clone(),
-
-                    _ => unreachable!(),
-                };
-
-                *rhs = result;
-            }
-            Instruction::Cmp => {
-                let [.., lhs, rhs] = self.stack.as_slice() else {
-                    unreachable!();
-                };
-
-                self.registers.cr = lhs == rhs;
-            }
+            | Instruction::Divide => self.binary_operation(instruction),
+            Instruction::Cmp => self.handle_cmp(),
             Instruction::Nop => (),
         }
+    }
+
+    fn load_constant(&mut self, bytecode: &Module, constant_index: ConstantIndex) {
+        let constant_value = bytecode.globals.constants_pool[constant_index].clone();
+
+        self.stack.push(constant_value.into());
+    }
+
+    fn store_name<'a>(&mut self, name: impl Into<Cow<'a, str>>) {
+        let value = self.stack.first().unwrap().clone();
+
+        self.frames
+            .first_mut()
+            .unwrap()
+            .names
+            .insert(name.into().into_owned(), value);
+    }
+
+    fn load_name(&mut self, name: impl AsRef<str>) {
+        let value = self
+            .frames
+            .iter()
+            .find_map(|frame| frame.names.get(name.as_ref()))
+            .unwrap();
+
+        self.stack.push(value.clone());
+    }
+
+    fn pop_stack(&mut self) {
+        self.stack.pop();
+    }
+
+    fn call_function(&mut self, bytecode: &Module, function_index: FunctionIndex) {
+        let function = bytecode.globals.functions[function_index].clone();
+
+        self.frames.push(Frame::default());
+
+        function
+            .body
+            .iter()
+            .for_each(|i| self.run_instruction(i, bytecode));
+
+        self.pop_stack();
+    }
+
+    fn call_function_if(&mut self, bytecode: &Module, function_index: FunctionIndex) {
+        if self.registers.cr {
+            self.call_function(bytecode, function_index);
+        }
+    }
+
+    fn handle_return(&mut self) {
+        // Nothing to do
+    }
+
+    fn binary_operation(&mut self, instruction: &Instruction) {
+        let [.., lhs, rhs] = self.stack.as_mut_slice() else {
+            unreachable!()
+        };
+
+        let result = match instruction {
+            Instruction::Add => lhs.clone() + rhs.clone(),
+            Instruction::Subtract => lhs.clone() - rhs.clone(),
+            Instruction::Multiply => lhs.clone() * rhs.clone(),
+            Instruction::Divide => lhs.clone() / rhs.clone(),
+
+            _ => unreachable!(),
+        };
+
+        *rhs = result;
+    }
+
+    fn handle_cmp(&mut self) {
+        let [.., lhs, rhs] = self.stack.as_slice() else {
+            unreachable!();
+        };
+
+        self.registers.cr = lhs == rhs;
     }
 }
 
@@ -108,92 +141,4 @@ impl Default for FrostbiteVm {
 #[derive(Debug, Clone, Default)]
 struct Registers {
     cr: bool,
-}
-
-#[derive(Debug, Clone, Default)]
-struct Frame {
-    names: BTreeMap<String, StackValue>,
-}
-
-#[derive(Debug, Clone, PartialEq, derive_more::From)]
-enum StackValue {
-    Int(i32),
-    Float(f32),
-    String(String),
-    Bool(bool),
-
-    Unit,
-}
-
-impl core::ops::Add for StackValue {
-    type Output = Self;
-
-    fn add(self, rhs: Self) -> Self::Output {
-        match (self, rhs) {
-            (StackValue::Int(lhs), StackValue::Int(rhs)) => (lhs + rhs).into(),
-            (StackValue::Float(lhs), StackValue::Float(rhs)) => (lhs + rhs).into(),
-            (StackValue::Int(lhs), StackValue::Float(rhs)) => (lhs as f32 + rhs).into(),
-            (StackValue::Float(lhs), StackValue::Int(rhs)) => (lhs + rhs as f32).into(),
-
-            _ => unreachable!(),
-        }
-    }
-}
-
-impl core::ops::Sub for StackValue {
-    type Output = Self;
-
-    fn sub(self, rhs: Self) -> Self::Output {
-        match (self, rhs) {
-            (StackValue::Int(lhs), StackValue::Int(rhs)) => (lhs - rhs).into(),
-            (StackValue::Float(lhs), StackValue::Float(rhs)) => (lhs - rhs).into(),
-            (StackValue::Int(lhs), StackValue::Float(rhs)) => (lhs as f32 - rhs).into(),
-            (StackValue::Float(lhs), StackValue::Int(rhs)) => (lhs - rhs as f32).into(),
-
-            _ => unreachable!(),
-        }
-    }
-}
-
-impl core::ops::Mul for StackValue {
-    type Output = Self;
-
-    fn mul(self, rhs: Self) -> Self::Output {
-        match (self, rhs) {
-            (StackValue::Int(lhs), StackValue::Int(rhs)) => (lhs * rhs).into(),
-            (StackValue::Float(lhs), StackValue::Float(rhs)) => (lhs * rhs).into(),
-            (StackValue::Int(lhs), StackValue::Float(rhs)) => (lhs as f32 * rhs).into(),
-            (StackValue::Float(lhs), StackValue::Int(rhs)) => (lhs * rhs as f32).into(),
-
-            _ => unreachable!(),
-        }
-    }
-}
-
-impl core::ops::Div for StackValue {
-    type Output = Self;
-
-    fn div(self, rhs: Self) -> Self::Output {
-        match (self, rhs) {
-            (StackValue::Int(lhs), StackValue::Int(rhs)) => (lhs / rhs).into(),
-            (StackValue::Float(lhs), StackValue::Float(rhs)) => (lhs / rhs).into(),
-            (StackValue::Int(lhs), StackValue::Float(rhs)) => (lhs as f32 / rhs).into(),
-            (StackValue::Float(lhs), StackValue::Int(rhs)) => (lhs / rhs as f32).into(),
-
-            _ => unreachable!(),
-        }
-    }
-}
-
-impl From<ConstantValue> for StackValue {
-    fn from(constant_value: ConstantValue) -> Self {
-        match constant_value {
-            ConstantValue::Int(int) => Self::from(int),
-            ConstantValue::Float(float) => Self::from(float),
-            ConstantValue::String(string) => Self::from(string),
-            ConstantValue::Bool(bool) => Self::from(bool),
-
-            ConstantValue::Unit => Self::Unit,
-        }
-    }
 }

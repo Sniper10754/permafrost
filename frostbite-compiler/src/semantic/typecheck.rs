@@ -243,6 +243,11 @@ impl<'ast> RecursiveTypechecker {
                     ),
                 ) {
                     (
+                        BinaryOperatorKind::Add | BinaryOperatorKind::Sub | BinaryOperatorKind::Mul,
+                        (Type::Int, Type::Int),
+                    ) => Ok(t_ir.types_arena.insert(Type::Int)),
+
+                    (
                         BinaryOperatorKind::Add
                         | BinaryOperatorKind::Sub
                         | BinaryOperatorKind::Mul
@@ -251,11 +256,9 @@ impl<'ast> RecursiveTypechecker {
                         | (Type::Float, Type::Float)
                         | (Type::Float, Type::Int)
                         | (Type::Int, Type::Float),
-                    ) => Ok(t_ir.types_arena.insert(Type::Int)),
+                    ) => Ok(t_ir.types_arena.insert(Type::Float)),
 
-                    (BinaryOperatorKind::Equal, (_, _)) => {
-                        Ok(t_ir.types_arena.insert(Type::Bool))
-                    }
+                    (BinaryOperatorKind::Equal, (_, _)) => Ok(t_ir.types_arena.insert(Type::Bool)),
 
                     _ => Err(TypecheckError::IncompatibleOperands {
                         source_id,
@@ -339,6 +342,12 @@ impl<'ast> RecursiveTypechecker {
 
                 _ => Err(TypecheckError::CannotCallNonIdent(source_id, callee.span())),
             },
+
+            Expr::Block { span, expressions } => {
+                todo!()
+            }
+
+            Expr::Return(_) => Ok(t_ir.types_arena.insert(Type::Unit)),
 
             Expr::Poisoned => unreachable!(),
         }
@@ -616,6 +625,8 @@ impl<'ast> RecursiveTypechecker {
             },
 
             Expr::Poisoned => unreachable!(),
+            Expr::Block { span, expressions } => todo!(),
+            Expr::Return(_) => todo!(),
         };
 
         assert!(

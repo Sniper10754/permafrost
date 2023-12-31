@@ -188,7 +188,6 @@ impl<'a> From<TypeAnnotation<'a>> for Type {
             TypeAnnotation::Float => Self::Float,
             TypeAnnotation::String => Self::String,
             TypeAnnotation::Any => Self::Any,
-            TypeAnnotation::NotSpecified => Self::Unit,
             TypeAnnotation::Unit => Self::Unit,
             TypeAnnotation::Object(obj) => Self::Object(obj.into()),
             TypeAnnotation::Bool => Self::Bool,
