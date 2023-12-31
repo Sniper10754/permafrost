@@ -52,10 +52,11 @@ where
                 .iter()
                 .try_for_each(|instruction| print_instruction(w, instruction, module))?;
 
+            writeln!(w)?;
+
             Ok(())
         })?;
 
-    writeln!(w)?;
     writeln!(w, "{}", "Program body".bold().underline())?;
 
     module
@@ -89,7 +90,7 @@ where
             index.cyan(),
             module.globals.constants_pool[*index]
         )?,
-        Instruction::Call(index) => write!(w, "{}", index.cyan())?,
+        Instruction::CallIf(index) | Instruction::Call(index) => write!(w, "{}", index.cyan())?,
         Instruction::StoreName(name) => write!(w, "{:?}", name.bright_yellow())?,
         Instruction::LoadName(name) => write!(w, "{:?}", name.bright_yellow())?,
 
@@ -99,6 +100,7 @@ where
         | Instruction::Subtract
         | Instruction::Multiply
         | Instruction::Divide
+        | Instruction::Cmp
         | Instruction::Nop => (),
     }
 

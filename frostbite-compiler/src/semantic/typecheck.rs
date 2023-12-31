@@ -16,7 +16,10 @@ use alloc::{
     vec,
     vec::Vec,
 };
-use frostbite_parser::ast::{tokens::TypeAnnotation, Argument, Expr, Program, Spannable, Spanned};
+use frostbite_parser::ast::{
+    tokens::{BinaryOperatorKind, TypeAnnotation},
+    Argument, Expr, Program, Spannable, Spanned,
+};
 use frostbite_reports::{
     sourcemap::{SourceId, SourceMap},
     IntoReport, Label, Level, Report, ReportContext,
@@ -201,12 +204,13 @@ impl<'ast> RecursiveTypechecker {
         &mut self,
         source_id: SourceId,
         expr: &Expr<'ast>,
-        t_ir_tree: &mut TirTree,
+        t_ir: &mut TirTree,
     ) -> Result<TypeIndex, TypecheckError<'ast>> {
         match expr {
-            Expr::Int(_) => Ok(t_ir_tree.types_arena.insert(Type::Int)),
-            Expr::Float(_) => Ok(t_ir_tree.types_arena.insert(Type::Float)),
-            Expr::String(_) => Ok(t_ir_tree.types_arena.insert(Type::String)),
+            Expr::Int(_) => Ok(t_ir.types_arena.insert(Type::Int)),
+            Expr::Float(_) => Ok(t_ir.types_arena.insert(Type::Float)),
+            Expr::String(_) => Ok(t_ir.types_arena.insert(Type::String)),
+            Expr::Bool(_) => Ok(t_ir.types_arena.insert(Type::Bool)),
             Expr::Ident(spanned_str) => {
                 let Some(referred_to) = self
                     .scopes
@@ -221,34 +225,43 @@ impl<'ast> RecursiveTypechecker {
                 };
 
                 match referred_to {
-                    RefersTo::Local(local_index) => Ok(t_ir_tree.locals[local_index]),
+                    RefersTo::Local(local_index) => Ok(t_ir.locals[local_index]),
                     RefersTo::Type(type_index) => Ok(type_index),
                 }
             }
-            Expr::BinaryOperation {
-                lhs,
-                operator: _,
-                rhs,
-            } => {
+            Expr::BinaryOperation { lhs, operator, rhs } => {
                 let (lhs_type_idx, rhs_type_idx) = (
-                    self.infer_type(source_id, lhs, t_ir_tree)?,
-                    self.infer_type(source_id, rhs, t_ir_tree)?,
+                    self.infer_type(source_id, lhs, t_ir)?,
+                    self.infer_type(source_id, rhs, t_ir)?,
                 );
 
                 match (
-                    &t_ir_tree.types_arena[lhs_type_idx],
-                    &t_ir_tree.types_arena[rhs_type_idx],
+                    operator.kind,
+                    (
+                        &t_ir.types_arena[lhs_type_idx],
+                        &t_ir.types_arena[rhs_type_idx],
+                    ),
                 ) {
-                    (Type::Int, Type::Int) => Ok(t_ir_tree.types_arena.insert(Type::Int)),
-                    (Type::Float, Type::Float)
-                    | (Type::Float, Type::Int)
-                    | (Type::Int, Type::Float) => Ok(t_ir_tree.types_arena.insert(Type::Float)),
+                    (
+                        BinaryOperatorKind::Add
+                        | BinaryOperatorKind::Sub
+                        | BinaryOperatorKind::Mul
+                        | BinaryOperatorKind::Div,
+                        (Type::Int, Type::Int)
+                        | (Type::Float, Type::Float)
+                        | (Type::Float, Type::Int)
+                        | (Type::Int, Type::Float),
+                    ) => Ok(t_ir.types_arena.insert(Type::Int)),
+
+                    (BinaryOperatorKind::Equal, (_, _)) => {
+                        Ok(t_ir.types_arena.insert(Type::Bool))
+                    }
 
                     _ => Err(TypecheckError::IncompatibleOperands {
                         source_id,
                         span: expr.span(),
-                        left: display_type(lhs_type_idx, t_ir_tree),
-                        right: display_type(rhs_type_idx, t_ir_tree),
+                        left: display_type(lhs_type_idx, t_ir),
+                        right: display_type(rhs_type_idx, t_ir),
                     }),
                 }
             }
@@ -256,7 +269,7 @@ impl<'ast> RecursiveTypechecker {
                 lhs: _,
                 eq_token: _,
                 value: _,
-            } => Ok(t_ir_tree.types_arena.insert(Type::Unit)),
+            } => Ok(t_ir.types_arena.insert(Type::Unit)),
             Expr::Function {
                 fn_token: _,
                 name: _,
@@ -274,13 +287,11 @@ impl<'ast> RecursiveTypechecker {
                         .map(|argument| {
                             (
                                 argument.name.1.into(),
-                                t_ir_tree
-                                    .types_arena
-                                    .insert(argument.type_annotation.1.into()),
+                                t_ir.types_arena.insert(argument.type_annotation.1.into()),
                             )
                         })
                         .collect(),
-                    return_type: t_ir_tree.types_arena.insert(
+                    return_type: t_ir.types_arena.insert(
                         return_type_annotation
                             .as_ref()
                             .cloned()
@@ -290,7 +301,7 @@ impl<'ast> RecursiveTypechecker {
                     ),
                 });
 
-                Ok(t_ir_tree.types_arena.insert(fn_type))
+                Ok(t_ir.types_arena.insert(fn_type))
             }
             Expr::Call {
                 callee,
@@ -310,12 +321,12 @@ impl<'ast> RecursiveTypechecker {
                         ));
                     };
 
-                    let type_index = referred_to.into_type(t_ir_tree);
+                    let type_index = referred_to.into_type(t_ir);
 
                     if let Type::Function(TirFunction {
                         arguments: _,
                         return_type,
-                    }) = &t_ir_tree.types_arena[type_index]
+                    }) = &t_ir.types_arena[type_index]
                     {
                         Ok(*return_type)
                     } else {
@@ -344,6 +355,7 @@ impl<'ast> RecursiveTypechecker {
         let t_ir_node = match expr {
             Expr::Int(value) => TirNode::Int(value.as_ref().map(|value| *value)),
             Expr::Float(value) => TirNode::Float(value.as_ref().map(|value| *value)),
+            Expr::Bool(value) => TirNode::Bool(value.as_ref().map(|value| *value)),
             Expr::String(value) => TirNode::String(value.as_ref().map(|value| (*value).into())),
             Expr::Ident(spanned_ident) => {
                 let Some(refers_to) = self
@@ -372,13 +384,24 @@ impl<'ast> RecursiveTypechecker {
                 );
 
                 match (
-                    &t_ir.types_arena[inferred_lhs],
-                    &t_ir.types_arena[inferred_rhs],
+                    operator.kind,
+                    (
+                        &t_ir.types_arena[inferred_lhs],
+                        &t_ir.types_arena[inferred_rhs],
+                    ),
                 ) {
-                    (Type::Int, Type::Int) => (),
-                    (Type::Float, Type::Float) => (),
-                    (Type::Float, Type::Int) => (),
-                    (Type::Int, Type::Float) => (),
+                    (
+                        BinaryOperatorKind::Add
+                        | BinaryOperatorKind::Sub
+                        | BinaryOperatorKind::Mul
+                        | BinaryOperatorKind::Div,
+                        (Type::Int, Type::Int)
+                        | (Type::Float, Type::Float)
+                        | (Type::Float, Type::Int)
+                        | (Type::Int, Type::Float),
+                    ) => (),
+
+                    (BinaryOperatorKind::Equal, (_, _)) => (),
 
                     _ => {
                         return Err(TypecheckError::IncompatibleOperands {
