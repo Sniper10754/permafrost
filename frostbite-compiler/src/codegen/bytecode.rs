@@ -6,17 +6,17 @@ use frostbite_parser::ast::{tokens::BinaryOperatorKind, Spanned};
 use frostbite_reports::ReportContext;
 use slotmap::SecondaryMap;
 
-use crate::tir::{self, TirNode, TirTree, TypeIndex};
+use crate::tir;
 
 use super::{CodegenBackend, CodegenError};
 
 #[derive(Debug, Default)]
 pub struct BytecodeCodegenBackend {
-    functions: SecondaryMap<TypeIndex, FunctionIndex>,
+    functions: SecondaryMap<tir::TypeIndex, FunctionIndex>,
 }
 
 impl BytecodeCodegenBackend {
-    fn compile_program(&mut self, t_ir: &TirTree, module: &mut Module) {
+    fn compile_program(&mut self, t_ir: &tir::TirTree, module: &mut Module) {
         let body = &mut module.body;
         let globals = &mut module.globals;
 
@@ -29,43 +29,49 @@ impl BytecodeCodegenBackend {
         &mut self,
         instructions: &mut Vec<Instruction>,
         globals: &mut Globals,
-        t_ir_node: &TirNode,
+        t_ir_node: &tir::TirNode,
     ) {
         match t_ir_node {
-            TirNode::Int(..) | TirNode::Float(..) | TirNode::Bool(..) | TirNode::String(..) => {
-                self.compile_constant(instructions, globals, t_ir_node)
-            }
-            TirNode::Ident {
+            tir::TirNode::Int(..)
+            | tir::TirNode::Float(..)
+            | tir::TirNode::Bool(..)
+            | tir::TirNode::String(..) => self.compile_constant(instructions, globals, t_ir_node),
+
+            tir::TirNode::Ident {
                 type_index: _,
                 refers_to: _,
                 str_value: Spanned(_, name),
             } => {
                 instructions.push(Instruction::LoadName(name.into()));
             }
-            TirNode::BinaryOperation { lhs, operator, rhs } => {
+
+            tir::TirNode::BinaryOperation { lhs, operator, rhs } => {
                 self.compile_binary_operation(instructions, globals, lhs, operator.kind, rhs)
             }
-            TirNode::Assign {
+
+            tir::TirNode::Assign {
                 local_index: _,
                 lhs,
                 value,
             } => {
                 self.compile_assignment(globals, instructions, lhs, value);
             }
-            TirNode::Function {
+
+            tir::TirNode::Function {
                 type_index,
                 name: _,
                 arguments: _,
                 return_type: _,
                 body: function_body,
             } => self.compile_function_node(globals, function_body, *type_index),
-            TirNode::Call {
+
+            tir::TirNode::Call {
                 callee,
                 arguments,
                 return_type: _,
             } => self.compile_function_call(globals, instructions, callee, arguments),
 
-            TirNode::Poisoned | TirNode::Uninitialized => unreachable!(),
+            tir::TirNode::Poisoned | tir::TirNode::Uninitialized => unreachable!(),
         }
     }
 
@@ -73,13 +79,12 @@ impl BytecodeCodegenBackend {
         &mut self,
         instructions: &mut Vec<Instruction>,
         globals: &mut Globals,
-        node: &TirNode,
+        node: &tir::TirNode,
     ) {
         let constant_index = globals.constants_pool.insert(match node {
-            TirNode::Int(Spanned(_, constant)) => (*constant).into(),
-            TirNode::Float(Spanned(_, constant)) => (*constant).into(),
-            TirNode::String(Spanned(_, constant)) => constant.clone().into(),
-            TirNode::Bool(Spanned(_, bool)) => (*bool).into(),
+            tir::TirNode::Int(Spanned(_, constant)) => (*constant).into(),
+            tir::TirNode::Float(Spanned(_, constant)) => (*constant).into(),
+            tir::TirNode::String(Spanned(_, constant)) => constant.clone().into(),
 
             _ => unreachable!(),
         });
@@ -91,9 +96,9 @@ impl BytecodeCodegenBackend {
         &mut self,
         instructions: &mut Vec<Instruction>,
         globals: &mut Globals,
-        lhs: &TirNode,
+        lhs: &tir::TirNode,
         operator: BinaryOperatorKind,
-        rhs: &TirNode,
+        rhs: &tir::TirNode,
     ) {
         self.compile_node(instructions, globals, rhs);
         self.compile_node(instructions, globals, lhs);
@@ -110,10 +115,17 @@ impl BytecodeCodegenBackend {
                 // we can achieve this using function calls pushing a result on the stack
 
                 {
-                    let false_temp_function = self.compile_function(
-                        globals,
-                        &TirNode::Bool(Spanned(Default::default(), false)),
-                    );
+                    let true_temp_function =
+                        self.compile_function(globals, &tir::TirNode::Bool(Spanned(0..0, true)));
+
+                    let true_temp_function_index = globals.functions.insert(true_temp_function);
+
+                    instructions.push(Instruction::CallIf(true_temp_function_index))
+                }
+
+                {
+                    let false_temp_function =
+                        self.compile_function(globals, &tir::TirNode::Bool(Spanned(0..0, false)));
 
                     let false_temp_function_index = globals.functions.insert(false_temp_function);
 
@@ -123,7 +135,7 @@ impl BytecodeCodegenBackend {
                 {
                     let true_temp_function = self.compile_function(
                         globals,
-                        &TirNode::Bool(Spanned(Default::default(), true)),
+                        &tir::TirNode::Bool(Spanned(Default::default(), true)),
                     );
 
                     let true_temp_function_index = globals.functions.insert(true_temp_function);
@@ -139,7 +151,7 @@ impl BytecodeCodegenBackend {
         globals: &mut Globals,
         instructions: &mut Vec<Instruction>,
         lhs: &tir::Assignable,
-        value: &TirNode,
+        value: &tir::TirNode,
     ) {
         self.compile_node(instructions, globals, value);
 
@@ -153,8 +165,8 @@ impl BytecodeCodegenBackend {
     fn compile_function_node(
         &mut self,
         globals: &mut Globals,
-        function_body: &TirNode,
-        type_index: TypeIndex,
+        function_body: &tir::TirNode,
+        type_index: tir::TypeIndex,
     ) {
         let function = self.compile_function(globals, function_body);
 
@@ -166,7 +178,7 @@ impl BytecodeCodegenBackend {
     fn compile_function(
         &mut self,
         globals: &mut Globals,
-        function_body: &TirNode,
+        function_body: &tir::TirNode,
     ) -> frostbite_bytecode::Function {
         let mut bytecode_function_body = Vec::new();
 
@@ -184,7 +196,7 @@ impl BytecodeCodegenBackend {
         globals: &mut Globals,
         instructions: &mut Vec<Instruction>,
         callee: &tir::Callable,
-        arguments: &[TirNode],
+        arguments: &[tir::TirNode],
     ) {
         arguments.iter().for_each(|argument| {
             self.compile_node(instructions, globals, argument);
@@ -206,7 +218,7 @@ impl CodegenBackend for BytecodeCodegenBackend {
     fn codegen(
         mut self,
         _report_ctx: &mut ReportContext,
-        t_ir_tree: &TirTree,
+        t_ir: &tir::TirTree,
     ) -> Result<Self::Output, CodegenError> {
         let mut module = Module {
             manifest: Manifest {
@@ -216,7 +228,7 @@ impl CodegenBackend for BytecodeCodegenBackend {
             body: Vec::new(),
         };
 
-        self.compile_program(t_ir_tree, &mut module);
+        self.compile_program(t_ir, &mut module);
 
         Ok(module)
     }
