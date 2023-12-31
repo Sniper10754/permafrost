@@ -94,7 +94,7 @@ impl FrostbiteVm {
 
                 self.registers.cr = lhs == rhs;
             }
-            Instruction::Nop => todo!(),
+            Instruction::Nop => (),
         }
     }
 }
