@@ -576,7 +576,7 @@ impl<'ast> RecursiveTypechecker {
                 if !matches!(&t_ast.types_arena[function.return_type], Type::Unit)
                     && matches!(&*function.body, TypedExpression::Block { .. })
                 {
-                    self.typecheck_function_body_returns(source_id, t_ast, &function)?;
+                    self.typecheck_function_body_returns(source_id, &function)?;
                 }
 
                 TypedExpression::Function(function)
@@ -629,6 +629,17 @@ impl<'ast> RecursiveTypechecker {
                                 function_arguments_len,
                             })
                         }
+                    }
+
+                    for (call_arg, func_arg) in Iterator::zip(
+                        call_arguments
+                            .iter()
+                            .map(|expr| self.infer_type(source_id, expr, t_ast))
+                            .collect::<Result<Vec<_>, _>>()?
+                            .into_iter(),
+                        function.arguments.values().copied(),
+                    ) {
+                        self.unify(t_ast, a, b)
                     }
 
                     let mut arguments = vec![];
@@ -709,25 +720,20 @@ impl<'ast> RecursiveTypechecker {
     fn typecheck_function_body_returns(
         &mut self,
         source_id: SourceId,
-        t_ast: &mut TypedAst,
         function: &TypedFunctionExpr,
     ) -> Result<(), TypecheckError<'ast>> {
-        self.__typecheck_function_body_returns(source_id, t_ast, &function.body, function)
+        self.__typecheck_function_body_returns(source_id, &function.body)
     }
 
     fn __typecheck_function_body_returns(
         &mut self,
         source_id: SourceId,
-        t_ast: &mut TypedAst,
         expr: &TypedExpression,
-        function: &TypedFunctionExpr,
     ) -> Result<(), TypecheckError<'ast>> {
         if let Err(span) = Self::__check_branches_for_return(expr) {
-            Err(TypecheckError::TypeMismatch {
+            Err(TypecheckError::FunctionDoesntReturn {
                 source_id,
-                span,
-                expected: display_type(function.return_type, t_ast),
-                found: display_type(t_ast.types_arena.insert(Type::Unit), t_ast),
+                faulty_branch_position: span,
             })
         } else {
             Ok(())
@@ -746,7 +752,7 @@ impl<'ast> RecursiveTypechecker {
                 if scope_has_return {
                     expressions
                         .iter()
-                        .map(|expr| Self::__check_branches_for_return(expr))
+                        .map(Self::__check_branches_for_return)
                         .collect::<Result<Vec<_>, _>>()?;
 
                     Ok(())
