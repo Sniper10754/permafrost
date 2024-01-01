@@ -9,7 +9,7 @@ use frostbite_reports::{
     ReportContext,
 };
 use semantic::run_semantic_checks;
-use tir::TirTree;
+use tir::TypedAst;
 
 pub mod codegen;
 pub mod semantic;
@@ -31,7 +31,7 @@ mod utils {
 
 #[derive(Debug)]
 pub struct CompilationResults<C: CodegenBackend> {
-    pub t_ir: TirTree,
+    pub t_ir: TypedAst,
     pub codegen_output: C::Output,
 }
 
@@ -54,19 +54,17 @@ impl Compiler {
 
         utils::bail_on_errors(report_ctx)?;
 
-        let mut t_ir = TirTree::default();
-
-        run_semantic_checks(report_ctx, source_id, src_map, &ast, &mut t_ir);
+        let (mut t_ast,) = run_semantic_checks(report_ctx, source_id, src_map, &ast);
 
         utils::bail_on_errors(report_ctx)?;
 
-        let codegen_output = C::codegen(codegen, report_ctx, &t_ir)?;
+        let codegen_output = C::codegen(codegen, report_ctx, &t_ast)?;
 
         utils::bail_on_errors(report_ctx)?;
 
         let compilation_results = CompilationResults {
             codegen_output,
-            t_ir,
+            t_ir: t_ast,
         };
 
         Ok(compilation_results)

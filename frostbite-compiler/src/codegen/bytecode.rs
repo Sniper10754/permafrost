@@ -1,12 +1,12 @@
 use alloc::{vec, vec::Vec};
 use frostbite_bytecode::{
-    BytecodeVersion, Function, FunctionIndex, Globals, Instruction, Manifest, Module,
+    BytecodeVersion, ConstantValue, Function, FunctionIndex, Globals, Instruction, Manifest, Module,
 };
 use frostbite_parser::ast::{tokens::BinaryOperatorKind, Spanned};
 use frostbite_reports::ReportContext;
 use slotmap::SecondaryMap;
 
-use crate::tir;
+use crate::tir::{self, TypedAst, TypedExpression, TypedFunctionExpr};
 
 use super::{CodegenBackend, CodegenError};
 
@@ -16,7 +16,7 @@ pub struct BytecodeCodegenBackend {
 }
 
 impl BytecodeCodegenBackend {
-    fn compile_program(&mut self, t_ir: &tir::TirTree, module: &mut Module) {
+    fn compile_program(&mut self, t_ir: &TypedAst, module: &mut Module) {
         let body = &mut module.body;
         let globals = &mut module.globals;
 
@@ -29,15 +29,17 @@ impl BytecodeCodegenBackend {
         &mut self,
         instructions: &mut Vec<Instruction>,
         globals: &mut Globals,
-        t_ir_node: &tir::TirNode,
+        t_ir_node: &TypedExpression,
     ) {
         match t_ir_node {
-            tir::TirNode::Int(..)
-            | tir::TirNode::Float(..)
-            | tir::TirNode::Bool(..)
-            | tir::TirNode::String(..) => self.compile_constant(instructions, globals, t_ir_node),
+            TypedExpression::Int(..)
+            | TypedExpression::Float(..)
+            | TypedExpression::Bool(..)
+            | TypedExpression::String(..) => {
+                self.compile_constant(instructions, globals, t_ir_node)
+            }
 
-            tir::TirNode::Ident {
+            TypedExpression::Ident {
                 type_index: _,
                 refers_to: _,
                 str_value: Spanned(_, name),
@@ -45,11 +47,11 @@ impl BytecodeCodegenBackend {
                 instructions.push(Instruction::LoadName(name.into()));
             }
 
-            tir::TirNode::BinaryOperation { lhs, operator, rhs } => {
+            TypedExpression::BinaryOperation { lhs, operator, rhs } => {
                 self.compile_binary_operation(instructions, globals, lhs, operator.kind, rhs)
             }
 
-            tir::TirNode::Assign {
+            TypedExpression::Assign {
                 local_index: _,
                 lhs,
                 value,
@@ -57,21 +59,33 @@ impl BytecodeCodegenBackend {
                 self.compile_assignment(globals, instructions, lhs, value);
             }
 
-            tir::TirNode::Function {
+            TypedExpression::Function(TypedFunctionExpr {
                 type_index,
-                name: _,
-                arguments: _,
-                return_type: _,
                 body: function_body,
-            } => self.compile_function_node(globals, function_body, *type_index),
+                ..
+            }) => self.compile_function_node(globals, function_body, *type_index),
 
-            tir::TirNode::Call {
-                callee,
-                arguments,
-                return_type: _,
+            TypedExpression::Call {
+                callee, arguments, ..
             } => self.compile_function_call(globals, instructions, callee, arguments),
 
-            tir::TirNode::Poisoned | tir::TirNode::Uninitialized => unreachable!(),
+            TypedExpression::Return(_, _, return_value) => {
+                if let Some(value) = return_value {
+                    self.compile_node(instructions, globals, value);
+                } else {
+                    instructions.push(Instruction::LoadConstant(
+                        globals.constants_pool.insert(ConstantValue::Unit),
+                    ));
+                }
+
+                instructions.push(Instruction::Return);
+            }
+
+            TypedExpression::Block { expressions } => expressions
+                .iter()
+                .for_each(|expr| self.compile_node(instructions, globals, expr)),
+
+            TypedExpression::Poisoned | TypedExpression::Uninitialized => unreachable!(),
         }
     }
 
@@ -79,13 +93,13 @@ impl BytecodeCodegenBackend {
         &mut self,
         instructions: &mut Vec<Instruction>,
         globals: &mut Globals,
-        node: &tir::TirNode,
+        node: &TypedExpression,
     ) {
         let constant_index = globals.constants_pool.insert(match node {
-            tir::TirNode::Int(Spanned(_, constant)) => (*constant).into(),
-            tir::TirNode::Float(Spanned(_, constant)) => (*constant).into(),
-            tir::TirNode::Bool(Spanned(_, bool)) => (*bool).into(),
-            tir::TirNode::String(Spanned(_, constant)) => constant.clone().into(),
+            TypedExpression::Int(Spanned(_, constant)) => (*constant).into(),
+            TypedExpression::Float(Spanned(_, constant)) => (*constant).into(),
+            TypedExpression::Bool(Spanned(_, bool)) => (*bool).into(),
+            TypedExpression::String(Spanned(_, constant)) => constant.clone().into(),
 
             _ => unreachable!(),
         });
@@ -97,9 +111,9 @@ impl BytecodeCodegenBackend {
         &mut self,
         instructions: &mut Vec<Instruction>,
         globals: &mut Globals,
-        lhs: &tir::TirNode,
+        lhs: &TypedExpression,
         operator: BinaryOperatorKind,
-        rhs: &tir::TirNode,
+        rhs: &TypedExpression,
     ) {
         self.compile_node(instructions, globals, rhs);
         self.compile_node(instructions, globals, lhs);
@@ -117,7 +131,7 @@ impl BytecodeCodegenBackend {
 
                 {
                     let true_temp_function =
-                        self.compile_function(globals, &tir::TirNode::Bool(Spanned(0..0, true)));
+                        self.compile_function(globals, &TypedExpression::Bool(Spanned(0..0, true)));
 
                     let true_temp_function_index = globals.functions.insert(true_temp_function);
 
@@ -125,8 +139,8 @@ impl BytecodeCodegenBackend {
                 }
 
                 {
-                    let false_temp_function =
-                        self.compile_function(globals, &tir::TirNode::Bool(Spanned(0..0, false)));
+                    let false_temp_function = self
+                        .compile_function(globals, &TypedExpression::Bool(Spanned(0..0, false)));
 
                     let false_temp_function_index = globals.functions.insert(false_temp_function);
 
@@ -136,7 +150,7 @@ impl BytecodeCodegenBackend {
                 {
                     let true_temp_function = self.compile_function(
                         globals,
-                        &tir::TirNode::Bool(Spanned(Default::default(), true)),
+                        &TypedExpression::Bool(Spanned(Default::default(), true)),
                     );
 
                     let true_temp_function_index = globals.functions.insert(true_temp_function);
@@ -152,7 +166,7 @@ impl BytecodeCodegenBackend {
         globals: &mut Globals,
         instructions: &mut Vec<Instruction>,
         lhs: &tir::Assignable,
-        value: &tir::TirNode,
+        value: &TypedExpression,
     ) {
         self.compile_node(instructions, globals, value);
 
@@ -166,7 +180,7 @@ impl BytecodeCodegenBackend {
     fn compile_function_node(
         &mut self,
         globals: &mut Globals,
-        function_body: &tir::TirNode,
+        function_body: &TypedExpression,
         type_index: tir::TypeIndex,
     ) {
         let dummy_function_index = globals.functions.insert(Function { body: vec![] });
@@ -179,7 +193,7 @@ impl BytecodeCodegenBackend {
     fn compile_function(
         &mut self,
         globals: &mut Globals,
-        function_body: &tir::TirNode,
+        function_body: &TypedExpression,
     ) -> frostbite_bytecode::Function {
         let mut bytecode_function_body = Vec::new();
 
@@ -197,7 +211,7 @@ impl BytecodeCodegenBackend {
         globals: &mut Globals,
         instructions: &mut Vec<Instruction>,
         callee: &tir::Callable,
-        arguments: &[tir::TirNode],
+        arguments: &[TypedExpression],
     ) {
         arguments.iter().for_each(|argument| {
             self.compile_node(instructions, globals, argument);
@@ -219,7 +233,7 @@ impl CodegenBackend for BytecodeCodegenBackend {
     fn codegen(
         mut self,
         _report_ctx: &mut ReportContext,
-        t_ir: &tir::TirTree,
+        t_ir: &TypedAst,
     ) -> Result<Self::Output, CodegenError> {
         let mut module = Module {
             manifest: Manifest {

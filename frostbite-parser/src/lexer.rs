@@ -129,6 +129,11 @@ pub enum Token<'input> {
     #[token(")")]
     RParen,
 
+    #[token("{")]
+    LBrace,
+    #[token("}")]
+    RBrace,
+
     #[token("=")]
     Eq,
 

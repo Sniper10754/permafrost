@@ -1,7 +1,10 @@
 use alloc::{boxed::Box, collections::BTreeMap, string::String, vec::Vec};
 use frostbite_parser::ast::{
-    tokens::{Operator, TypeAnnotation},
-    Spanned,
+    tokens::{
+        FunctionToken, LeftParenthesisToken, Operator, ReturnToken, RightParenthesisToken,
+        TypeAnnotation,
+    },
+    Spannable, Spanned,
 };
 use slotmap::{new_key_type, SlotMap};
 
@@ -14,7 +17,7 @@ pub mod display {
     use alloc::{borrow::Cow, format, string::String};
     use core::fmt::{Display, Write as _};
 
-    use super::{TirFunction, TirTree, TypeIndex};
+    use super::{FunctionType, TypeIndex, TypedAst};
     use crate::tir::Type::*;
 
     fn join_map_into_string<K, V>(mut map: impl Iterator<Item = (K, V)>) -> String
@@ -35,12 +38,12 @@ pub mod display {
         buffer
     }
 
-    pub fn display_type(type_index: TypeIndex, t_ir_tree: &TirTree) -> Cow<'static, str> {
+    pub fn display_type(type_index: TypeIndex, t_ir_tree: &TypedAst) -> Cow<'static, str> {
         match &t_ir_tree.types_arena[type_index] {
             Int => "int".into(),
             Float => "float".into(),
             String => "str".into(),
-            Function(TirFunction {
+            Function(FunctionType {
                 arguments,
                 return_type,
             }) => {
@@ -67,14 +70,24 @@ pub struct Typed<T>(TypeIndex, T);
 
 /// A High level representation of the input
 #[derive(Debug, Default)]
-pub struct TirTree {
-    pub nodes: Vec<TirNode>,
+pub struct TypedAst {
+    pub nodes: Vec<TypedExpression>,
     pub locals: SlotMap<LocalIndex, TypeIndex>,
     pub types_arena: SlotMap<TypeIndex, Type>,
 }
 
+#[derive(Debug, Clone)]
+pub struct TypedFunctionExpr {
+    pub fn_token: FunctionToken,
+    pub type_index: TypeIndex,
+    pub name: Option<Spanned<String>>,
+    pub arguments: BTreeMap<String, TypeIndex>,
+    pub return_type: TypeIndex,
+    pub body: Box<TypedExpression>,
+}
+
 #[derive(Debug, Clone, derive_more::IsVariant)]
-pub enum TirNode {
+pub enum TypedExpression {
     Int(Spanned<i32>),
     Float(Spanned<f32>),
     Bool(Spanned<bool>),
@@ -98,27 +111,87 @@ pub enum TirNode {
         value: Box<Self>,
     },
 
-    Function {
-        type_index: TypeIndex,
-        name: Option<Spanned<String>>,
-        arguments: BTreeMap<String, TypeIndex>,
-        return_type: TypeIndex,
-        body: Box<Self>,
-    },
+    Function(TypedFunctionExpr),
 
     Call {
         callee: Callable,
+        right_parent: RightParenthesisToken,
         arguments: Vec<Self>,
+        left_parent: LeftParenthesisToken,
         return_type: TypeIndex,
+    },
+
+    Return(TypeIndex, ReturnToken, Option<Box<Self>>),
+
+    Block {
+        expressions: Vec<Self>,
     },
 
     Poisoned,
     Uninitialized,
 }
 
+impl Spannable for TypedExpression {
+    fn span(&self) -> frostbite_parser::ast::Span {
+        match self {
+            TypedExpression::Int(Spanned(span, _)) => span.clone(),
+            TypedExpression::Float(Spanned(span, _)) => span.clone(),
+            TypedExpression::Bool(Spanned(span, _)) => span.clone(),
+            TypedExpression::String(Spanned(span, _)) => span.clone(),
+            TypedExpression::Ident {
+                type_index,
+                refers_to,
+                str_value: Spanned(span, _),
+            } => span.clone(),
+            TypedExpression::BinaryOperation { lhs, operator, rhs } => {
+                (lhs.span().start)..(rhs.span().end)
+            }
+            TypedExpression::Assign {
+                local_index,
+                lhs,
+                value,
+            } => (lhs.span().start)..(value.span().end),
+            TypedExpression::Function(TypedFunctionExpr {
+                fn_token,
+                type_index,
+                name,
+                arguments,
+                return_type,
+                body,
+            }) => (fn_token.span().start)..(body.span().end),
+            TypedExpression::Call {
+                callee,
+                left_parent,
+                arguments,
+                right_parent,
+                return_type,
+            } => (left_parent.span().start)..(right_parent.0.end),
+            TypedExpression::Return(_, ret_token, value) => {
+                (ret_token.0.start)
+                    ..(value
+                        .as_ref()
+                        .map(|value| value.span())
+                        .map(|span| span.start)
+                        .unwrap_or(ret_token.span().end))
+            }
+            TypedExpression::Block { expressions } => todo!(),
+            TypedExpression::Poisoned => todo!(),
+            TypedExpression::Uninitialized => todo!(),
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub enum Callable {
     Ident(TypeIndex, Spanned<String>),
+}
+
+impl Spannable for Callable {
+    fn span(&self) -> frostbite_parser::ast::Span {
+        match self {
+            Callable::Ident(_, Spanned(span, _)) => span.clone(),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -128,7 +201,7 @@ pub enum RefersTo {
 }
 
 impl RefersTo {
-    pub fn into_type(self, t_ir_tree: &TirTree) -> TypeIndex {
+    pub fn into_type(self, t_ir_tree: &TypedAst) -> TypeIndex {
         match self {
             RefersTo::Local(local_index) => t_ir_tree.locals[local_index],
             RefersTo::Type(type_index) => type_index,
@@ -142,12 +215,20 @@ pub enum Assignable {
     Ident(TypeIndex, Spanned<String>),
 }
 
-impl TryFrom<TirNode> for Assignable {
+impl Spannable for Assignable {
+    fn span(&self) -> frostbite_parser::ast::Span {
+        match self {
+            Assignable::Ident(_, Spanned(span, _)) => span.clone(),
+        }
+    }
+}
+
+impl TryFrom<TypedExpression> for Assignable {
     type Error = ();
 
-    fn try_from(value: TirNode) -> Result<Self, Self::Error> {
+    fn try_from(value: TypedExpression) -> Result<Self, Self::Error> {
         match value {
-            TirNode::Ident {
+            TypedExpression::Ident {
                 type_index: ty,
                 refers_to: _,
                 str_value: ident,
@@ -159,7 +240,7 @@ impl TryFrom<TirNode> for Assignable {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct TirFunction {
+pub struct FunctionType {
     pub arguments: BTreeMap<String, TypeIndex>,
 
     pub return_type: TypeIndex,
@@ -172,7 +253,7 @@ pub enum Type {
     String,
     Bool,
 
-    Function(TirFunction),
+    Function(FunctionType),
 
     Unit,
 
