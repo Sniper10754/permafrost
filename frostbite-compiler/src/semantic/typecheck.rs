@@ -701,9 +701,11 @@ impl<'ast> RecursiveTypechecker {
                 )
             }
             Expr::Block {
-                span: _,
+                left_brace,
                 expressions,
+                right_brace,
             } => TypedExpression::Block {
+                left_brace: left_brace.clone(),
                 expressions: expressions
                     .iter()
                     .map(|expr| (TypedExpression::Uninitialized, expr))
@@ -712,6 +714,7 @@ impl<'ast> RecursiveTypechecker {
                         Ok(t_expr)
                     })
                     .collect::<Result<_, TypecheckError<'ast>>>()?,
+                right_brace: right_brace.clone(),
             },
 
             Expr::Poisoned => unreachable!(),
@@ -767,7 +770,11 @@ impl<'ast> RecursiveTypechecker {
                 }
             }
 
-            Block { expressions } => expressions.iter().try_for_each(|expr| {
+            Block {
+                left_brace,
+                expressions,
+                right_brace,
+            } => expressions.iter().try_for_each(|expr| {
                 self.typecheck_fn_body_returns(source_id, t_ast, expected_type, expr)
             }),
 
@@ -796,7 +803,7 @@ impl<'ast> RecursiveTypechecker {
         match expr {
             Return(..) => Ok(()),
 
-            Block { expressions } => {
+            Block { expressions, .. } => {
                 let scope_has_return = expressions.iter().any(|expr| matches!(expr, Return(..)));
 
                 if scope_has_return {
@@ -811,7 +818,7 @@ impl<'ast> RecursiveTypechecker {
                 }
             }
 
-            _ => Err(expr.span()),
+            _ => Ok(()),
         }
     }
 }

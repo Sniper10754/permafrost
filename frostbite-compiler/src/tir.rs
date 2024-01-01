@@ -1,8 +1,8 @@
 use alloc::{boxed::Box, collections::BTreeMap, string::String, vec::Vec};
 use frostbite_parser::ast::{
     tokens::{
-        FunctionToken, LeftParenthesisToken, Operator, ReturnToken, RightParenthesisToken,
-        TypeAnnotation,
+        FunctionToken, LeftBraceToken, LeftParenthesisToken, Operator, ReturnToken,
+        RightBraceToken, RightParenthesisToken, TypeAnnotation,
     },
     Spannable, Spanned,
 };
@@ -123,7 +123,9 @@ pub enum TypedExpression {
     Return(TypeIndex, ReturnToken, Option<Box<Self>>),
 
     Block {
+        left_brace: LeftBraceToken,
         expressions: Vec<Self>,
+        right_brace: RightBraceToken,
     },
 
     Poisoned,
@@ -175,7 +177,11 @@ impl Spannable for TypedExpression {
                         .map(|span| span.start)
                         .unwrap_or(ret_token.span().end))
             }
-            TypedExpression::Block { expressions: _ } => todo!(),
+            TypedExpression::Block {
+                left_brace,
+                expressions: _,
+                right_brace,
+            } => (left_brace.span().start)..(right_brace.span().end),
             TypedExpression::Poisoned => todo!(),
             TypedExpression::Uninitialized => todo!(),
         }

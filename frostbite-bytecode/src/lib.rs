@@ -11,8 +11,6 @@ use slotmap::{new_key_type, SlotMap};
 
 use ciborium::de::Error;
 use serde::{Deserialize, Serialize};
-use variant_name::VariantName;
-use variant_name_derive::VariantName;
 
 new_key_type! {
     #[derive(derive_more::Display)]
@@ -36,7 +34,7 @@ pub struct Manifest {
     pub bytecode_version: BytecodeVersion,
 }
 
-#[derive(Debug, Clone, VariantName, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[repr(u8)]
 pub enum Instruction {
     /// Loads a constant element into the stack from the constants pool

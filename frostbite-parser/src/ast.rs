@@ -4,8 +4,8 @@ use core::ops::Range;
 use derive_more::From;
 
 use self::tokens::{
-    ArrowToken, Eq, FunctionToken, LeftParenthesisToken, Operator, ReturnToken,
-    RightParenthesisToken, TypeAnnotation,
+    ArrowToken, Eq, FunctionToken, LeftBraceToken, LeftParenthesisToken, Operator, ReturnToken,
+    RightBraceToken, RightParenthesisToken, TypeAnnotation,
 };
 
 pub type Span = Range<usize>;
@@ -168,9 +168,10 @@ impl<'a> Spannable for Expr<'a> {
             } => (left_paren.span().start)..(right_paren.span().end),
 
             Expr::Block {
+                left_brace,
                 expressions: _,
-                span,
-            } => span.clone(),
+                right_brace,
+            } => (left_brace.span().start)..(right_brace.span().end),
 
             Expr::Return(ret_token, expr) => {
                 (ret_token.span().start)
@@ -225,8 +226,9 @@ pub enum Expr<'a> {
     },
 
     Block {
-        span: Span,
+        left_brace: LeftBraceToken,
         expressions: Vec<Self>,
+        right_brace: RightBraceToken,
     },
 
     Return(ReturnToken, Option<Box<Self>>),

@@ -11,8 +11,8 @@ pub mod lexer;
 use ast::{
     tokens,
     tokens::{
-        ArrowToken, Eq, LeftParenthesisToken, Operator, ReturnToken, RightParenthesisToken,
-        TypeAnnotation,
+        ArrowToken, Eq, LeftBraceToken, LeftParenthesisToken, Operator, ReturnToken,
+        RightParenthesisToken, TypeAnnotation, RightBraceToken,
     },
     Argument, Expr, Program, Spanned,
 };
@@ -347,7 +347,7 @@ impl<'report_context, 'input> Parser<'report_context, 'input> {
                 })
             }
 
-            Some(Spanned(start_brace_span, Token::LBrace)) => {
+            Some(Spanned(left_brace_span, Token::LBrace)) => {
                 let mut expressions = vec![];
 
                 loop {
@@ -383,15 +383,16 @@ impl<'report_context, 'input> Parser<'report_context, 'input> {
                         )),
                     }
                 }
-                let Spanned(end_brace_span, _) = consume_token!(
+                let Spanned(right_brace_span, _) = consume_token!(
                     parser: self,
                     token: Token::RBrace,
                     description: "right brace"
                 )?;
 
                 Some(Expr::Block {
-                    span: (start_brace_span.start)..(end_brace_span.end),
+                    left_brace: LeftBraceToken(left_brace_span),
                     expressions,
+                    right_brace: RightBraceToken(right_brace_span),
                 })
             }
 

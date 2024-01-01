@@ -9,9 +9,8 @@ edition.workspace = true
 std = []
 
 [dependencies]
-ciborium = { version = "0.2.1", default-features = false }
-variant_name = "0"
-variant_name_derive = "0"
+ciborium = { version = "0", default-features = false }
+serde_variant = "0"
 
 serde = { version = "1.0.193", default-features = false, features = ["derive"] }
 

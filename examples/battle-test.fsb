@@ -1,12 +1,10 @@
-function recurse() = recurse();
-
 function add(a: bool, b: bool) -> bool = {
-    return a == b;
+    result = a == b;
+
+    return result;
 };
 
-x = 5;
-y = 2;
+x = false;
+y = true;
 
 z = add(x, y);
-
-recurse();

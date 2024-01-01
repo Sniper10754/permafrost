@@ -1,6 +1,5 @@
 use alloc::fmt;
 use owo_colors::OwoColorize;
-use variant_name::VariantName;
 
 use crate::{Instruction, Module};
 
@@ -80,7 +79,9 @@ where
     write!(
         w,
         "{:>INSTRUCTION_PADDING$} ",
-        instruction.variant_name().bright_red()
+        serde_variant::to_variant_name(instruction)
+            .unwrap()
+            .bright_red()
     )?;
 
     match instruction {

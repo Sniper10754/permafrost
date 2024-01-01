@@ -79,7 +79,7 @@ impl BytecodeCodegenBackend {
                 instructions.push(Instruction::Return);
             }
 
-            TypedExpression::Block { expressions } => expressions
+            TypedExpression::Block { expressions, .. } => expressions
                 .iter()
                 .for_each(|expr| self.compile_node(instructions, globals, expr)),
 
@@ -143,17 +143,6 @@ impl BytecodeCodegenBackend {
                     let false_temp_function_index = globals.functions.insert(false_temp_function);
 
                     instructions.push(Instruction::Call(false_temp_function_index));
-                }
-
-                {
-                    let true_temp_function = self.compile_function(
-                        globals,
-                        &TypedExpression::Bool(Spanned(Default::default(), true)),
-                    );
-
-                    let true_temp_function_index = globals.functions.insert(true_temp_function);
-
-                    instructions.push(Instruction::CallIf(true_temp_function_index));
                 }
             }
         };
