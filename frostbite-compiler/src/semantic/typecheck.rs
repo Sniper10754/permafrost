@@ -771,9 +771,9 @@ impl<'ast> RecursiveTypechecker {
             }
 
             Block {
-                left_brace,
+                left_brace: _,
                 expressions,
-                right_brace,
+                right_brace: _,
             } => expressions.iter().try_for_each(|expr| {
                 self.typecheck_fn_body_returns(source_id, t_ast, expected_type, expr)
             }),
