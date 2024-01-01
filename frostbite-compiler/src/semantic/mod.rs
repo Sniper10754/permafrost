@@ -4,7 +4,7 @@ use frostbite_reports::{
     ReportContext,
 };
 
-use crate::tir::TirTree;
+use crate::tir::TypedAst;
 
 use self::typecheck::check_types;
 
@@ -16,7 +16,6 @@ pub fn run_semantic_checks(
     source_id: SourceId,
     source_map: &SourceMap,
     ast: &Program<'_>,
-    t_ir: &mut TirTree,
-) {
-    check_types(report_ctx, source_id, source_map, ast, t_ir);
+) -> (TypedAst,) {
+    (check_types(report_ctx, source_id, source_map, ast),)
 }

@@ -10,7 +10,9 @@ pub mod lexer;
 
 use ast::{
     tokens,
-    tokens::{Arrow, Eq, LeftParenthesisToken, Operator, RightParenthesisToken, TypeAnnotation},
+    tokens::{
+        ArrowToken, Eq, LeftParenthesisToken, Operator, RightParenthesisToken, TypeAnnotation,
+    },
     Argument, Expr, Program, Spanned,
 };
 use error::ErrorKind;
@@ -90,19 +92,20 @@ impl<'report_context, 'input> Parser<'report_context, 'input> {
         while self.token_stream.peek().is_some() {
             match self.parse_expr() {
                 Some(expr) => {
-                    exprs.push(expr);
-
-                    if consume_token!(
-                        parser: self,
-                        token: Token::Semicolon,
-                        description: "semicolon"
-                    )
-                    .is_none()
+                    if !matches!(expr, Expr::Block { .. })
+                        && consume_token!(
+                            parser: self,
+                            token: Token::Semicolon,
+                            description: "semicolon"
+                        )
+                        .is_none()
                     {
                         TokenStream::take_while(&mut self.token_stream, |Spanned(_, token)| {
                             matches!(token, Token::Semicolon)
                         });
                     }
+
+                    exprs.push(expr);
                 }
                 None => {
                     // recover
@@ -318,7 +321,7 @@ impl<'report_context, 'input> Parser<'report_context, 'input> {
 
                         let return_type_annotation = self.parse_type_annotation()?;
 
-                        (Some(Arrow(span.clone())), Some(return_type_annotation))
+                        (Some(ArrowToken(span.clone())), Some(return_type_annotation))
                     } else {
                         (None, None)
                     };
@@ -341,6 +344,54 @@ impl<'report_context, 'input> Parser<'report_context, 'input> {
                     return_type_annotation,
                     equals: Eq(equals_span),
                     body: Box::new(body),
+                })
+            }
+
+            Some(Spanned(start_brace_span, Token::LBrace)) => {
+                let mut expressions = vec![];
+
+                loop {
+                    match self.token_stream.peek() {
+                        Some(Spanned(_, Token::RBrace)) => break,
+                        Some(_) => match self.parse_expr() {
+                            Some(expr) => {
+                                expressions.push(expr);
+
+                                consume_token!(
+                                    parser: self,
+                                    token: Token::Semicolon,
+                                    description: "Semicolon"
+                                )?;
+                            }
+                            None => {
+                                TokenStream::take_while(
+                                    &mut self.token_stream,
+                                    |Spanned(_, token)| {
+                                        !matches!(token, Token::Semicolon | Token::RBrace)
+                                    },
+                                );
+
+                                return None;
+                            }
+                        },
+                        None => self.report_ctx.push(report!(
+                            parser: self,
+                            ErrorKind::UnrecognizedEof {
+                                expected: &["An expression", "`}`"],
+                                previous_element_span: self.token_stream.previous().unwrap().0
+                            }
+                        )),
+                    }
+                }
+                let Spanned(end_brace_span, _) = consume_token!(
+                    parser: self,
+                    token: Token::RBrace,
+                    description: "right brace"
+                )?;
+
+                Some(Expr::Block {
+                    span: (start_brace_span.start)..(end_brace_span.end),
+                    expressions,
                 })
             }
 
@@ -414,7 +465,7 @@ mod tests {
 
     use crate::ast::{
         tokens::{
-            Arrow, BinaryOperatorKind, Eq, FunctionToken, LeftParenthesisToken, Operator,
+            ArrowToken, BinaryOperatorKind, Eq, FunctionToken, LeftParenthesisToken, Operator,
             RightParenthesisToken, TypeAnnotation,
         },
         Argument, Expr, Program, Spanned,
@@ -557,7 +608,7 @@ mod tests {
                         },
                     ],
                     rpt: RightParenthesisToken(28..29),
-                    return_type_token: Some(Arrow(30..32)),
+                    return_type_token: Some(ArrowToken(30..32)),
                     return_type_annotation: Some(Spanned(33..36, TypeAnnotation::Int)),
                     equals: Eq(37..38),
                     body: boxed!(Expr::BinaryOperation {
@@ -576,6 +627,30 @@ mod tests {
     #[test]
     fn test_parser_call() {
         let (report_ctx, parsed) = parser!("bilo(a);");
+
+        assert!(report_ctx.is_empty());
+
+        assert_eq!(
+            parsed,
+            Program {
+                exprs: vec![Expr::Call {
+                    callee: Box::new(Expr::Ident(Spanned(0..4, "bilo"))),
+                    lpt: LeftParenthesisToken(4..5),
+                    arguments: vec![Expr::Ident(Spanned(5..6, "a"))],
+                    rpt: RightParenthesisToken(6..7)
+                }]
+            }
+        );
+    }
+
+    #[test]
+    fn test_parser_block() {
+        let (report_ctx, parsed) = parser!(
+            "{
+            a;
+            b;
+        }"
+        );
 
         assert!(report_ctx.is_empty());
 

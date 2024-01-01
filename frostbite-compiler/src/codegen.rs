@@ -4,7 +4,7 @@ mod bytecode;
 
 pub use bytecode::BytecodeCodegenBackend;
 
-use crate::tir::TirTree;
+use crate::tir::TypedAst;
 
 #[derive(Debug, Clone, Copy, Default, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub struct CodegenError;
@@ -15,7 +15,7 @@ pub trait CodegenBackend {
     fn codegen(
         self,
         reports: &mut ReportContext,
-        tree: &TirTree,
+        tree: &TypedAst,
     ) -> Result<Self::Output, CodegenError>;
 }
 

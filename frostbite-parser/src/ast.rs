@@ -4,7 +4,8 @@ use core::ops::Range;
 use derive_more::From;
 
 use self::tokens::{
-    Arrow, Eq, FunctionToken, LeftParenthesisToken, Operator, RightParenthesisToken, TypeAnnotation,
+    ArrowToken, Eq, FunctionToken, LeftParenthesisToken, Operator, ReturnToken,
+    RightParenthesisToken, TypeAnnotation,
 };
 
 pub type Span = Range<usize>;
@@ -89,7 +90,10 @@ pub mod tokens {
     token!(FunctionToken);
     token!(LeftParenthesisToken);
     token!(RightParenthesisToken);
-    token!(Arrow);
+    token!(LeftBraceToken);
+    token!(RightBraceToken);
+    token!(ArrowToken);
+    token!(ReturnToken);
 }
 
 pub trait Spannable {
@@ -171,7 +175,13 @@ impl<'a> Spannable for Expr<'a> {
                 span,
             } => span.clone(),
 
-            Expr::Return(expr) => expr.span(),
+            Expr::Return(ret_token, expr) => {
+                (ret_token.span().start)
+                    ..expr
+                        .as_ref()
+                        .map(|expr| expr.span().end)
+                        .unwrap_or(ret_token.span().end)
+            }
 
             Expr::Poisoned => unreachable!(),
         }
@@ -204,7 +214,7 @@ pub enum Expr<'a> {
         lpt: LeftParenthesisToken,
         arguments: Vec<Argument<'a>>,
         rpt: RightParenthesisToken,
-        return_type_token: Option<Arrow>,
+        return_type_token: Option<ArrowToken>,
         return_type_annotation: Option<Spanned<TypeAnnotation<'a>>>,
         equals: Eq,
         body: Box<Self>,
@@ -222,7 +232,7 @@ pub enum Expr<'a> {
         expressions: Vec<Self>,
     },
 
-    Return(Box<Self>),
+    Return(ReturnToken, Option<Box<Self>>),
 
     Poisoned,
 }
