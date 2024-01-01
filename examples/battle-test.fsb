@@ -1,6 +1,8 @@
 function recurse() = recurse();
 
-function add(a: int, b: int) -> bool = a == b;
+function add(a: bool, b: bool) -> bool = {
+    return a == b;
+};
 
 x = 5;
 y = 2;

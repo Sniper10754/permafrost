@@ -131,6 +131,7 @@ pub enum Token<'input> {
 
     #[token("{")]
     LBrace,
+
     #[token("}")]
     RBrace,
 
@@ -142,6 +143,9 @@ pub enum Token<'input> {
 
     #[token("import")]
     Import,
+
+    #[token("return")]
+    Return,
 
     #[token("->")]
     Arrow,

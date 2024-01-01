@@ -31,7 +31,7 @@ mod utils {
 
 #[derive(Debug)]
 pub struct CompilationResults<C: CodegenBackend> {
-    pub t_ir: TypedAst,
+    pub t_ast: TypedAst,
     pub codegen_output: C::Output,
 }
 
@@ -64,7 +64,7 @@ impl Compiler {
 
         let compilation_results = CompilationResults {
             codegen_output,
-            t_ir: t_ast,
+            t_ast,
         };
 
         Ok(compilation_results)

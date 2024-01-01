@@ -16,11 +16,11 @@ pub struct BytecodeCodegenBackend {
 }
 
 impl BytecodeCodegenBackend {
-    fn compile_program(&mut self, t_ir: &TypedAst, module: &mut Module) {
+    fn compile_program(&mut self, t_ast: &TypedAst, module: &mut Module) {
         let body = &mut module.body;
         let globals = &mut module.globals;
 
-        for node in &t_ir.nodes {
+        for node in &t_ast.nodes {
             self.compile_node(body, globals, node);
         }
     }
@@ -29,15 +29,13 @@ impl BytecodeCodegenBackend {
         &mut self,
         instructions: &mut Vec<Instruction>,
         globals: &mut Globals,
-        t_ir_node: &TypedExpression,
+        t_expr: &TypedExpression,
     ) {
-        match t_ir_node {
+        match t_expr {
             TypedExpression::Int(..)
             | TypedExpression::Float(..)
             | TypedExpression::Bool(..)
-            | TypedExpression::String(..) => {
-                self.compile_constant(instructions, globals, t_ir_node)
-            }
+            | TypedExpression::String(..) => self.compile_constant(instructions, globals, t_expr),
 
             TypedExpression::Ident {
                 type_index: _,
@@ -233,7 +231,7 @@ impl CodegenBackend for BytecodeCodegenBackend {
     fn codegen(
         mut self,
         _report_ctx: &mut ReportContext,
-        t_ir: &TypedAst,
+        t_ast: &TypedAst,
     ) -> Result<Self::Output, CodegenError> {
         let mut module = Module {
             manifest: Manifest {
@@ -243,7 +241,7 @@ impl CodegenBackend for BytecodeCodegenBackend {
             body: Vec::new(),
         };
 
-        self.compile_program(t_ir, &mut module);
+        self.compile_program(t_ast, &mut module);
 
         Ok(module)
     }

@@ -11,7 +11,8 @@ pub mod lexer;
 use ast::{
     tokens,
     tokens::{
-        ArrowToken, Eq, LeftParenthesisToken, Operator, RightParenthesisToken, TypeAnnotation,
+        ArrowToken, Eq, LeftParenthesisToken, Operator, ReturnToken, RightParenthesisToken,
+        TypeAnnotation,
     },
     Argument, Expr, Program, Spanned,
 };
@@ -392,6 +393,16 @@ impl<'report_context, 'input> Parser<'report_context, 'input> {
                     span: (start_brace_span.start)..(end_brace_span.end),
                     expressions,
                 })
+            }
+
+            Some(Spanned(span, Token::Return)) => {
+                let mut value = None;
+
+                if !matches!(self.token_stream.peek(), Some(Spanned(_, Token::Semicolon))) {
+                    value = Some(self.parse_expr()?);
+                }
+
+                Some(Expr::Return(ReturnToken(span), value.map(Box::new)))
             }
 
             Some(Spanned(span, _)) => {

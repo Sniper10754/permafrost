@@ -184,13 +184,13 @@ pub fn check_types(
     let mut typed_ast = TypedAst::default();
 
     for expr in &ast.exprs {
-        let mut t_ast_node = TypedExpression::Uninitialized;
+        let mut t_expr = TypedExpression::Uninitialized;
 
-        if let Err(report) = rts.visit_expr(source_id, expr, &mut t_ast_node, &mut typed_ast) {
+        if let Err(report) = rts.visit_expr(source_id, expr, &mut t_expr, &mut typed_ast) {
             report_ctx.push(report.into_report())
         }
 
-        typed_ast.nodes.push(t_ast_node);
+        typed_ast.nodes.push(t_expr);
     }
 
     typed_ast
@@ -369,10 +369,10 @@ impl<'ast> RecursiveTypechecker {
         &mut self,
         source_id: SourceId,
         expr: &Expr<'ast>,
-        t_ast_node_ptr: &mut TypedExpression,
+        t_expr_ptr: &mut TypedExpression,
         t_ast: &mut TypedAst,
     ) -> Result<(), TypecheckError<'ast>> {
-        let t_ast_node = match expr {
+        let t_expr = match expr {
             Expr::Int(value) => TypedExpression::Int(value.as_ref().map(|value| *value)),
             Expr::Float(value) => TypedExpression::Float(value.as_ref().map(|value| *value)),
             Expr::Bool(value) => TypedExpression::Bool(value.as_ref().map(|value| *value)),
@@ -576,7 +576,7 @@ impl<'ast> RecursiveTypechecker {
                 if !matches!(&t_ast.types_arena[function.return_type], Type::Unit)
                     && matches!(&*function.body, TypedExpression::Block { .. })
                 {
-                    self.typecheck_function_body_returns(source_id, &function)?;
+                    self.typecheck_function_body_returns(source_id, t_ast, &function)?;
                 }
 
                 TypedExpression::Function(function)
@@ -631,15 +631,28 @@ impl<'ast> RecursiveTypechecker {
                         }
                     }
 
-                    for (call_arg, func_arg) in Iterator::zip(
+                    for ((call_arg_span, call_arg), func_arg) in Iterator::zip(
                         call_arguments
                             .iter()
-                            .map(|expr| self.infer_type(source_id, expr, t_ast))
+                            .map(|expr| {
+                                self.infer_type(source_id, expr, t_ast)
+                                    .map(|inferred| (expr.span(), inferred))
+                            })
                             .collect::<Result<Vec<_>, _>>()?
                             .into_iter(),
                         function.arguments.values().copied(),
                     ) {
-                        self.unify(t_ast, a, b)
+                        match self.unify(t_ast, call_arg, func_arg) {
+                            Ok(_) => {}
+                            Err(_) => {
+                                return Err(TypecheckError::TypeMismatch {
+                                    source_id,
+                                    span: call_arg_span,
+                                    expected: display_type(func_arg, t_ast),
+                                    found: display_type(call_arg, t_ast),
+                                })
+                            }
+                        }
                     }
 
                     let mut arguments = vec![];
@@ -694,9 +707,9 @@ impl<'ast> RecursiveTypechecker {
                 expressions: expressions
                     .iter()
                     .map(|expr| (TypedExpression::Uninitialized, expr))
-                    .map(|(mut t_ast_node, expr)| {
-                        self.visit_expr(source_id, expr, &mut t_ast_node, t_ast)?;
-                        Ok(t_ast_node)
+                    .map(|(mut t_expr, expr)| {
+                        self.visit_expr(source_id, expr, &mut t_expr, t_ast)?;
+                        Ok(t_expr)
                     })
                     .collect::<Result<_, TypecheckError<'ast>>>()?,
             },
@@ -705,11 +718,11 @@ impl<'ast> RecursiveTypechecker {
         };
 
         assert!(
-            (!t_ast_node.is_uninitialized()) && (!t_ast_node.is_poisoned()),
-            "{source_id}, {t_ast_node:#?}",
+            (!t_expr.is_uninitialized()) && (!t_expr.is_poisoned()),
+            "{source_id}, {t_expr:#?}",
         );
 
-        *t_ast_node_ptr = t_ast_node;
+        *t_expr_ptr = t_expr;
 
         Ok(())
     }
@@ -720,17 +733,54 @@ impl<'ast> RecursiveTypechecker {
     fn typecheck_function_body_returns(
         &mut self,
         source_id: SourceId,
+        t_ast: &mut TypedAst,
         function: &TypedFunctionExpr,
     ) -> Result<(), TypecheckError<'ast>> {
-        self.__typecheck_function_body_returns(source_id, &function.body)
+        self.check_fn_body_branches(source_id, &function.body)?;
+        self.typecheck_fn_body_returns(source_id, t_ast, function.return_type, &function.body)?;
+
+        Ok(())
     }
 
-    fn __typecheck_function_body_returns(
+    fn typecheck_fn_body_returns(
+        &mut self,
+        source_id: SourceId,
+        t_ast: &mut TypedAst,
+        expected_type: TypeIndex,
+        expr: &TypedExpression,
+    ) -> Result<(), TypecheckError<'ast>> {
+        use TypedExpression::*;
+
+        match expr {
+            Return(return_type_index, return_token, value) => {
+                match self.unify(t_ast, *return_type_index, expected_type) {
+                    Ok(_) => Ok(()),
+                    Err(_) => Err(TypecheckError::TypeMismatch {
+                        source_id,
+                        span: value
+                            .as_ref()
+                            .map(|expr| expr.span())
+                            .unwrap_or(return_token.span()),
+                        expected: display_type(expected_type, t_ast),
+                        found: display_type(*return_type_index, t_ast),
+                    }),
+                }
+            }
+
+            Block { expressions } => expressions.iter().try_for_each(|expr| {
+                self.typecheck_fn_body_returns(source_id, t_ast, expected_type, expr)
+            }),
+
+            _ => Ok(()),
+        }
+    }
+
+    fn check_fn_body_branches(
         &mut self,
         source_id: SourceId,
         expr: &TypedExpression,
     ) -> Result<(), TypecheckError<'ast>> {
-        if let Err(span) = Self::__check_branches_for_return(expr) {
+        if let Err(span) = Self::check_branches_for_return(expr) {
             Err(TypecheckError::FunctionDoesntReturn {
                 source_id,
                 faulty_branch_position: span,
@@ -740,7 +790,7 @@ impl<'ast> RecursiveTypechecker {
         }
     }
 
-    fn __check_branches_for_return(expr: &TypedExpression) -> Result<(), Range<usize>> {
+    fn check_branches_for_return(expr: &TypedExpression) -> Result<(), Range<usize>> {
         use TypedExpression::*;
 
         match expr {
@@ -752,7 +802,7 @@ impl<'ast> RecursiveTypechecker {
                 if scope_has_return {
                     expressions
                         .iter()
-                        .map(Self::__check_branches_for_return)
+                        .map(Self::check_branches_for_return)
                         .collect::<Result<Vec<_>, _>>()?;
 
                     Ok(())

@@ -38,25 +38,24 @@ pub mod display {
         buffer
     }
 
-    pub fn display_type(type_index: TypeIndex, t_ir_tree: &TypedAst) -> Cow<'static, str> {
-        match &t_ir_tree.types_arena[type_index] {
+    pub fn display_type(type_index: TypeIndex, t_ast: &TypedAst) -> Cow<'static, str> {
+        match &t_ast.types_arena[type_index] {
             Int => "int".into(),
             Float => "float".into(),
             String => "str".into(),
             Function(FunctionType {
                 arguments,
                 return_type,
-            }) => {
-                format!(
-                    "fn ({}) -> {}",
-                    join_map_into_string(arguments.iter().map(|(name, type_idx)| (
-                        name.as_str(),
-                        display_type(*type_idx, t_ir_tree)
-                    ))),
-                    display_type(*return_type, t_ir_tree)
-                )
-                .into()
-            }
+            }) => format!(
+                "fn ({}) -> {}",
+                join_map_into_string(
+                    arguments
+                        .iter()
+                        .map(|(name, type_idx)| (name.as_str(), display_type(*type_idx, t_ast)))
+                ),
+                display_type(*return_type, t_ast)
+            )
+            .into(),
             Unit => "()".into(),
             Object(object_name) => format!("object {object_name}").into(),
             Any => "any".into(),
@@ -143,9 +142,11 @@ impl Spannable for TypedExpression {
                 refers_to: _,
                 str_value: Spanned(span, _),
             } => span.clone(),
-            TypedExpression::BinaryOperation { lhs, operator: _, rhs } => {
-                (lhs.span().start)..(rhs.span().end)
-            }
+            TypedExpression::BinaryOperation {
+                lhs,
+                operator: _,
+                rhs,
+            } => (lhs.span().start)..(rhs.span().end),
             TypedExpression::Assign {
                 local_index: _,
                 lhs,
@@ -201,9 +202,9 @@ pub enum RefersTo {
 }
 
 impl RefersTo {
-    pub fn into_type(self, t_ir_tree: &TypedAst) -> TypeIndex {
+    pub fn into_type(self, t_ast: &TypedAst) -> TypeIndex {
         match self {
-            RefersTo::Local(local_index) => t_ir_tree.locals[local_index],
+            RefersTo::Local(local_index) => t_ast.locals[local_index],
             RefersTo::Type(type_index) => type_index,
         }
     }
