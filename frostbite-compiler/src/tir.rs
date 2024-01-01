@@ -85,6 +85,12 @@ pub struct TypedFunctionExpr {
     pub body: Box<TypedExpression>,
 }
 
+impl TypedFunctionExpr {
+    pub fn is_body_block(&self) -> bool {
+        matches!(&*self.body, TypedExpression::Block { .. })
+    }
+}
+
 #[derive(Debug, Clone, derive_more::IsVariant)]
 pub enum TypedExpression {
     Int(Spanned<i32>),
@@ -182,8 +188,8 @@ impl Spannable for TypedExpression {
                 expressions: _,
                 right_brace,
             } => (left_brace.span().start)..(right_brace.span().end),
-            TypedExpression::Poisoned => todo!(),
-            TypedExpression::Uninitialized => todo!(),
+
+            TypedExpression::Poisoned | TypedExpression::Uninitialized => unreachable!(),
         }
     }
 }

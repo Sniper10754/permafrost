@@ -68,7 +68,10 @@ pub enum Instruction {
     Cmp,
 
     /// Jumps to determinate function if the `CR` register is set to 1 | true
-    CallIf(FunctionIndex),
+    CallEq(FunctionIndex),
+
+    /// Jumps to determinate function if the `CR` register is set to 0 | false
+    CallNe(FunctionIndex),
 
     /// Does nothing
     Nop,

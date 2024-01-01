@@ -42,7 +42,8 @@ impl FrostbiteVm {
             Instruction::LoadName(name) => self.load_name(name),
             Instruction::Pop => self.pop_stack(),
             Instruction::Call(function_index) => self.call_function(bytecode, *function_index),
-            Instruction::CallIf(function_index) => self.call_function_if(bytecode, *function_index),
+            Instruction::CallEq(function_index) => self.call_function_eq(bytecode, *function_index),
+            Instruction::CallNe(function_index) => self.call_function_ne(bytecode, *function_index),
             Instruction::Return => self.handle_return(),
             Instruction::Add
             | Instruction::Subtract
@@ -96,8 +97,14 @@ impl FrostbiteVm {
         self.pop_stack();
     }
 
-    fn call_function_if(&mut self, bytecode: &Module, function_index: FunctionIndex) {
+    fn call_function_eq(&mut self, bytecode: &Module, function_index: FunctionIndex) {
         if self.registers.cr {
+            self.call_function(bytecode, function_index);
+        }
+    }
+
+    fn call_function_ne(&mut self, bytecode: &Module, function_index: FunctionIndex) {
+        if !self.registers.cr {
             self.call_function(bytecode, function_index);
         }
     }
