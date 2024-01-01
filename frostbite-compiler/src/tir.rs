@@ -139,32 +139,32 @@ impl Spannable for TypedExpression {
             TypedExpression::Bool(Spanned(span, _)) => span.clone(),
             TypedExpression::String(Spanned(span, _)) => span.clone(),
             TypedExpression::Ident {
-                type_index,
-                refers_to,
+                type_index: _,
+                refers_to: _,
                 str_value: Spanned(span, _),
             } => span.clone(),
-            TypedExpression::BinaryOperation { lhs, operator, rhs } => {
+            TypedExpression::BinaryOperation { lhs, operator: _, rhs } => {
                 (lhs.span().start)..(rhs.span().end)
             }
             TypedExpression::Assign {
-                local_index,
+                local_index: _,
                 lhs,
                 value,
             } => (lhs.span().start)..(value.span().end),
             TypedExpression::Function(TypedFunctionExpr {
                 fn_token,
-                type_index,
-                name,
-                arguments,
-                return_type,
+                type_index: _,
+                name: _,
+                arguments: _,
+                return_type: _,
                 body,
             }) => (fn_token.span().start)..(body.span().end),
             TypedExpression::Call {
-                callee,
+                callee: _,
                 left_parent,
-                arguments,
+                arguments: _,
                 right_parent,
-                return_type,
+                return_type: _,
             } => (left_parent.span().start)..(right_parent.0.end),
             TypedExpression::Return(_, ret_token, value) => {
                 (ret_token.0.start)
@@ -174,7 +174,7 @@ impl Spannable for TypedExpression {
                         .map(|span| span.start)
                         .unwrap_or(ret_token.span().end))
             }
-            TypedExpression::Block { expressions } => todo!(),
+            TypedExpression::Block { expressions: _ } => todo!(),
             TypedExpression::Poisoned => todo!(),
             TypedExpression::Uninitialized => todo!(),
         }

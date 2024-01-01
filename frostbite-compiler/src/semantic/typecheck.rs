@@ -323,9 +323,9 @@ impl<'ast> RecursiveTypechecker {
             }
             Expr::Call {
                 callee,
-                left_paren,
+                left_paren: _,
                 arguments: _,
-                right_paren,
+                right_paren: _,
             } => match &**callee {
                 Expr::Ident(spanned_str) => {
                     let Some(referred_to) = self
@@ -673,7 +673,7 @@ impl<'ast> RecursiveTypechecker {
                 TypedExpression::Return(
                     return_value_type,
                     return_token.clone(),
-                    value.map(|val| Box::new(val)),
+                    value.map(Box::new),
                 )
             }
             Expr::Block {
@@ -691,31 +691,6 @@ impl<'ast> RecursiveTypechecker {
             },
 
             Expr::Poisoned => unreachable!(),
-            Expr::Block {
-                span: _,
-                expressions,
-            } => {
-                self.scopes.push(BTreeMap::default());
-
-                let block = TypedExpression::Block {
-                    expressions: expressions
-                        .iter()
-                        .map(|expr| {
-                            let mut temp = TypedExpression::Uninitialized;
-
-                            self.visit_expr(source_id, expr, &mut temp, t_ast);
-
-                            temp
-                        })
-                        .collect(),
-                };
-
-                self.scopes.pop();
-
-                block
-            }
-
-            Expr::Return(_, _) => todo!(),
         };
 
         assert!(

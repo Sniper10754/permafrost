@@ -54,7 +54,7 @@ impl Compiler {
 
         utils::bail_on_errors(report_ctx)?;
 
-        let (mut t_ast,) = run_semantic_checks(report_ctx, source_id, src_map, &ast);
+        let (t_ast,) = run_semantic_checks(report_ctx, source_id, src_map, &ast);
 
         utils::bail_on_errors(report_ctx)?;
 

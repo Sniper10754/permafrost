@@ -161,7 +161,7 @@ impl<'a> Spannable for Expr<'a> {
 
             Expr::Function { fn_token, body, .. } => (fn_token.span().start)..(body.span().end),
             Expr::Call {
-                callee,
+                callee: _,
                 left_paren,
                 arguments: _,
                 right_paren,
