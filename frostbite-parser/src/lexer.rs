@@ -1,4 +1,4 @@
-use alloc::{collections::VecDeque, vec, vec::Vec};
+use alloc::{collections::VecDeque, string::String, vec, vec::Vec};
 
 use frostbite_reports::{sourcemap::SourceId, IntoReport, Level, Report, ReportContext};
 use logos::{Logos, Span};
