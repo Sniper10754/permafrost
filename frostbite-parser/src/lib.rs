@@ -496,7 +496,7 @@ mod tests {
             let mut src_map = frostbite_reports::sourcemap::SourceMap::new();
 
             let src_id = src_map.insert(frostbite_reports::sourcemap::SourceDescription {
-                url: "Test".to_string().into(),
+                url: alloc::string::ToString::to_string("Test").into(),
                 source_code: $text_to_parse.into(),
             });
 
