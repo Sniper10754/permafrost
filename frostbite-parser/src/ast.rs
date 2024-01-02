@@ -11,10 +11,11 @@ use self::tokens::{
 pub type Span = Range<usize>;
 
 pub mod tokens {
-
     use derive_more::Display;
 
     use super::{Span, Spannable};
+
+    use alloc::string::String;
 
     macro_rules! token {
         ($name:ident) => {
