@@ -15,14 +15,14 @@ mod helpers {
 
     use super::{LexerErrorKind, Token};
 
-    pub fn parse_number<'input, N: Num>(lexer: &Lexer<'input, Token>) -> Result<N, LexerErrorKind> {
+    pub fn parse_number<N: Num>(lexer: &Lexer<'_, Token>) -> Result<N, LexerErrorKind> {
         let slice = lexer.slice();
 
         N::from_str_radix(slice, 10)
             .map_err(|_| LexerErrorKind::NumberTooBig { span: lexer.span() })
     }
 
-    pub fn parse_operator<'input>(lexer: &Lexer<'input, Token>) -> BinaryOperatorKind {
+    pub fn parse_operator(lexer: &Lexer<'_, Token>) -> BinaryOperatorKind {
         match lexer.slice() {
             "+" => BinaryOperatorKind::Add,
             "-" => BinaryOperatorKind::Sub,

@@ -17,7 +17,7 @@ use alloc::{
 
 use frostbite_parser::ast::{
     tokens::{BinaryOperatorKind, TypeAnnotation},
-    Argument, Expr, Program, Spannable, Spanned,
+    Argument, Expr, Spannable, Spanned,
 };
 use frostbite_reports::{sourcemap::SourceId, IntoReport, Label, Level, Report};
 
@@ -311,7 +311,7 @@ impl RecursiveTypechecker {
                         .iter()
                         .map(|argument| {
                             (
-                                argument.name.1.clone().into(),
+                                argument.name.1.clone(),
                                 t_ast
                                     .types_arena
                                     .insert(argument.type_annotation.1.clone().into()),
@@ -405,7 +405,7 @@ impl RecursiveTypechecker {
                 TypedExpression::Ident {
                     type_index,
                     refers_to,
-                    str_value: spanned_ident.clone().map(|name| name.into()),
+                    str_value: spanned_ident.clone().map(|name| name),
                 }
             }
             Expr::BinaryOperation { lhs, operator, rhs } => {
@@ -446,10 +446,10 @@ impl RecursiveTypechecker {
 
                                 let local_index = t_ast.locals.insert(inferred_type);
 
-                                self.scopes.first_mut().unwrap().insert(
-                                    spanned_str.1.clone().into(),
-                                    RefersTo::Local(local_index),
-                                );
+                                self.scopes
+                                    .first_mut()
+                                    .unwrap()
+                                    .insert(spanned_str.1.clone(), RefersTo::Local(local_index));
 
                                 local_index
                             }

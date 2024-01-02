@@ -282,7 +282,7 @@ impl From<TypeAnnotation> for Type {
             TypeAnnotation::String => Self::String,
             TypeAnnotation::Any => Self::Any,
             TypeAnnotation::Unit => Self::Unit,
-            TypeAnnotation::Object(obj) => Self::Object(obj.into()),
+            TypeAnnotation::Object(obj) => Self::Object(obj),
             TypeAnnotation::Bool => Self::Bool,
         }
     }
