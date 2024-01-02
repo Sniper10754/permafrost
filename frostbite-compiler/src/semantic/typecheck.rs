@@ -180,13 +180,10 @@ pub fn check_types(compiler_ctx: &mut CompilerContext<'_, '_>, source_id: Source
     let ast = &compiler_ctx.asts[source_id];
 
     for expr in &ast.exprs {
-        let mut t_expr = TypedExpression::Uninitialized;
-
-        if let Err(report) = rts.visit_expr(source_id, expr, &mut t_expr, &mut typed_ast) {
-            compiler_ctx.report_ctx.push(report.into_report())
+        match rts.visit_expr(source_id, expr, &mut typed_ast) {
+            Ok(t_expr) => typed_ast.nodes.push(t_expr),
+            Err(report) => compiler_ctx.report_ctx.push(report.into_report()),
         }
-
-        typed_ast.nodes.push(t_expr);
     }
 
     typed_ast
@@ -378,9 +375,8 @@ impl RecursiveTypechecker {
         &mut self,
         source_id: SourceId,
         expr: &Expr,
-        t_expr_ptr: &mut TypedExpression,
         t_ast: &mut TypedAst,
-    ) -> Result<(), TypecheckError> {
+    ) -> Result<TypedExpression, TypecheckError> {
         let t_expr = match expr {
             Expr::Int(value) => TypedExpression::Int(value.as_ref().map(|value| *value)),
             Expr::Float(value) => TypedExpression::Float(value.as_ref().map(|value| *value)),
@@ -412,12 +408,9 @@ impl RecursiveTypechecker {
                 self.infer_type(source_id, expr, t_ast)?;
 
                 let (mut t_ast_lhs, mut t_ast_rhs) = (
-                    TypedExpression::Uninitialized,
-                    TypedExpression::Uninitialized,
+                    self.visit_expr(source_id, lhs, t_ast)?,
+                    self.visit_expr(source_id, rhs, t_ast)?,
                 );
-
-                self.visit_expr(source_id, lhs, &mut t_ast_lhs, t_ast)?;
-                self.visit_expr(source_id, rhs, &mut t_ast_rhs, t_ast)?;
 
                 TypedExpression::BinaryOperation {
                     lhs: Box::new(t_ast_lhs),
@@ -460,12 +453,9 @@ impl RecursiveTypechecker {
                 };
 
                 let (mut t_ast_lhs, mut t_ast_value) = (
-                    TypedExpression::Uninitialized,
-                    TypedExpression::Uninitialized,
+                    self.visit_expr(source_id, lhs, t_ast)?,
+                    self.visit_expr(source_id, value, t_ast)?,
                 );
-
-                self.visit_expr(source_id, lhs, &mut t_ast_lhs, t_ast)?;
-                self.visit_expr(source_id, value, &mut t_ast_value, t_ast)?;
 
                 let assignable = Assignable::try_from(t_ast_lhs).unwrap();
 
@@ -521,8 +511,6 @@ impl RecursiveTypechecker {
 
                 let return_type = t_ast.types_arena.insert(return_type);
 
-                let mut t_ast_body = TypedExpression::Uninitialized;
-
                 self.scopes.push(BTreeMap::default());
 
                 for (k, v) in arguments.iter() {
@@ -534,7 +522,7 @@ impl RecursiveTypechecker {
                         .insert(k.clone(), RefersTo::Local(local_index));
                 }
 
-                self.visit_expr(source_id, body, &mut t_ast_body, t_ast)?;
+                let mut t_ast_body = self.visit_expr(source_id, body, t_ast)?;
 
                 self.scopes.pop();
 
@@ -634,9 +622,7 @@ impl RecursiveTypechecker {
                     let mut arguments = vec![];
 
                     for call_arg in call_arguments.iter() {
-                        let mut node = TypedExpression::Uninitialized;
-
-                        self.visit_expr(source_id, call_arg, &mut node, t_ast)?;
+                        let mut node = self.visit_expr(source_id, call_arg, t_ast)?;
 
                         arguments.push(node);
                     }
@@ -663,9 +649,7 @@ impl RecursiveTypechecker {
                 let mut value = None;
 
                 if let Some(ret_expr) = ret_expr {
-                    let mut temp_val = TypedExpression::Uninitialized;
-
-                    self.visit_expr(source_id, ret_expr, &mut temp_val, t_ast)?;
+                    let mut temp_val = self.visit_expr(source_id, ret_expr, t_ast)?;
 
                     value = Some(temp_val);
                 }
@@ -685,10 +669,7 @@ impl RecursiveTypechecker {
                 expressions: expressions
                     .iter()
                     .map(|expr| (TypedExpression::Uninitialized, expr))
-                    .map(|(mut t_expr, expr)| {
-                        self.visit_expr(source_id, expr, &mut t_expr, t_ast)?;
-                        Ok(t_expr)
-                    })
+                    .map(|(mut t_expr, expr)| self.visit_expr(source_id, expr, t_ast))
                     .collect::<Result<_, TypecheckError>>()?,
                 right_brace: right_brace.clone(),
             },
@@ -696,14 +677,7 @@ impl RecursiveTypechecker {
             Expr::Poisoned => unreachable!(),
         };
 
-        assert!(
-            (!t_expr.is_uninitialized()) && (!t_expr.is_poisoned()),
-            "{source_id}, {t_expr:#?}",
-        );
-
-        *t_expr_ptr = t_expr;
-
-        Ok(())
+        Ok(t_expr)
     }
 
     /// Rules for this algorithm:
