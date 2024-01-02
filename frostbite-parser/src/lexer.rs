@@ -6,6 +6,8 @@ use logos::{Logos, Span};
 use crate::ast::{tokens::BinaryOperatorKind, Spanned};
 
 mod helpers {
+    use alloc::string::String;
+
     use logos::Lexer;
     use num_traits::Num;
 
