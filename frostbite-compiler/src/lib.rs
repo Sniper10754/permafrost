@@ -1,4 +1,5 @@
 #![no_std]
+#![feature(try_blocks)]
 
 extern crate alloc;
 

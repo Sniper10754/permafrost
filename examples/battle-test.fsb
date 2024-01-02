@@ -1,9 +1,7 @@
 function add(a: bool, b: bool) -> bool = {
     result = a == b;
 
-    x = "hi";
-
-    return result + x;
+    return result == b;
 };
 
 x = false;

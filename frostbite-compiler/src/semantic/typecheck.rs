@@ -377,6 +377,8 @@ impl RecursiveTypechecker {
         expr: &Expr,
         t_ast: &mut TypedAst,
     ) -> Result<TypedExpression, TypecheckError> {
+        let old_len = self.scopes.len();
+
         let t_expr = match expr {
             Expr::Int(value) => TypedExpression::Int(value.as_ref().map(|value| *value)),
             Expr::Float(value) => TypedExpression::Float(value.as_ref().map(|value| *value)),
@@ -388,6 +390,7 @@ impl RecursiveTypechecker {
                 let Some(refers_to) = self
                     .scopes
                     .iter()
+                    .rev()
                     .find_map(|scope| scope.get(spanned_ident.1.as_str()).copied())
                 else {
                     return Err(TypecheckError::SymbolNotFound(
@@ -407,7 +410,7 @@ impl RecursiveTypechecker {
             Expr::BinaryOperation { lhs, operator, rhs } => {
                 self.infer_type(source_id, expr, t_ast)?;
 
-                let (mut t_ast_lhs, mut t_ast_rhs) = (
+                let (t_ast_lhs, t_ast_rhs) = (
                     self.visit_expr(source_id, lhs, t_ast)?,
                     self.visit_expr(source_id, rhs, t_ast)?,
                 );
@@ -428,6 +431,7 @@ impl RecursiveTypechecker {
                         match self
                             .scopes
                             .iter()
+                            .rev()
                             .find_map(|scope| scope.get(spanned_str.1.as_str()).copied())
                         {
                             Some(RefersTo::Local(local_index)) => local_index,
@@ -440,7 +444,7 @@ impl RecursiveTypechecker {
                                 let local_index = t_ast.locals.insert(inferred_type);
 
                                 self.scopes
-                                    .first_mut()
+                                    .last_mut()
                                     .unwrap()
                                     .insert(spanned_str.1.clone(), RefersTo::Local(local_index));
 
@@ -452,7 +456,7 @@ impl RecursiveTypechecker {
                     _ => return Err(TypecheckError::CannotAssignTo(source_id, lhs.span())),
                 };
 
-                let (mut t_ast_lhs, mut t_ast_value) = (
+                let (t_ast_lhs, t_ast_value) = (
                     self.visit_expr(source_id, lhs, t_ast)?,
                     self.visit_expr(source_id, value, t_ast)?,
                 );
@@ -481,7 +485,7 @@ impl RecursiveTypechecker {
                 match name {
                     Some(Spanned(_, name)) => {
                         self.scopes
-                            .first_mut()
+                            .last_mut()
                             .unwrap()
                             .insert(name.into(), RefersTo::Type(fn_type_index));
                     }
@@ -517,12 +521,12 @@ impl RecursiveTypechecker {
                     let local_index = t_ast.locals.insert(*v);
 
                     self.scopes
-                        .first_mut()
+                        .last_mut()
                         .unwrap()
                         .insert(k.clone(), RefersTo::Local(local_index));
                 }
 
-                let mut t_ast_body = self.visit_expr(source_id, body, t_ast)?;
+                let t_ast_body = self.visit_expr(source_id, body, t_ast)?;
 
                 self.scopes.pop();
 
@@ -622,7 +626,7 @@ impl RecursiveTypechecker {
                     let mut arguments = vec![];
 
                     for call_arg in call_arguments.iter() {
-                        let mut node = self.visit_expr(source_id, call_arg, t_ast)?;
+                        let node = self.visit_expr(source_id, call_arg, t_ast)?;
 
                         arguments.push(node);
                     }
@@ -649,7 +653,7 @@ impl RecursiveTypechecker {
                 let mut value = None;
 
                 if let Some(ret_expr) = ret_expr {
-                    let mut temp_val = self.visit_expr(source_id, ret_expr, t_ast)?;
+                    let temp_val = self.visit_expr(source_id, ret_expr, t_ast)?;
 
                     value = Some(temp_val);
                 }
@@ -668,14 +672,15 @@ impl RecursiveTypechecker {
                 left_brace: left_brace.clone(),
                 expressions: expressions
                     .iter()
-                    .map(|expr| (TypedExpression::Uninitialized, expr))
-                    .map(|(mut t_expr, expr)| self.visit_expr(source_id, expr, t_ast))
+                    .map(|expr| self.visit_expr(source_id, expr, t_ast))
                     .collect::<Result<_, TypecheckError>>()?,
                 right_brace: right_brace.clone(),
             },
 
             Expr::Poisoned => unreachable!(),
         };
+
+        self.scopes.truncate(old_len);
 
         Ok(t_expr)
     }
