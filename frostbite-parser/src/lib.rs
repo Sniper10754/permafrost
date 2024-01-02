@@ -12,7 +12,7 @@ use ast::{
     tokens,
     tokens::{
         ArrowToken, Eq, LeftBraceToken, LeftParenthesisToken, Operator, ReturnToken,
-        RightParenthesisToken, TypeAnnotation, RightBraceToken,
+        RightBraceToken, RightParenthesisToken, TypeAnnotation,
     },
     Argument, Expr, Program, Spanned,
 };
@@ -67,17 +67,17 @@ mod utils {
 
 /// A Backend-agnostic wrapper around lalrpop
 #[derive(Debug)]
-pub struct Parser<'report_context, 'input> {
-    token_stream: TokenStream<'input>,
+pub struct Parser<'report_context> {
+    token_stream: TokenStream,
     report_ctx: &'report_context mut ReportContext,
     source_id: SourceId,
 }
 
-impl<'report_context, 'input> Parser<'report_context, 'input> {
+impl<'report_context> Parser<'report_context> {
     #[must_use]
     pub fn with_tokenstream(
         report_ctx: &'report_context mut ReportContext,
-        token_stream: TokenStream<'input>,
+        token_stream: TokenStream,
         source_id: SourceId,
     ) -> Self {
         Self {
@@ -87,7 +87,7 @@ impl<'report_context, 'input> Parser<'report_context, 'input> {
         }
     }
 
-    pub fn parse(mut self) -> Program<'input> {
+    pub fn parse(mut self) -> Program {
         let mut exprs = vec![];
 
         while self.token_stream.peek().is_some() {
@@ -121,7 +121,7 @@ impl<'report_context, 'input> Parser<'report_context, 'input> {
         Program { exprs }
     }
 
-    pub fn parse_expr(&mut self) -> Option<Expr<'input>> {
+    pub fn parse_expr(&mut self) -> Option<Expr> {
         let mut expression = self.parse_atom_expr()?;
 
         loop {
@@ -212,7 +212,7 @@ impl<'report_context, 'input> Parser<'report_context, 'input> {
         Some(expression)
     }
 
-    fn parse_atom_expr(&mut self) -> Option<Expr<'input>> {
+    fn parse_atom_expr(&mut self) -> Option<Expr> {
         match self.token_stream.next() {
             Some(Spanned(span, Token::Int(value))) => Some(Expr::Int(Spanned(span, value))),
             Some(Spanned(span, Token::Float(value))) => Some(Expr::Float(Spanned(span, value))),
@@ -428,15 +428,23 @@ impl<'report_context, 'input> Parser<'report_context, 'input> {
         }
     }
 
-    fn parse_type_annotation(&mut self) -> Option<Spanned<TypeAnnotation<'input>>> {
+    fn parse_type_annotation(&mut self) -> Option<Spanned<TypeAnnotation>> {
         match self.token_stream.next() {
-            Some(Spanned(span, Token::Ident("int"))) => Some(Spanned(span, TypeAnnotation::Int)),
-            Some(Spanned(span, Token::Ident("float"))) => {
+            Some(Spanned(span, Token::Ident(ident))) if ident == "int" => {
+                Some(Spanned(span, TypeAnnotation::Int))
+            }
+            Some(Spanned(span, Token::Ident(ident))) if ident == "float" => {
                 Some(Spanned(span, TypeAnnotation::Float))
             }
-            Some(Spanned(span, Token::Ident("str"))) => Some(Spanned(span, TypeAnnotation::String)),
-            Some(Spanned(span, Token::Ident("bool"))) => Some(Spanned(span, TypeAnnotation::Bool)),
-            Some(Spanned(span, Token::Ident("any"))) => Some(Spanned(span, TypeAnnotation::Any)),
+            Some(Spanned(span, Token::Ident(ident))) if ident == "str" => {
+                Some(Spanned(span, TypeAnnotation::String))
+            }
+            Some(Spanned(span, Token::Ident(ident))) if ident == "bool" => {
+                Some(Spanned(span, TypeAnnotation::Bool))
+            }
+            Some(Spanned(span, Token::Ident(ident))) if ident == "any" => {
+                Some(Spanned(span, TypeAnnotation::Any))
+            }
             Some(Spanned(span, Token::Ident(other))) => {
                 Some(Spanned(span, TypeAnnotation::Object(other)))
             }
@@ -485,19 +493,16 @@ mod tests {
     macro_rules! parser {
         ($text_to_parse:expr) => {{
             let mut report_ctx = frostbite_reports::ReportContext::default();
+            let mut src_map = frostbite_reports::sourcemap::SourceMap::new();
 
-            let lexed = crate::lexer::tokenize(
-                &mut report_ctx,
-                frostbite_reports::sourcemap::SourceId(0),
-                $text_to_parse,
-            );
+            let src_id = src_map.insert(frostbite_reports::sourcemap::SourceDescription {
+                url: "Test".to_string().into(),
+                source_code: $text_to_parse.into(),
+            });
 
-            let program = crate::Parser::with_tokenstream(
-                &mut report_ctx,
-                lexed,
-                frostbite_reports::sourcemap::SourceId(0),
-            )
-            .parse();
+            let lexed = crate::lexer::tokenize(&mut report_ctx, src_id, $text_to_parse);
+
+            let program = crate::Parser::with_tokenstream(&mut report_ctx, lexed, src_id).parse();
 
             (report_ctx, program)
         }};
@@ -547,7 +552,7 @@ mod tests {
             parsed,
             Program {
                 exprs: vec![Expr::Assign {
-                    lhs: boxed!(Expr::Ident(Spanned(0..1, "a"))),
+                    lhs: boxed!(Expr::Ident(Spanned(0..1, "a".into()))),
                     eq_token: Eq(2..3),
                     value: boxed!(Expr::Int(Spanned(4..5, 1))),
                 }]
@@ -566,15 +571,15 @@ mod tests {
             Program {
                 exprs: vec![Expr::Function {
                     fn_token: FunctionToken(0..8),
-                    name: Some(Spanned(9..13, "test")),
+                    name: Some(Spanned(9..13, "test".into())),
                     lpt: LeftParenthesisToken(13..14),
                     arguments: vec![
                         Argument {
-                            name: Spanned(14..15, "x"),
+                            name: Spanned(14..15, "x".into()),
                             type_annotation: Spanned(17..20, TypeAnnotation::Int),
                         },
                         Argument {
-                            name: Spanned(22..23, "y"),
+                            name: Spanned(22..23, "y".into()),
                             type_annotation: Spanned(25..28, TypeAnnotation::Int),
                         },
                     ],
@@ -583,12 +588,12 @@ mod tests {
                     return_type_annotation: None,
                     equals: Eq(30..31),
                     body: boxed!(Expr::BinaryOperation {
-                        lhs: boxed!(Expr::Ident(Spanned(32..33, "x"))),
+                        lhs: boxed!(Expr::Ident(Spanned(32..33, "x".into()))),
                         operator: Operator {
                             span: 34..35,
                             kind: BinaryOperatorKind::Add
                         },
-                        rhs: boxed!(Expr::Ident(Spanned(36..37, "y")))
+                        rhs: boxed!(Expr::Ident(Spanned(36..37, "y".into())))
                     }),
                 }]
             }
@@ -606,15 +611,15 @@ mod tests {
             Program {
                 exprs: vec![Expr::Function {
                     fn_token: FunctionToken(0..8),
-                    name: Some(Spanned(9..13, "test")),
+                    name: Some(Spanned(9..13, "test".into())),
                     lpt: LeftParenthesisToken(13..14),
                     arguments: vec![
                         Argument {
-                            name: Spanned(14..15, "x"),
+                            name: Spanned(14..15, "x".into()),
                             type_annotation: Spanned(17..20, TypeAnnotation::Int),
                         },
                         Argument {
-                            name: Spanned(22..23, "y"),
+                            name: Spanned(22..23, "y".into()),
                             type_annotation: Spanned(25..28, TypeAnnotation::Int),
                         },
                     ],
@@ -623,12 +628,12 @@ mod tests {
                     return_type_annotation: Some(Spanned(33..36, TypeAnnotation::Int)),
                     equals: Eq(37..38),
                     body: boxed!(Expr::BinaryOperation {
-                        lhs: boxed!(Expr::Ident(Spanned(39..40, "x"))),
+                        lhs: boxed!(Expr::Ident(Spanned(39..40, "x".into()))),
                         operator: Operator {
                             span: 41..42,
                             kind: BinaryOperatorKind::Add
                         },
-                        rhs: boxed!(Expr::Ident(Spanned(43..44, "y")))
+                        rhs: boxed!(Expr::Ident(Spanned(43..44, "y".into())))
                     }),
                 }]
             }
@@ -645,9 +650,9 @@ mod tests {
             parsed,
             Program {
                 exprs: vec![Expr::Call {
-                    callee: Box::new(Expr::Ident(Spanned(0..4, "bilo"))),
+                    callee: Box::new(Expr::Ident(Spanned(0..4, "bilo".into()))),
                     left_paren: LeftParenthesisToken(4..5),
-                    arguments: vec![Expr::Ident(Spanned(5..6, "a"))],
+                    arguments: vec![Expr::Ident(Spanned(5..6, "a".into()))],
                     right_paren: RightParenthesisToken(6..7)
                 }]
             }
@@ -669,9 +674,9 @@ mod tests {
             parsed,
             Program {
                 exprs: vec![Expr::Call {
-                    callee: Box::new(Expr::Ident(Spanned(0..4, "bilo"))),
+                    callee: Box::new(Expr::Ident(Spanned(0..4, "bilo".into()))),
                     left_paren: LeftParenthesisToken(4..5),
-                    arguments: vec![Expr::Ident(Spanned(5..6, "a"))],
+                    arguments: vec![Expr::Ident(Spanned(5..6, "a".into()))],
                     right_paren: RightParenthesisToken(6..7)
                 }]
             }

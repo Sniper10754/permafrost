@@ -46,7 +46,7 @@ mod utils {
         pub fn new(src_map: &'src_map SourceMap) -> Self {
             Self {
                 fn_cache: FnCache::new(Box::new(|id: &_| {
-                    let (_, source) = src_map.iter().find(|(src_id, _)| **src_id == *id).unwrap();
+                    let (_, source) = src_map.iter().find(|(src_id, _)| *src_id == *id).unwrap();
 
                     Ok(source.source_code.to_owned())
                 }) as Box<_>),

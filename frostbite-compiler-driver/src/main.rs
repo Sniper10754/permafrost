@@ -40,17 +40,17 @@ fn main() -> eyre::Result<()> {
 
             let mut source_map = SourceMap::new();
 
-            let src_id = source_map.push(SourceDescription {
+            let src_id = source_map.insert(SourceDescription {
                 url: file.clone().into(),
                 source_code: src,
             });
 
             let mut report_ctx = ReportContext::default();
 
-            let output = Compiler::compile_source(
+            let output = Compiler::compile_source_code(
                 &mut report_ctx,
-                src_id,
                 &mut source_map,
+                src_id,
                 CodegenBackends::bytecode_backend(),
             );
 

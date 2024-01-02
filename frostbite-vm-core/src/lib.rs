@@ -75,9 +75,10 @@ impl FrostbiteVm {
             .frames
             .iter()
             .find_map(|frame| frame.names.get(name.as_ref()))
+            .cloned()
             .unwrap();
 
-        self.stack.push(value.clone());
+        self.stack.push(value);
     }
 
     fn pop_stack(&mut self) {

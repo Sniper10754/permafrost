@@ -336,6 +336,7 @@ dependencies = [
  "ariadne",
  "cfg-if",
  "derive_more",
+ "slotmap",
 ]
 
 [[package]]

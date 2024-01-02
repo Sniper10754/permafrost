@@ -255,7 +255,6 @@ impl TryFrom<TypedExpression> for Assignable {
 #[derive(Debug, Clone, PartialEq)]
 pub struct FunctionType {
     pub arguments: BTreeMap<String, TypeIndex>,
-
     pub return_type: TypeIndex,
 }
 
@@ -275,8 +274,8 @@ pub enum Type {
     Any,
 }
 
-impl<'a> From<TypeAnnotation<'a>> for Type {
-    fn from(value: TypeAnnotation<'a>) -> Self {
+impl From<TypeAnnotation> for Type {
+    fn from(value: TypeAnnotation) -> Self {
         match value {
             TypeAnnotation::Int => Self::Int,
             TypeAnnotation::Float => Self::Float,

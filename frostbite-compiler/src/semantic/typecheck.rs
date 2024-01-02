@@ -16,30 +16,31 @@ use alloc::{
     vec,
     vec::Vec,
 };
+
 use frostbite_parser::ast::{
     tokens::{BinaryOperatorKind, TypeAnnotation},
     Argument, Expr, Program, Spannable, Spanned,
 };
-use frostbite_reports::{
-    sourcemap::{SourceId, SourceMap},
-    IntoReport, Label, Level, Report, ReportContext,
-};
+use frostbite_reports::{sourcemap::SourceId, IntoReport, Label, Level, Report};
 
-use crate::tir::{
-    display::display_type, Assignable, Callable, FunctionType, RefersTo, Type, TypeIndex, TypedAst,
-    TypedExpression, TypedFunctionExpr,
+use crate::{
+    context::CompilerContext,
+    tir::{
+        display::display_type, Assignable, Callable, FunctionType, RefersTo, Type, TypeIndex,
+        TypedAst, TypedExpression, TypedFunctionExpr,
+    },
 };
 
 #[derive(Debug)]
-pub enum TypecheckError<'ast> {
+pub enum TypecheckError {
     TypeMismatch {
         source_id: SourceId,
         span: Range<usize>,
 
-        expected: Cow<'ast, str>,
-        found: Cow<'ast, str>,
+        expected: Cow<'static, str>,
+        found: Cow<'static, str>,
     },
-    SymbolNotFound(SourceId, Spanned<&'ast str>),
+    SymbolNotFound(SourceId, Spanned<String>),
     IncompatibleOperands {
         source_id: SourceId,
         span: Range<usize>,
@@ -70,7 +71,7 @@ pub enum TypecheckError<'ast> {
     },
 }
 
-impl<'ast> IntoReport for TypecheckError<'ast> {
+impl IntoReport for TypecheckError {
     fn into_report(self) -> Report {
         match self {
             TypecheckError::TypeMismatch {
@@ -174,20 +175,17 @@ impl<'ast> IntoReport for TypecheckError<'ast> {
     }
 }
 
-pub fn check_types(
-    report_ctx: &mut ReportContext,
-    source_id: SourceId,
-    _map: &SourceMap,
-    ast: &Program<'_>,
-) -> TypedAst {
+pub fn check_types(compiler_ctx: &mut CompilerContext<'_, '_>, source_id: SourceId) -> TypedAst {
     let mut rts = RecursiveTypechecker::new();
     let mut typed_ast = TypedAst::default();
+
+    let ast = &compiler_ctx.asts[source_id];
 
     for expr in &ast.exprs {
         let mut t_expr = TypedExpression::Uninitialized;
 
         if let Err(report) = rts.visit_expr(source_id, expr, &mut t_expr, &mut typed_ast) {
-            report_ctx.push(report.into_report())
+            compiler_ctx.report_ctx.push(report.into_report())
         }
 
         typed_ast.nodes.push(t_expr);
@@ -200,7 +198,7 @@ struct RecursiveTypechecker {
     scopes: Vec<BTreeMap<String, RefersTo>>,
 }
 
-impl<'ast> RecursiveTypechecker {
+impl RecursiveTypechecker {
     fn new() -> Self {
         Self {
             scopes: vec![BTreeMap::new()],
@@ -218,9 +216,9 @@ impl<'ast> RecursiveTypechecker {
     fn infer_type(
         &mut self,
         source_id: SourceId,
-        expr: &Expr<'ast>,
+        expr: &Expr,
         t_ast: &mut TypedAst,
-    ) -> Result<TypeIndex, TypecheckError<'ast>> {
+    ) -> Result<TypeIndex, TypecheckError> {
         match expr {
             Expr::Int(_) => Ok(t_ast.types_arena.insert(Type::Int)),
             Expr::Float(_) => Ok(t_ast.types_arena.insert(Type::Float)),
@@ -230,8 +228,8 @@ impl<'ast> RecursiveTypechecker {
                 let Some(referred_to) = self
                     .scopes
                     .iter()
-                    .find(|scope| scope.contains_key(spanned_str.1))
-                    .map(|scope| scope[spanned_str.1])
+                    .find(|scope| scope.contains_key(spanned_str.1.as_str()))
+                    .map(|scope| scope[spanned_str.1.as_str()])
                 else {
                     return Err(TypecheckError::SymbolNotFound(
                         source_id,
@@ -271,9 +269,20 @@ impl<'ast> RecursiveTypechecker {
                         | (Type::Float, Type::Float)
                         | (Type::Float, Type::Int)
                         | (Type::Int, Type::Float),
-                    ) => Ok(t_ast.types_arena.insert(Type::Int)),
+                    ) => Ok(t_ast.types_arena.insert(Type::Float)),
 
-                    (BinaryOperatorKind::Equal, (_, _)) => Ok(t_ast.types_arena.insert(Type::Bool)),
+                    (BinaryOperatorKind::Equal, (_, _)) => {
+                        if self.unify(t_ast, lhs_type_idx, rhs_type_idx).is_ok() {
+                            Ok(t_ast.types_arena.insert(Type::Bool))
+                        } else {
+                            Err(TypecheckError::TypeMismatch {
+                                source_id,
+                                span: expr.span(),
+                                expected: display_type(lhs_type_idx, t_ast),
+                                found: display_type(rhs_type_idx, t_ast),
+                            })
+                        }
+                    }
 
                     _ => Err(TypecheckError::IncompatibleOperands {
                         source_id,
@@ -304,8 +313,10 @@ impl<'ast> RecursiveTypechecker {
                         .iter()
                         .map(|argument| {
                             (
-                                argument.name.1.into(),
-                                t_ast.types_arena.insert(argument.type_annotation.1.into()),
+                                argument.name.1.clone().into(),
+                                t_ast
+                                    .types_arena
+                                    .insert(argument.type_annotation.1.clone().into()),
                             )
                         })
                         .collect(),
@@ -331,7 +342,7 @@ impl<'ast> RecursiveTypechecker {
                     let Some(referred_to) = self
                         .scopes
                         .iter()
-                        .find_map(|scope| scope.get(spanned_str.1).copied())
+                        .find_map(|scope| scope.get(spanned_str.1.as_str()).copied())
                     else {
                         return Err(TypecheckError::SymbolNotFound(
                             source_id,
@@ -368,22 +379,22 @@ impl<'ast> RecursiveTypechecker {
     fn visit_expr(
         &mut self,
         source_id: SourceId,
-        expr: &Expr<'ast>,
+        expr: &Expr,
         t_expr_ptr: &mut TypedExpression,
         t_ast: &mut TypedAst,
-    ) -> Result<(), TypecheckError<'ast>> {
+    ) -> Result<(), TypecheckError> {
         let t_expr = match expr {
             Expr::Int(value) => TypedExpression::Int(value.as_ref().map(|value| *value)),
             Expr::Float(value) => TypedExpression::Float(value.as_ref().map(|value| *value)),
             Expr::Bool(value) => TypedExpression::Bool(value.as_ref().map(|value| *value)),
             Expr::String(value) => {
-                TypedExpression::String(value.as_ref().map(|value| (*value).into()))
+                TypedExpression::String(value.as_ref().map(|value| value.into()))
             }
             Expr::Ident(spanned_ident) => {
                 let Some(refers_to) = self
                     .scopes
                     .iter()
-                    .find_map(|scope| scope.get(spanned_ident.1).copied())
+                    .find_map(|scope| scope.get(spanned_ident.1.as_str()).copied())
                 else {
                     return Err(TypecheckError::SymbolNotFound(
                         source_id,
@@ -400,40 +411,7 @@ impl<'ast> RecursiveTypechecker {
                 }
             }
             Expr::BinaryOperation { lhs, operator, rhs } => {
-                let (inferred_lhs, inferred_rhs) = (
-                    self.infer_type(source_id, lhs, t_ast)?,
-                    self.infer_type(source_id, rhs, t_ast)?,
-                );
-
-                match (
-                    operator.kind,
-                    (
-                        &t_ast.types_arena[inferred_lhs],
-                        &t_ast.types_arena[inferred_rhs],
-                    ),
-                ) {
-                    (
-                        BinaryOperatorKind::Add
-                        | BinaryOperatorKind::Sub
-                        | BinaryOperatorKind::Mul
-                        | BinaryOperatorKind::Div,
-                        (Type::Int, Type::Int)
-                        | (Type::Float, Type::Float)
-                        | (Type::Float, Type::Int)
-                        | (Type::Int, Type::Float),
-                    ) => (),
-
-                    (BinaryOperatorKind::Equal, (_, _)) => (),
-
-                    _ => {
-                        return Err(TypecheckError::IncompatibleOperands {
-                            source_id,
-                            span: expr.span(),
-                            left: display_type(inferred_lhs, t_ast),
-                            right: display_type(inferred_rhs, t_ast),
-                        });
-                    }
-                };
+                self.infer_type(source_id, expr, t_ast)?;
 
                 let (mut t_ast_lhs, mut t_ast_rhs) = (
                     TypedExpression::Uninitialized,
@@ -459,7 +437,7 @@ impl<'ast> RecursiveTypechecker {
                         match self
                             .scopes
                             .iter()
-                            .find_map(|scope| scope.get(spanned_str.1).copied())
+                            .find_map(|scope| scope.get(spanned_str.1.as_str()).copied())
                         {
                             Some(RefersTo::Local(local_index)) => local_index,
                             Some(RefersTo::Type(_)) => {
@@ -470,10 +448,10 @@ impl<'ast> RecursiveTypechecker {
 
                                 let local_index = t_ast.locals.insert(inferred_type);
 
-                                self.scopes
-                                    .first_mut()
-                                    .unwrap()
-                                    .insert(spanned_str.1.into(), RefersTo::Local(local_index));
+                                self.scopes.first_mut().unwrap().insert(
+                                    spanned_str.1.clone().into(),
+                                    RefersTo::Local(local_index),
+                                );
 
                                 local_index
                             }
@@ -517,7 +495,7 @@ impl<'ast> RecursiveTypechecker {
                         self.scopes
                             .first_mut()
                             .unwrap()
-                            .insert((*name).into(), RefersTo::Type(fn_type_index));
+                            .insert(name.into(), RefersTo::Type(fn_type_index));
                     }
                     None => {}
                 }
@@ -529,7 +507,7 @@ impl<'ast> RecursiveTypechecker {
                              name: Spanned(_, arg_name),
                              type_annotation,
                          }| {
-                            (arg_name.to_string(), Type::from(type_annotation.1))
+                            (arg_name.to_string(), Type::from(type_annotation.1.clone()))
                         },
                     )
                     .map(|(name, ty)| (name, t_ast.types_arena.insert(ty)))
@@ -591,7 +569,7 @@ impl<'ast> RecursiveTypechecker {
                     let Some(refers_to) = self
                         .scopes
                         .iter()
-                        .find_map(|scope| scope.get(spanned_str.1).cloned())
+                        .find_map(|scope| scope.get(spanned_str.1.as_str()).cloned())
                     else {
                         return Err(TypecheckError::SymbolNotFound(
                             source_id,
@@ -713,7 +691,7 @@ impl<'ast> RecursiveTypechecker {
                         self.visit_expr(source_id, expr, &mut t_expr, t_ast)?;
                         Ok(t_expr)
                     })
-                    .collect::<Result<_, TypecheckError<'ast>>>()?,
+                    .collect::<Result<_, TypecheckError>>()?,
                 right_brace: right_brace.clone(),
             },
 
@@ -738,7 +716,7 @@ impl<'ast> RecursiveTypechecker {
         source_id: SourceId,
         t_ast: &mut TypedAst,
         function: &TypedFunctionExpr,
-    ) -> Result<(), TypecheckError<'ast>> {
+    ) -> Result<(), TypecheckError> {
         self.check_fn_body_branches(source_id, &function.body)?;
         self.typecheck_fn_body_returns(source_id, t_ast, function.return_type, &function.body)?;
 
@@ -751,7 +729,7 @@ impl<'ast> RecursiveTypechecker {
         t_ast: &mut TypedAst,
         expected_type: TypeIndex,
         expr: &TypedExpression,
-    ) -> Result<(), TypecheckError<'ast>> {
+    ) -> Result<(), TypecheckError> {
         use TypedExpression::*;
 
         match expr {
@@ -782,7 +760,7 @@ impl<'ast> RecursiveTypechecker {
         &mut self,
         source_id: SourceId,
         expr: &TypedExpression,
-    ) -> Result<(), TypecheckError<'ast>> {
+    ) -> Result<(), TypecheckError> {
         if let Err(span) = Self::check_branches_for_return(expr) {
             Err(TypecheckError::FunctionDoesntReturn {
                 source_id,

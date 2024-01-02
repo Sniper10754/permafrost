@@ -3,6 +3,7 @@
 extern crate alloc;
 
 use codegen::{CodegenBackend, CodegenError};
+use context::CompilerContext;
 use frostbite_parser::{lexer::tokenize, Parser};
 use frostbite_reports::{
     sourcemap::{SourceId, SourceMap},
@@ -12,6 +13,7 @@ use semantic::run_semantic_checks;
 use tir::TypedAst;
 
 pub mod codegen;
+pub(crate) mod context;
 pub mod semantic;
 pub mod tir;
 
@@ -38,33 +40,31 @@ pub struct CompilationResults<C: CodegenBackend> {
 pub struct Compiler;
 
 impl Compiler {
-    pub fn compile_source<C: CodegenBackend>(
+    pub fn compile_source_code<C: CodegenBackend>(
         report_ctx: &mut ReportContext,
-        source_id: SourceId,
         src_map: &mut SourceMap,
+        source_id: SourceId,
         codegen: C,
     ) -> Result<CompilationResults<C>, CodegenError> {
-        let source = &src_map.get(source_id).unwrap().source_code;
+        let mut ctx = CompilerContext::new(src_map, report_ctx);
 
-        let token_stream = tokenize(report_ctx, source_id, source);
+        let source = ctx.src_map.get(source_id).unwrap().source_code.as_str();
+        let token_stream = tokenize(ctx.report_ctx, source_id, source);
+        utils::bail_on_errors(ctx.report_ctx)?;
 
-        utils::bail_on_errors(report_ctx)?;
+        let ast = Parser::with_tokenstream(ctx.report_ctx, token_stream, source_id).parse();
+        ctx.asts.insert(source_id, ast);
+        utils::bail_on_errors(ctx.report_ctx)?;
 
-        let ast = Parser::with_tokenstream(report_ctx, token_stream, source_id).parse();
+        let (t_ast,) = run_semantic_checks(&mut ctx, source_id);
+        utils::bail_on_errors(ctx.report_ctx)?;
 
-        utils::bail_on_errors(report_ctx)?;
-
-        let (t_ast,) = run_semantic_checks(report_ctx, source_id, src_map, &ast);
-
-        utils::bail_on_errors(report_ctx)?;
-
-        let codegen_output = C::codegen(codegen, report_ctx, &t_ast)?;
-
-        utils::bail_on_errors(report_ctx)?;
+        let codegen_output = C::codegen(codegen, ctx.report_ctx, &t_ast)?;
+        utils::bail_on_errors(ctx.report_ctx)?;
 
         let compilation_results = CompilationResults {
-            codegen_output,
             t_ast,
+            codegen_output,
         };
 
         Ok(compilation_results)

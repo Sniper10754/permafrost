@@ -26,7 +26,7 @@ impl<'a, W: fmt::Write> BacktracePrinter<'a, W> {
         for frame in &backtrace.frames {
             let line = match frame.position.as_ref() {
                 Some(crate::Position::Span(span)) => Some(get_line_from_location(
-                    &source_map[frame.source_id].source_code,
+                    source_map[frame.source_id].source_code.as_str(),
                     span.start,
                 )),
                 Some(crate::Position::Line(line)) => Some(*line),
@@ -35,7 +35,7 @@ impl<'a, W: fmt::Write> BacktracePrinter<'a, W> {
 
             let position = format!(
                 "at {}:{}",
-                frame.source_id,
+                source_map[frame.source_id].url,
                 line.map_or("unknown".to_string(), |line| line.to_string())
             );
 

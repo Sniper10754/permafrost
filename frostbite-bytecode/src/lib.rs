@@ -12,6 +12,8 @@ use slotmap::{new_key_type, SlotMap};
 use ciborium::de::Error;
 use serde::{Deserialize, Serialize};
 
+pub mod text_repr;
+
 new_key_type! {
     #[derive(derive_more::Display)]
     #[display(fmt = "constant #{}", "_0.as_ffi() as u32")]
@@ -21,8 +23,6 @@ new_key_type! {
     #[display(fmt = "function #{}", "_0.as_ffi() as u32")]
     pub struct FunctionIndex;
 }
-
-pub mod text_repr;
 
 #[derive(Debug, Clone, derive_more::Display, Serialize, Deserialize)]
 pub enum BytecodeVersion {
@@ -99,7 +99,7 @@ pub struct Module {
     pub body: Vec<Instruction>,
 }
 
-#[derive(Debug, Default, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct Globals {
     pub constants_pool: SlotMap<ConstantIndex, ConstantValue>,
     pub functions: SlotMap<FunctionIndex, Function>,
