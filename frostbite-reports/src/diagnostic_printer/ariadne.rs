@@ -1,3 +1,5 @@
+extern crate std;
+
 use std::fmt;
 
 use self::utils::SourceMapCache;
@@ -9,6 +11,8 @@ use crate::{
 pub struct AriadnePrintBackend;
 
 mod utils {
+    use super::std;
+
     use std::{borrow::ToOwned, boxed::Box, fmt, fmt::Debug, io, string::String};
 
     use ariadne::{Cache, FnCache};

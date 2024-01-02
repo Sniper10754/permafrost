@@ -1,7 +1,5 @@
 #![allow(clippy::single_match)]
 
-extern crate std;
-
 use core::{
     cmp::Ordering::{Equal, Greater, Less},
     ops::Range,

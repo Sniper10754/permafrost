@@ -477,9 +477,7 @@ impl<'report_context> Parser<'report_context> {
 
 #[cfg(test)]
 mod tests {
-    #[allow(unused_extern_crates)]
-    extern crate std;
-
+    #![allow(unused_extern_crates)]
     use std::{boxed::Box, vec};
 
     use crate::ast::{

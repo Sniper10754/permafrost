@@ -32,7 +32,7 @@ mod helpers {
         }
     }
 
-    pub fn unquote_str<'input>(lexer: &Lexer<'input, Token>) -> String {
+    pub fn unquote_str(lexer: &Lexer<'_, Token>) -> String {
         let input = lexer.slice();
 
         input[1..(input.len() - 1)].into()

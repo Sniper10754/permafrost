@@ -1,3 +1,6 @@
+#[cfg(feature = "std")]
+extern crate std;
+
 use core::ops::Index;
 
 use alloc::string::String;

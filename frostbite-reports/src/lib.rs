@@ -8,7 +8,7 @@ use sourcemap::SourceId;
 
 cfg_if! {
     if #[cfg(feature = "std")] {
-        extern crate std;
+
 
     }
 }
