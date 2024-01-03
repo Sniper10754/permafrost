@@ -1,0 +1,19 @@
+[package]
+name = "frostbite-repl"
+version.workspace = true
+edition.workspace = true
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+reedline = "0"
+
+frostbite-compiler = { path = "../frostbite-compiler" }
+frostbite-bytecode = { path = "../frostbite-bytecode" }
+frostbite-reports = { path = "../frostbite-reports", features = [
+    "diagnostic_printer",
+    "ariadne",
+] }
+
+[lints]
+workspace = true

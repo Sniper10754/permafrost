@@ -15,6 +15,11 @@ derive_more = "0"
 cfg-if = "1"
 owo-colors = "4"
 
+[workspace.dependencies.serde]
+version = "1"
+default-features = false
+features = ["derive"]
+
 [workspace.dependencies.slotmap]
 default-features = false
 features = ["serde"]

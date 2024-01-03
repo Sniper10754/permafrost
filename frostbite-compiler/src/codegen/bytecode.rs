@@ -128,21 +128,23 @@ impl BytecodeCodegenBackend {
                 // we can achieve this using function calls pushing a result on the stack
 
                 {
-                    let true_temp_function =
-                        self.compile_function(globals, &TypedExpression::Bool(Spanned(0..0, true)));
+                    let const_val_idx = globals.constants_pool.insert(ConstantValue::Bool(true));
 
-                    let true_temp_function_index = globals.functions.insert(true_temp_function);
+                    let tmp_fn_idx = globals.functions.insert(Self::compile_function_with_body(
+                        [Instruction::LoadConstant(const_val_idx)].into(),
+                    ));
 
-                    instructions.push(Instruction::CallIf(true_temp_function_index))
+                    instructions.push(Instruction::CallEq(tmp_fn_idx))
                 }
 
                 {
-                    let false_temp_function = self
-                        .compile_function(globals, &TypedExpression::Bool(Spanned(0..0, false)));
+                    let const_val_idx = globals.constants_pool.insert(ConstantValue::Bool(false));
 
-                    let false_temp_function_index = globals.functions.insert(false_temp_function);
+                    let tmp_fn_idx = globals.functions.insert(Self::compile_function_with_body(
+                        [Instruction::LoadConstant(const_val_idx)].into(),
+                    ));
 
-                    instructions.push(Instruction::Call(false_temp_function_index));
+                    instructions.push(Instruction::CallNe(tmp_fn_idx))
                 }
             }
         };
@@ -186,11 +188,14 @@ impl BytecodeCodegenBackend {
 
         self.compile_node(&mut bytecode_function_body, globals, function_body);
 
-        bytecode_function_body.push(Instruction::Return);
+        BytecodeCodegenBackend::compile_function_with_body(bytecode_function_body)
+    }
 
-        Function {
-            body: bytecode_function_body,
-        }
+    /// Caller must guarantee that the return type is on the stack before calling this function
+    fn compile_function_with_body(mut body: Vec<Instruction>) -> frostbite_bytecode::Function {
+        body.push(Instruction::Return);
+
+        Function { body }
     }
 
     fn compile_function_call(

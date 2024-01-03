@@ -85,6 +85,12 @@ pub struct TypedFunctionExpr {
     pub body: Box<TypedExpression>,
 }
 
+impl TypedFunctionExpr {
+    pub fn is_body_block(&self) -> bool {
+        matches!(&*self.body, TypedExpression::Block { .. })
+    }
+}
+
 #[derive(Debug, Clone, derive_more::IsVariant)]
 pub enum TypedExpression {
     Int(Spanned<i32>),
@@ -182,8 +188,8 @@ impl Spannable for TypedExpression {
                 expressions: _,
                 right_brace,
             } => (left_brace.span().start)..(right_brace.span().end),
-            TypedExpression::Poisoned => todo!(),
-            TypedExpression::Uninitialized => todo!(),
+
+            TypedExpression::Poisoned | TypedExpression::Uninitialized => unreachable!(),
         }
     }
 }
@@ -249,7 +255,6 @@ impl TryFrom<TypedExpression> for Assignable {
 #[derive(Debug, Clone, PartialEq)]
 pub struct FunctionType {
     pub arguments: BTreeMap<String, TypeIndex>,
-
     pub return_type: TypeIndex,
 }
 
@@ -269,15 +274,15 @@ pub enum Type {
     Any,
 }
 
-impl<'a> From<TypeAnnotation<'a>> for Type {
-    fn from(value: TypeAnnotation<'a>) -> Self {
+impl From<TypeAnnotation> for Type {
+    fn from(value: TypeAnnotation) -> Self {
         match value {
             TypeAnnotation::Int => Self::Int,
             TypeAnnotation::Float => Self::Float,
             TypeAnnotation::String => Self::String,
             TypeAnnotation::Any => Self::Any,
             TypeAnnotation::Unit => Self::Unit,
-            TypeAnnotation::Object(obj) => Self::Object(obj.into()),
+            TypeAnnotation::Object(obj) => Self::Object(obj),
             TypeAnnotation::Bool => Self::Bool,
         }
     }

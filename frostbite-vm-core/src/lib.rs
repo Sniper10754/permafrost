@@ -2,7 +2,7 @@
 
 extern crate alloc;
 
-use alloc::{borrow::Cow, vec, vec::Vec};
+use alloc::{string::String, vec, vec::Vec};
 
 use frostbite_bytecode::{ConstantIndex, FunctionIndex, Instruction, Module};
 
@@ -42,13 +42,15 @@ impl FrostbiteVm {
             Instruction::LoadName(name) => self.load_name(name),
             Instruction::Pop => self.pop_stack(),
             Instruction::Call(function_index) => self.call_function(bytecode, *function_index),
-            Instruction::CallIf(function_index) => self.call_function_if(bytecode, *function_index),
+            Instruction::CallEq(function_index) => self.call_function_eq(bytecode, *function_index),
+            Instruction::CallNe(function_index) => self.call_function_ne(bytecode, *function_index),
             Instruction::Return => self.handle_return(),
             Instruction::Add
             | Instruction::Subtract
             | Instruction::Multiply
             | Instruction::Divide => self.binary_operation(instruction),
             Instruction::Cmp => self.handle_cmp(),
+
             Instruction::Nop => (),
         }
     }
@@ -59,14 +61,14 @@ impl FrostbiteVm {
         self.stack.push(constant_value.into());
     }
 
-    fn store_name<'a>(&mut self, name: impl Into<Cow<'a, str>>) {
+    fn store_name(&mut self, name: impl Into<String>) {
         let value = self.stack.first().unwrap().clone();
 
         self.frames
             .first_mut()
             .unwrap()
             .names
-            .insert(name.into().into_owned(), value);
+            .insert(name.into(), value);
     }
 
     fn load_name(&mut self, name: impl AsRef<str>) {
@@ -74,9 +76,10 @@ impl FrostbiteVm {
             .frames
             .iter()
             .find_map(|frame| frame.names.get(name.as_ref()))
+            .cloned()
             .unwrap();
 
-        self.stack.push(value.clone());
+        self.stack.push(value);
     }
 
     fn pop_stack(&mut self) {
@@ -96,8 +99,14 @@ impl FrostbiteVm {
         self.pop_stack();
     }
 
-    fn call_function_if(&mut self, bytecode: &Module, function_index: FunctionIndex) {
+    fn call_function_eq(&mut self, bytecode: &Module, function_index: FunctionIndex) {
         if self.registers.cr {
+            self.call_function(bytecode, function_index);
+        }
+    }
+
+    fn call_function_ne(&mut self, bytecode: &Module, function_index: FunctionIndex) {
+        if !self.registers.cr {
             self.call_function(bytecode, function_index);
         }
     }

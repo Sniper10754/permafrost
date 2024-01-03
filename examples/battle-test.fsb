@@ -1,10 +1,6 @@
-function add(a: bool, b: bool) -> bool = {
+add = function(a: any, b: bool) -> bool = {
     result = a == b;
 
-    return result;
+    return result == b;
 };
 
-x = false;
-y = true;
-
-z = add(x, y);

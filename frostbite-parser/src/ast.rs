@@ -1,4 +1,4 @@
-use alloc::{boxed::Box, vec::Vec};
+use alloc::{boxed::Box, string::String, vec::Vec};
 use core::ops::Range;
 
 use derive_more::From;
@@ -11,10 +11,11 @@ use self::tokens::{
 pub type Span = Range<usize>;
 
 pub mod tokens {
-
     use derive_more::Display;
 
     use super::{Span, Spannable};
+
+    use alloc::string::String;
 
     macro_rules! token {
         ($name:ident) => {
@@ -62,8 +63,8 @@ pub mod tokens {
         Equal,
     }
 
-    #[derive(Debug, Clone, Copy, PartialEq, Display)]
-    pub enum TypeAnnotation<'a> {
+    #[derive(Debug, Clone, PartialEq, Display)]
+    pub enum TypeAnnotation {
         #[display(fmt = "int")]
         Int,
         #[display(fmt = "float")]
@@ -80,7 +81,7 @@ pub mod tokens {
         Unit,
 
         #[display(fmt = "object {_0}")]
-        Object(&'a str),
+        Object(String),
     }
 
     token!(Eq);
@@ -134,11 +135,11 @@ impl<T> From<(&Span, T)> for Spanned<T> {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct Program<'a> {
-    pub exprs: Vec<Expr<'a>>,
+pub struct Program {
+    pub exprs: Vec<Expr>,
 }
 
-impl<'a> Spannable for Expr<'a> {
+impl Spannable for Expr {
     fn span(&self) -> Span {
         match self {
             Expr::Int(Spanned(span, _))
@@ -187,12 +188,12 @@ impl<'a> Spannable for Expr<'a> {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub enum Expr<'a> {
+pub enum Expr {
     Int(Spanned<i32>),
     Float(Spanned<f32>),
-    Ident(Spanned<&'a str>),
+    Ident(Spanned<String>),
     Bool(Spanned<bool>),
-    String(Spanned<&'a str>),
+    String(Spanned<String>),
 
     BinaryOperation {
         lhs: Box<Self>,
@@ -208,12 +209,12 @@ pub enum Expr<'a> {
 
     Function {
         fn_token: FunctionToken,
-        name: Option<Spanned<&'a str>>,
+        name: Option<Spanned<String>>,
         lpt: LeftParenthesisToken,
-        arguments: Vec<Argument<'a>>,
+        arguments: Vec<Argument>,
         rpt: RightParenthesisToken,
         return_type_token: Option<ArrowToken>,
-        return_type_annotation: Option<Spanned<TypeAnnotation<'a>>>,
+        return_type_annotation: Option<Spanned<TypeAnnotation>>,
         equals: Eq,
         body: Box<Self>,
     },
@@ -221,7 +222,7 @@ pub enum Expr<'a> {
     Call {
         callee: Box<Self>,
         left_paren: LeftParenthesisToken,
-        arguments: Vec<Expr<'a>>,
+        arguments: Vec<Expr>,
         right_paren: RightParenthesisToken,
     },
 
@@ -237,7 +238,7 @@ pub enum Expr<'a> {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct Argument<'a> {
-    pub name: Spanned<&'a str>,
-    pub type_annotation: Spanned<TypeAnnotation<'a>>,
+pub struct Argument {
+    pub name: Spanned<String>,
+    pub type_annotation: Spanned<TypeAnnotation>,
 }

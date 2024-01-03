@@ -1,4 +1,4 @@
-use alloc::{collections::VecDeque, vec, vec::Vec};
+use alloc::{collections::VecDeque, string::String, vec, vec::Vec};
 
 use frostbite_reports::{sourcemap::SourceId, IntoReport, Level, Report, ReportContext};
 use logos::{Logos, Span};
@@ -6,6 +6,8 @@ use logos::{Logos, Span};
 use crate::ast::{tokens::BinaryOperatorKind, Spanned};
 
 mod helpers {
+    use alloc::string::String;
+
     use logos::Lexer;
     use num_traits::Num;
 
@@ -13,16 +15,14 @@ mod helpers {
 
     use super::{LexerErrorKind, Token};
 
-    pub fn parse_number<'input, N: Num>(
-        lexer: &Lexer<'input, Token<'input>>,
-    ) -> Result<N, LexerErrorKind> {
+    pub fn parse_number<N: Num>(lexer: &Lexer<'_, Token>) -> Result<N, LexerErrorKind> {
         let slice = lexer.slice();
 
         N::from_str_radix(slice, 10)
             .map_err(|_| LexerErrorKind::NumberTooBig { span: lexer.span() })
     }
 
-    pub fn parse_operator<'input>(lexer: &Lexer<'input, Token<'input>>) -> BinaryOperatorKind {
+    pub fn parse_operator(lexer: &Lexer<'_, Token>) -> BinaryOperatorKind {
         match lexer.slice() {
             "+" => BinaryOperatorKind::Add,
             "-" => BinaryOperatorKind::Sub,
@@ -34,14 +34,14 @@ mod helpers {
         }
     }
 
-    pub fn unquote_str<'input>(lexer: &Lexer<'input, Token<'input>>) -> &'input str {
+    pub fn unquote_str(lexer: &Lexer<'_, Token>) -> String {
         let input = lexer.slice();
 
-        &input[1..(input.len() - 1)]
+        input[1..(input.len() - 1)].into()
     }
 }
 
-pub type SpannedToken<'a> = Spanned<Token<'a>>;
+pub type SpannedToken = Spanned<Token>;
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct LexerError {
@@ -104,18 +104,18 @@ impl IntoReport for LexerError {
 #[derive(Logos, Debug, Clone, PartialEq)]
 #[logos(error = LexerErrorKind)]
 #[logos(skip r"[\t\n\r ]+")]
-pub enum Token<'input> {
+pub enum Token {
     #[regex("-?[0-9]+", helpers::parse_number::<i32>)]
     Int(i32),
 
     #[regex(r#"(-?[0-9]+)?\.[0-9]+"#, helpers::parse_number::<f32>)]
     Float(f32),
 
-    #[regex("[a-zA-Z]([a-zA-Z0-9]|_)*")]
-    Ident(&'input str),
+    #[regex("[a-zA-Z]([a-zA-Z0-9]|_)*", |lexer| String::from(lexer.slice()))]
+    Ident(String),
 
     #[regex(r#""(\\[\\"]|[^"])*""#, helpers::unquote_str)]
-    String(&'input str),
+    String(String),
 
     #[token("true")]
     True,
@@ -164,30 +164,27 @@ pub enum Token<'input> {
 }
 
 #[derive(Debug, Clone)]
-pub struct TokenStream<'input> {
-    tokens: VecDeque<SpannedToken<'input>>,
+pub struct TokenStream {
+    tokens: VecDeque<SpannedToken>,
     index: usize,
 }
 
-impl<'input> TokenStream<'input> {
-    pub fn with_vec_deque(tokens: impl Into<VecDeque<SpannedToken<'input>>>) -> Self {
+impl TokenStream {
+    pub fn with_vec_deque(tokens: impl Into<VecDeque<SpannedToken>>) -> Self {
         let tokens = tokens.into();
         Self { tokens, index: 0 }
     }
 
-    pub fn with_iter(tokens: impl IntoIterator<Item = SpannedToken<'input>>) -> Self {
+    pub fn with_iter(tokens: impl IntoIterator<Item = SpannedToken>) -> Self {
         let tokens = tokens.into_iter().collect::<VecDeque<_>>();
         Self { tokens, index: 0 }
     }
 
-    pub fn skip_token(&mut self) -> Option<SpannedToken<'input>> {
+    pub fn skip_token(&mut self) -> Option<SpannedToken> {
         self.next()
     }
 
-    pub fn skip_tokens(
-        stream: &mut TokenStream<'input>,
-        count: usize,
-    ) -> Vec<SpannedToken<'input>> {
+    pub fn skip_tokens(stream: &mut TokenStream, count: usize) -> Vec<SpannedToken> {
         let mut taken_tokens = vec![];
 
         for _ in 0..count {
@@ -202,7 +199,7 @@ impl<'input> TokenStream<'input> {
     }
 
     #[allow(clippy::should_implement_trait)]
-    pub fn next(&mut self) -> Option<SpannedToken<'input>> {
+    pub fn next(&mut self) -> Option<SpannedToken> {
         if self.index < self.tokens.len() {
             let token = self.tokens[self.index].clone();
 
@@ -215,16 +212,13 @@ impl<'input> TokenStream<'input> {
     }
 
     #[must_use]
-    pub fn peek(&self) -> Option<&SpannedToken<'input>> {
+    pub fn peek(&self) -> Option<&SpannedToken> {
         self.tokens.get(self.index)
     }
 
-    pub fn take_while<P>(
-        stream: &mut TokenStream<'input>,
-        predicate: P,
-    ) -> Vec<SpannedToken<'input>>
+    pub fn take_while<P>(stream: &mut TokenStream, predicate: P) -> Vec<SpannedToken>
     where
-        P: Fn(&SpannedToken<'input>) -> bool,
+        P: Fn(&SpannedToken) -> bool,
     {
         let mut taken_tokens = vec![];
 
@@ -242,7 +236,7 @@ impl<'input> TokenStream<'input> {
     }
 
     #[must_use]
-    pub fn previous(&self) -> Option<SpannedToken<'input>> {
+    pub fn previous(&self) -> Option<SpannedToken> {
         if self.index > 0 {
             Some(self.tokens[self.index - 1].clone())
         } else {
@@ -251,11 +245,7 @@ impl<'input> TokenStream<'input> {
     }
 }
 
-pub fn tokenize<'input>(
-    report_ctx: &mut ReportContext,
-    source_id: SourceId,
-    input: &'input str,
-) -> TokenStream<'input> {
+pub fn tokenize(report_ctx: &mut ReportContext, source_id: SourceId, input: &str) -> TokenStream {
     let lexer = Token::lexer(input).spanned();
     let mut tokens = Vec::new();
 

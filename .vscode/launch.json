@@ -18,7 +18,7 @@
             },
             "args": [
                 "compile",
-                "examples/example.fsb"
+                "examples/battle-test.fsb"
             ],
             "cwd": "${workspaceFolder}"
         }
