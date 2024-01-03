@@ -199,6 +199,14 @@ pub enum Callable {
     Ident(TypeIndex, Spanned<String>),
 }
 
+impl Callable {
+    pub fn calling_function_type(&self) -> TypeIndex {
+        match self {
+            Callable::Ident(type_index, _) => *type_index,
+        }
+    }
+}
+
 impl Spannable for Callable {
     fn span(&self) -> frostbite_parser::ast::Span {
         match self {

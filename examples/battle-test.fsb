@@ -1,6 +1,7 @@
-add = function(a: any, b: bool) -> bool = {
+compare = function(a: any, b: any) -> bool = {
     result = a == b;
 
     return result == b;
 };
 
+compare(1, 2);

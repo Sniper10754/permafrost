@@ -6,7 +6,7 @@ use frostbite_parser::ast::{tokens::BinaryOperatorKind, Spanned};
 use frostbite_reports::ReportContext;
 use slotmap::SecondaryMap;
 
-use crate::tir::{self, TypedAst, TypedExpression, TypedFunctionExpr};
+use crate::tir::{self, FunctionType, Type, TypedAst, TypedExpression, TypedFunctionExpr};
 
 use super::{CodegenBackend, CodegenError};
 
@@ -21,12 +21,13 @@ impl BytecodeCodegenBackend {
         let globals = &mut module.globals;
 
         for node in &t_ast.nodes {
-            self.compile_node(body, globals, node);
+            self.compile_node(t_ast, body, globals, node);
         }
     }
 
     fn compile_node(
         &mut self,
+        t_ast: &TypedAst,
         instructions: &mut Vec<Instruction>,
         globals: &mut Globals,
         t_expr: &TypedExpression,
@@ -46,7 +47,7 @@ impl BytecodeCodegenBackend {
             }
 
             TypedExpression::BinaryOperation { lhs, operator, rhs } => {
-                self.compile_binary_operation(instructions, globals, lhs, operator.kind, rhs)
+                self.compile_binary_operation(t_ast, instructions, globals, lhs, operator.kind, rhs)
             }
 
             TypedExpression::Assign {
@@ -54,22 +55,20 @@ impl BytecodeCodegenBackend {
                 lhs,
                 value,
             } => {
-                self.compile_assignment(globals, instructions, lhs, value);
+                self.compile_assignment(t_ast, globals, instructions, lhs, value);
             }
 
-            TypedExpression::Function(TypedFunctionExpr {
-                type_index,
-                body: function_body,
-                ..
-            }) => self.compile_function_node(globals, function_body, *type_index),
+            TypedExpression::Function(function_expr) => {
+                self.compile_function_node(t_ast, globals, function_expr)
+            }
 
             TypedExpression::Call {
                 callee, arguments, ..
-            } => self.compile_function_call(globals, instructions, callee, arguments),
+            } => self.compile_function_call(t_ast, globals, instructions, callee, arguments),
 
             TypedExpression::Return(_, _, return_value) => {
                 if let Some(value) = return_value {
-                    self.compile_node(instructions, globals, value);
+                    self.compile_node(t_ast, instructions, globals, value);
                 } else {
                     instructions.push(Instruction::LoadConstant(
                         globals.constants_pool.insert(ConstantValue::Unit),
@@ -81,7 +80,7 @@ impl BytecodeCodegenBackend {
 
             TypedExpression::Block { expressions, .. } => expressions
                 .iter()
-                .for_each(|expr| self.compile_node(instructions, globals, expr)),
+                .for_each(|expr| self.compile_node(t_ast, instructions, globals, expr)),
 
             TypedExpression::Poisoned | TypedExpression::Uninitialized => unreachable!(),
         }
@@ -107,14 +106,15 @@ impl BytecodeCodegenBackend {
 
     fn compile_binary_operation(
         &mut self,
+        t_ast: &TypedAst,
         instructions: &mut Vec<Instruction>,
         globals: &mut Globals,
         lhs: &TypedExpression,
         operator: BinaryOperatorKind,
         rhs: &TypedExpression,
     ) {
-        self.compile_node(instructions, globals, rhs);
-        self.compile_node(instructions, globals, lhs);
+        self.compile_node(t_ast, instructions, globals, rhs);
+        self.compile_node(t_ast, instructions, globals, lhs);
 
         match operator {
             BinaryOperatorKind::Add => instructions.push(Instruction::Add),
@@ -152,12 +152,13 @@ impl BytecodeCodegenBackend {
 
     fn compile_assignment(
         &mut self,
+        t_ast: &TypedAst,
         globals: &mut Globals,
         instructions: &mut Vec<Instruction>,
         lhs: &tir::Assignable,
         value: &TypedExpression,
     ) {
-        self.compile_node(instructions, globals, value);
+        self.compile_node(t_ast, instructions, globals, value);
 
         match lhs {
             tir::Assignable::Ident(_, Spanned(_, name)) => {
@@ -168,25 +169,28 @@ impl BytecodeCodegenBackend {
 
     fn compile_function_node(
         &mut self,
+        t_ast: &TypedAst,
         globals: &mut Globals,
-        function_body: &TypedExpression,
-        type_index: tir::TypeIndex,
+        function: &TypedFunctionExpr,
     ) {
         let dummy_function_index = globals.functions.insert(Function { body: vec![] });
 
-        self.functions.insert(type_index, dummy_function_index);
+        self.functions
+            .insert(function.type_index, dummy_function_index);
 
-        globals.functions[dummy_function_index] = self.compile_function(globals, function_body);
+        globals.functions[dummy_function_index] =
+            self.compile_function(t_ast, globals, &function.body);
     }
 
     fn compile_function(
         &mut self,
+        t_ast: &TypedAst,
         globals: &mut Globals,
         function_body: &TypedExpression,
     ) -> frostbite_bytecode::Function {
         let mut bytecode_function_body = Vec::new();
 
-        self.compile_node(&mut bytecode_function_body, globals, function_body);
+        self.compile_node(t_ast, &mut bytecode_function_body, globals, function_body);
 
         BytecodeCodegenBackend::compile_function_with_body(bytecode_function_body)
     }
@@ -200,14 +204,28 @@ impl BytecodeCodegenBackend {
 
     fn compile_function_call(
         &mut self,
+        t_ast: &TypedAst,
         globals: &mut Globals,
         instructions: &mut Vec<Instruction>,
         callee: &tir::Callable,
-        arguments: &[TypedExpression],
+        arguments_exprs: &[TypedExpression],
     ) {
-        arguments.iter().for_each(|argument| {
-            self.compile_node(instructions, globals, argument);
-        });
+        let function_type = callee.calling_function_type();
+
+        let Type::Function(FunctionType {
+            arguments,
+            return_type: _,
+        }) = &t_ast.types_arena[function_type]
+        else {
+            unreachable!()
+        };
+
+        Iterator::zip(arguments.keys(), arguments_exprs.iter()).for_each(
+            |(argument_name, argument_expr)| {
+                self.compile_node(t_ast, instructions, globals, argument_expr);
+                instructions.push(Instruction::StoreName(argument_name.into()));
+            },
+        );
 
         match callee {
             tir::Callable::Ident(type_index, _) => {
