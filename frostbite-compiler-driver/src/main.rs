@@ -5,8 +5,7 @@ use color_eyre::eyre;
 use frostbite_compiler::{codegen::CodegenBackends, CompilationResults, Compiler};
 use frostbite_reports::{
     diagnostic_printer::{DefaultPrintBackend, DiagnosticPrinter},
-    sourcemap::{SourceDescription, SourceMap},
-    Report, ReportContext,
+    Report,
 };
 
 #[derive(clap::Parser)]
@@ -32,27 +31,15 @@ fn main() -> eyre::Result<()> {
 
     color_eyre::install()?;
 
-    let _debug = env::var("DEBUG").is_ok();
-
     match args.subcommand {
         CliSubcommand::Compile { file, output_file } => {
             let src = fs::read_to_string(&file)?;
 
-            let mut source_map = SourceMap::new();
+            let mut compiler = Compiler::new();
 
-            let src_id = source_map.insert(SourceDescription {
-                url: file.clone().into(),
-                source_code: src,
-            });
+            let src_id = compiler.add_source(file.display().to_string(), src);
 
-            let mut report_ctx = ReportContext::default();
-
-            let output = Compiler::compile_source_code(
-                &mut report_ctx,
-                &mut source_map,
-                src_id,
-                CodegenBackends::bytecode_backend(),
-            );
+            let output = compiler.compile_source_code(src_id, CodegenBackends::bytecode_backend());
 
             let CompilationResults {
                 t_ast: _,
@@ -62,11 +49,14 @@ fn main() -> eyre::Result<()> {
                 Err(_) => {
                     let mut buf = String::new();
 
-                    for report in report_ctx.iter() {
+                    for report in compiler.ctx().report_ctx.iter() {
                         match report {
                             Report::Diagnostic(diagnostic) => {
                                 DiagnosticPrinter::new(&mut buf)
-                                    .print::<DefaultPrintBackend>(&source_map, diagnostic)
+                                    .print::<DefaultPrintBackend>(
+                                        &compiler.ctx().src_map,
+                                        diagnostic,
+                                    )
                                     .unwrap();
                             }
                             Report::Backtrace(_) => unreachable!(),
@@ -83,7 +73,8 @@ fn main() -> eyre::Result<()> {
 
             frostbite_bytecode::encode(&codegen_output, &mut buf);
 
-            let output_file = output_file.unwrap_or("./output".into());
+            let output_file =
+                output_file.unwrap_or_else(|| env::temp_dir().join("frostbite-compiler-output"));
 
             let mut fs_writer = fs::OpenOptions::new()
                 .read(true)

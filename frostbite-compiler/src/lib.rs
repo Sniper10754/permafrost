@@ -2,18 +2,17 @@
 
 extern crate alloc;
 
+use alloc::string::String;
 use codegen::{CodegenBackend, CodegenError};
 use context::CompilerContext;
 use frostbite_parser::{lexer::tokenize, Parser};
-use frostbite_reports::{
-    sourcemap::{SourceId, SourceMap},
-    ReportContext,
-};
+use frostbite_reports::sourcemap::{SourceDescription, SourceId, SourceUrl};
 use semantic::run_semantic_checks;
 use tir::TypedAst;
 
 pub mod codegen;
-pub(crate) mod context;
+pub mod context;
+pub mod intrinsic;
 pub mod semantic;
 pub mod tir;
 
@@ -32,35 +31,57 @@ mod utils {
 }
 
 #[derive(Debug)]
-pub struct CompilationResults<C: CodegenBackend> {
-    pub t_ast: TypedAst,
+pub struct CompilationResults<'a, C: CodegenBackend> {
+    pub t_ast: &'a TypedAst,
     pub codegen_output: C::Output,
 }
 
-pub struct Compiler;
+#[derive(Debug, Default)]
+pub struct Compiler {
+    ctx: CompilerContext,
+}
 
 impl Compiler {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn add_source(&mut self, url: impl Into<SourceUrl>, source: impl Into<String>) -> SourceId {
+        self.ctx.src_map.insert(SourceDescription {
+            url: url.into(),
+            source_code: source.into(),
+        })
+    }
+
     pub fn compile_source_code<C: CodegenBackend>(
-        report_ctx: &mut ReportContext,
-        src_map: &mut SourceMap,
+        &mut self,
         source_id: SourceId,
         codegen: C,
-    ) -> Result<CompilationResults<C>, CodegenError> {
-        let mut ctx = CompilerContext::new(src_map, report_ctx);
+    ) -> Result<CompilationResults<'_, C>, CodegenError> {
+        let source = self
+            .ctx
+            .src_map
+            .get(source_id)
+            .unwrap()
+            .source_code
+            .as_str();
 
-        let source = ctx.src_map.get(source_id).unwrap().source_code.as_str();
-        let token_stream = tokenize(ctx.report_ctx, source_id, source);
-        utils::bail_on_errors(ctx.report_ctx)?;
+        let token_stream = tokenize(&mut self.ctx.report_ctx, source_id, source);
+        utils::bail_on_errors(&self.ctx.report_ctx)?;
 
-        let ast = Parser::with_tokenstream(ctx.report_ctx, token_stream, source_id).parse();
-        ctx.asts.insert(source_id, ast);
-        utils::bail_on_errors(ctx.report_ctx)?;
+        let ast =
+            Parser::with_tokenstream(&mut self.ctx.report_ctx, token_stream, source_id).parse();
+        self.ctx.asts.insert(source_id, ast);
+        utils::bail_on_errors(&self.ctx.report_ctx)?;
 
-        let (t_ast,) = run_semantic_checks(&mut ctx, source_id);
-        utils::bail_on_errors(ctx.report_ctx)?;
+        run_semantic_checks(&mut self.ctx, source_id);
 
-        let codegen_output = C::codegen(codegen, ctx.report_ctx, &t_ast)?;
-        utils::bail_on_errors(ctx.report_ctx)?;
+        let t_ast = &self.ctx.t_asts[source_id];
+
+        utils::bail_on_errors(&self.ctx.report_ctx)?;
+
+        let codegen_output = C::codegen(codegen, &mut self.ctx.report_ctx, t_ast)?;
+        utils::bail_on_errors(&self.ctx.report_ctx)?;
 
         let compilation_results = CompilationResults {
             t_ast,
@@ -68,5 +89,13 @@ impl Compiler {
         };
 
         Ok(compilation_results)
+    }
+
+    pub fn ctx(&self) -> &CompilerContext {
+        &self.ctx
+    }
+
+    pub fn explode(self) -> CompilerContext {
+        self.ctx
     }
 }

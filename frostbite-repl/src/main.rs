@@ -1,9 +1,10 @@
 use frostbite_bytecode::text_repr::print_bytecode;
-use frostbite_compiler::{codegen::CodegenBackends, CompilationResults, Compiler};
+use frostbite_compiler::{
+    codegen::CodegenBackends, context::CompilerContext, CompilationResults, Compiler,
+};
 use frostbite_reports::{
     diagnostic_printer::{DefaultPrintBackend, DiagnosticPrinter},
-    sourcemap::{SourceDescription, SourceMap},
-    Report, ReportContext,
+    Report,
 };
 use reedline::{DefaultPrompt, DefaultPromptSegment, Reedline, Signal};
 use std::error::Error;
@@ -33,15 +34,21 @@ fn main() -> Result<(), Box<dyn Error>> {
                     Ok(module) => {
                         print_bytecode(&mut code_buffer, &module)?;
                     }
-                    Err((src_map, reports)) => {
-                        reports.iter().for_each(|report| match report {
-                            Report::Diagnostic(diagnostic) => {
-                                DiagnosticPrinter::new(&mut code_buffer)
-                                    .print::<DefaultPrintBackend>(&src_map, diagnostic)
-                                    .unwrap();
-                            }
-                            Report::Backtrace(_) => unreachable!(),
-                        });
+                    Err(compiler_ctx) => {
+                        compiler_ctx
+                            .report_ctx
+                            .iter()
+                            .for_each(|report| match report {
+                                Report::Diagnostic(diagnostic) => {
+                                    DiagnosticPrinter::new(&mut code_buffer)
+                                        .print::<DefaultPrintBackend>(
+                                            &compiler_ctx.src_map,
+                                            diagnostic,
+                                        )
+                                        .unwrap();
+                                }
+                                Report::Backtrace(_) => unreachable!(),
+                            });
                     }
                 }
 
@@ -60,26 +67,18 @@ fn main() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-fn compile_code(code: &str) -> Result<frostbite_bytecode::Module, (SourceMap, ReportContext)> {
-    let mut report_ctx = ReportContext::default();
-    let mut src_map = SourceMap::default();
+fn compile_code(code: &str) -> Result<frostbite_bytecode::Module, CompilerContext> {
+    let mut compiler = Compiler::new();
 
-    let src_id = src_map.insert(SourceDescription {
-        url: "REPL".to_string().into(),
-        source_code: code.into(),
-    });
+    let src_id = compiler.add_source("REPL".to_string(), code);
 
-    Compiler::compile_source_code(
-        &mut report_ctx,
-        &mut src_map,
-        src_id,
-        CodegenBackends::bytecode_backend(),
-    )
-    .map(
-        |CompilationResults {
-             t_ast: _,
-             codegen_output,
-         }| codegen_output,
-    )
-    .map_err(|_| (src_map, report_ctx))
+    compiler
+        .compile_source_code(src_id, CodegenBackends::bytecode_backend())
+        .map(
+            |CompilationResults {
+                 t_ast: _,
+                 codegen_output,
+             }| codegen_output,
+        )
+        .map_err(|_| (compiler.explode()))
 }

@@ -5,20 +5,30 @@ use frostbite_reports::{
 };
 use slotmap::SecondaryMap;
 
-#[derive(Debug)]
-pub struct CompilerContext<'src, 'report_ctx> {
-    pub src_map: &'src mut SourceMap,
-    pub report_ctx: &'report_ctx mut ReportContext,
+use crate::{intrinsic::IntrinsicContext, tir::TypedAst};
+
+#[derive(Debug, Default)]
+pub struct CompilerContext {
+    pub src_map: SourceMap,
+    pub report_ctx: ReportContext,
+    pub intrinsic_ctx: IntrinsicContext,
 
     pub asts: SecondaryMap<SourceId, Program>,
+    pub t_asts: SecondaryMap<SourceId, TypedAst>,
 }
 
-impl<'src, 'report_ctx> CompilerContext<'src, 'report_ctx> {
-    pub fn new(src_map: &'src mut SourceMap, report_ctx: &'report_ctx mut ReportContext) -> Self {
+impl CompilerContext {
+    pub fn new(
+        src_map: SourceMap,
+        report_ctx: ReportContext,
+        intrinsic_ctx: IntrinsicContext,
+    ) -> Self {
         Self {
             src_map,
             report_ctx,
+            intrinsic_ctx,
             asts: SecondaryMap::new(),
+            t_asts: SecondaryMap::new(),
         }
     }
 }

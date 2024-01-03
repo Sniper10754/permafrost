@@ -2,7 +2,7 @@
 
 extern crate alloc;
 
-use alloc::{borrow::Cow, vec, vec::Vec};
+use alloc::{string::String, vec, vec::Vec};
 
 use frostbite_bytecode::{ConstantIndex, FunctionIndex, Instruction, Module};
 
@@ -50,6 +50,7 @@ impl FrostbiteVm {
             | Instruction::Multiply
             | Instruction::Divide => self.binary_operation(instruction),
             Instruction::Cmp => self.handle_cmp(),
+
             Instruction::Nop => (),
         }
     }
@@ -60,14 +61,14 @@ impl FrostbiteVm {
         self.stack.push(constant_value.into());
     }
 
-    fn store_name<'a>(&mut self, name: impl Into<Cow<'a, str>>) {
+    fn store_name(&mut self, name: impl Into<String>) {
         let value = self.stack.first().unwrap().clone();
 
         self.frames
             .first_mut()
             .unwrap()
             .names
-            .insert(name.into().into_owned(), value);
+            .insert(name.into(), value);
     }
 
     fn load_name(&mut self, name: impl AsRef<str>) {

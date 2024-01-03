@@ -173,7 +173,7 @@ impl IntoReport for TypecheckError {
     }
 }
 
-pub fn check_types(compiler_ctx: &mut CompilerContext<'_, '_>, source_id: SourceId) -> TypedAst {
+pub fn check_types(compiler_ctx: &mut CompilerContext, source_id: SourceId) {
     let mut rts = RecursiveTypechecker::new();
     let mut typed_ast = TypedAst::default();
 
@@ -186,7 +186,7 @@ pub fn check_types(compiler_ctx: &mut CompilerContext<'_, '_>, source_id: Source
         }
     }
 
-    typed_ast
+    compiler_ctx.t_asts.insert(source_id, typed_ast);
 }
 
 struct RecursiveTypechecker {
