@@ -6,6 +6,8 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+serde = { workspace = true, optional = true }
+
 derive_more = { workspace = true }
 slotmap = { workspace = true }
 cfg-if = { workspace = true }
@@ -14,8 +16,10 @@ ariadne = { version = "0.3", optional = true }
 
 [features]
 ariadne = ["std", "dep:ariadne", "diagnostic_printer"]
+serde = ["dep:serde"]
+std = ["serde/std"]
+
 diagnostic_printer = []
-std = []
 
 [lints]
 workspace = true

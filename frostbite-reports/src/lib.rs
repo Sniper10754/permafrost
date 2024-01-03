@@ -34,6 +34,7 @@ impl IntoReport for Infallible {
 }
 
 #[derive(Debug, Clone, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum Report {
     Diagnostic(Diagnostic),
     Backtrace(Backtrace),
@@ -74,6 +75,7 @@ impl Report {
 }
 
 #[derive(Debug, Clone, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Diagnostic {
     level: Level,
     span: Range<usize>,
@@ -85,6 +87,7 @@ pub struct Diagnostic {
 }
 
 #[derive(Debug, Clone, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Label {
     pub info: Cow<'static, str>,
     pub span: Option<Range<usize>>,
@@ -106,6 +109,7 @@ impl Label {
 }
 
 #[derive(Debug, Display, Clone, Copy, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum Level {
     Error,
     Warn,
@@ -113,6 +117,7 @@ pub enum Level {
 }
 
 #[derive(Debug, Clone, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Backtrace {
     pub reason: Cow<'static, str>,
     pub message: Cow<'static, str>,
@@ -120,18 +125,21 @@ pub struct Backtrace {
 }
 
 #[derive(Debug, Clone, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Frame {
     pub source_id: SourceId,
     pub position: Option<Position>,
 }
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq, derive_more::From)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum Position {
     Span(Range<usize>),
     Line(usize),
 }
 
 #[derive(Debug, Clone, Default)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ReportContext {
     reports: Vec<Report>,
 }

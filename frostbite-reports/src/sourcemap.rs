@@ -14,6 +14,7 @@ new_key_type! {
 
 /// Map representing a list of pairs composed by source identifiers and source codes
 #[derive(Debug)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct SourceMap(SlotMap<SourceId, SourceDescription>);
 
 impl Default for SourceMap {
@@ -52,12 +53,14 @@ impl Index<SourceId> for SourceMap {
 
 #[derive(Debug, Clone, derive_more::Display)]
 #[display(fmt = "{url}")]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct SourceDescription {
     pub url: SourceUrl,
     pub source_code: String,
 }
 
 #[derive(Debug, Clone, derive_more::Display, derive_more::From)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum SourceUrl {
     #[cfg(feature = "std")]
     #[display(fmt = "{}", "_0.display()")]
