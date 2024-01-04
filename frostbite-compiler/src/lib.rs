@@ -3,12 +3,17 @@
 extern crate alloc;
 
 use alloc::string::String;
-use codegen::{CodegenBackend, CodegenError};
+use codegen::CodegenBackend;
 use context::CompilerContext;
-use frostbite_parser::{lexer::tokenize, Parser};
-use frostbite_reports::sourcemap::{SourceDescription, SourceId, SourceUrl};
+use frostbite_parser::{
+    lexer::{tokenize, TokenStream},
+    Parser,
+};
+use frostbite_reports::{
+    sourcemap::{SourceDescription, SourceId, SourceUrl},
+    ReportContext,
+};
 use semantic::run_semantic_checks;
-use tir::TypedAst;
 
 pub mod codegen;
 pub mod context;
@@ -19,20 +24,22 @@ pub mod tir;
 mod utils {
     use frostbite_reports::ReportContext;
 
-    use crate::codegen::CodegenError;
+    use crate::CompilerError;
 
-    pub fn bail_on_errors(report_ctx: &ReportContext) -> Result<(), CodegenError> {
+    pub fn bail_on_errors(report_ctx: &ReportContext) -> Result<(), CompilerError> {
         if report_ctx.has_errors() {
-            Err(CodegenError)
+            Err(CompilerError)
         } else {
             Ok(())
         }
     }
 }
 
+#[derive(Debug, Clone, Copy, Default, Hash, PartialEq, Eq, PartialOrd, Ord)]
+pub struct CompilerError;
+
 #[derive(Debug)]
-pub struct CompilationResults<'a, C: CodegenBackend> {
-    pub t_ast: &'a TypedAst,
+pub struct CompilationResults<C: CodegenBackend> {
     pub codegen_output: C::Output,
 }
 
@@ -57,7 +64,7 @@ impl Compiler {
         &mut self,
         source_id: SourceId,
         codegen: C,
-    ) -> Result<CompilationResults<'_, C>, CodegenError> {
+    ) -> Result<CompilationResults<C>, CompilerError> {
         let source = self
             .ctx
             .src_map
@@ -66,29 +73,61 @@ impl Compiler {
             .source_code
             .as_str();
 
-        let token_stream = tokenize(&mut self.ctx.report_ctx, source_id, source);
-        utils::bail_on_errors(&self.ctx.report_ctx)?;
+        let token_stream = Self::lex(&mut self.ctx.report_ctx, source_id, source)?;
 
-        let ast =
-            Parser::with_tokenstream(&mut self.ctx.report_ctx, token_stream, source_id).parse();
-        self.ctx.asts.insert(source_id, ast);
-        utils::bail_on_errors(&self.ctx.report_ctx)?;
+        // AST is stored in the compiler context
+        Self::parse(&mut self.ctx, token_stream, source_id)?;
 
+        // TAST is stored in the compiler context
         run_semantic_checks(&mut self.ctx, source_id);
-
-        let t_ast = &self.ctx.t_asts[source_id];
-
         utils::bail_on_errors(&self.ctx.report_ctx)?;
 
-        let codegen_output = C::codegen(codegen, &mut self.ctx.report_ctx, t_ast)?;
-        utils::bail_on_errors(&self.ctx.report_ctx)?;
+        let codegen_output = Self::codegen(&mut self.ctx, source_id, codegen)?;
 
-        let compilation_results = CompilationResults {
-            t_ast,
-            codegen_output,
-        };
+        let compilation_results = CompilationResults { codegen_output };
 
         Ok(compilation_results)
+    }
+
+    fn lex(
+        report_ctx: &mut ReportContext,
+        source_id: SourceId,
+        source: &str,
+    ) -> Result<TokenStream, CompilerError> {
+        let token_stream = tokenize(report_ctx, source_id, source);
+
+        utils::bail_on_errors(report_ctx)?;
+
+        Ok(token_stream)
+    }
+
+    fn parse(
+        compiler_ctx: &mut CompilerContext,
+        token_stream: TokenStream,
+        source_id: SourceId,
+    ) -> Result<(), CompilerError> {
+        let ast =
+            Parser::with_tokenstream(&mut compiler_ctx.report_ctx, token_stream, source_id).parse();
+
+        compiler_ctx.asts.insert(source_id, ast);
+
+        utils::bail_on_errors(&compiler_ctx.report_ctx)?;
+
+        Ok(())
+    }
+
+    fn codegen<C: CodegenBackend>(
+        compiler_ctx: &mut CompilerContext,
+        main_source_id: SourceId,
+        codegen: C,
+    ) -> Result<C::Output, CompilerError> {
+        let t_ast = &compiler_ctx.t_asts[main_source_id];
+
+        let output = codegen.codegen(&mut compiler_ctx.report_ctx, t_ast);
+
+        utils::bail_on_errors(&compiler_ctx.report_ctx)?;
+
+        Ok(output)
     }
 
     pub fn ctx(&self) -> &CompilerContext {

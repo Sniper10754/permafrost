@@ -8,7 +8,7 @@ use slotmap::SecondaryMap;
 
 use crate::tir::{self, TypedAst, TypedExpression, TypedFunctionExpr};
 
-use super::{CodegenBackend, CodegenError};
+use super::CodegenBackend;
 
 #[derive(Debug, Default)]
 pub struct BytecodeCodegenBackend {
@@ -222,11 +222,7 @@ impl BytecodeCodegenBackend {
 impl CodegenBackend for BytecodeCodegenBackend {
     type Output = Module;
 
-    fn codegen(
-        mut self,
-        _report_ctx: &mut ReportContext,
-        t_ast: &TypedAst,
-    ) -> Result<Self::Output, CodegenError> {
+    fn codegen(mut self, _report_ctx: &mut ReportContext, t_ast: &TypedAst) -> Self::Output {
         let mut module = Module {
             manifest: Manifest {
                 bytecode_version: BytecodeVersion::Experimental(),
@@ -237,6 +233,6 @@ impl CodegenBackend for BytecodeCodegenBackend {
 
         self.compile_program(t_ast, &mut module);
 
-        Ok(module)
+        module
     }
 }

@@ -41,10 +41,7 @@ fn main() -> eyre::Result<()> {
 
             let output = compiler.compile_source_code(src_id, CodegenBackends::bytecode_backend());
 
-            let CompilationResults {
-                t_ast: _,
-                codegen_output,
-            } = match output {
+            let CompilationResults { codegen_output } = match output {
                 Ok(output) => output,
                 Err(_) => {
                     let mut buf = String::new();
