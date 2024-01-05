@@ -77,9 +77,9 @@ pub struct TypedAst {
 
 #[derive(Debug, Clone)]
 pub struct TypedFunctionExpr {
+    pub function_index: TypeIndex,
     pub fn_token: FunctionToken,
-    pub type_index: TypeIndex,
-    pub name: Option<Spanned<String>>,
+    pub name: Spanned<String>,
     pub arguments: BTreeMap<String, TypeIndex>,
     pub return_type: TypeIndex,
     pub body: Box<TypedExpression>,
@@ -133,9 +133,6 @@ pub enum TypedExpression {
         expressions: Vec<Self>,
         right_brace: RightBraceToken,
     },
-
-    Poisoned,
-    Uninitialized,
 }
 
 impl Spannable for TypedExpression {
@@ -160,14 +157,9 @@ impl Spannable for TypedExpression {
                 lhs,
                 value,
             } => (lhs.span().start)..(value.span().end),
-            TypedExpression::Function(TypedFunctionExpr {
-                fn_token,
-                type_index: _,
-                name: _,
-                arguments: _,
-                return_type: _,
-                body,
-            }) => (fn_token.span().start)..(body.span().end),
+            TypedExpression::Function(TypedFunctionExpr { fn_token, body, .. }) => {
+                (fn_token.span().start)..(body.span().end)
+            }
             TypedExpression::Call {
                 callee: _,
                 left_parent,
@@ -188,29 +180,19 @@ impl Spannable for TypedExpression {
                 expressions: _,
                 right_brace,
             } => (left_brace.span().start)..(right_brace.span().end),
-
-            TypedExpression::Poisoned | TypedExpression::Uninitialized => unreachable!(),
         }
     }
 }
 
 #[derive(Debug, Clone)]
 pub enum Callable {
-    Ident(TypeIndex, Spanned<String>),
-}
-
-impl Callable {
-    pub fn calling_function_type(&self) -> TypeIndex {
-        match self {
-            Callable::Ident(type_index, _) => *type_index,
-        }
-    }
+    Function(TypeIndex, Spanned<String>),
 }
 
 impl Spannable for Callable {
     fn span(&self) -> frostbite_parser::ast::Span {
         match self {
-            Callable::Ident(_, Spanned(span, _)) => span.clone(),
+            Callable::Function(_, Spanned(span, _)) => span.clone(),
         }
     }
 }

@@ -21,17 +21,13 @@ pub mod intrinsic;
 pub mod semantic;
 pub mod tir;
 
-mod utils {
-    use frostbite_reports::ReportContext;
+mod utils;
 
-    use crate::CompilerError;
-
-    pub fn bail_on_errors(report_ctx: &ReportContext) -> Result<(), CompilerError> {
-        if report_ctx.has_errors() {
-            Err(CompilerError)
-        } else {
-            Ok(())
-        }
+fn bail_on_errors(report_ctx: &ReportContext) -> Result<(), CompilerError> {
+    if report_ctx.has_errors() {
+        Err(CompilerError)
+    } else {
+        Ok(())
     }
 }
 
@@ -80,7 +76,7 @@ impl Compiler {
 
         // TAST is stored in the compiler context
         run_semantic_checks(&mut self.ctx, source_id);
-        utils::bail_on_errors(&self.ctx.report_ctx)?;
+        bail_on_errors(&self.ctx.report_ctx)?;
 
         let codegen_output = Self::codegen(&mut self.ctx, source_id, codegen)?;
 
@@ -96,7 +92,7 @@ impl Compiler {
     ) -> Result<TokenStream, CompilerError> {
         let token_stream = tokenize(report_ctx, source_id, source);
 
-        utils::bail_on_errors(report_ctx)?;
+        bail_on_errors(report_ctx)?;
 
         Ok(token_stream)
     }
@@ -111,7 +107,7 @@ impl Compiler {
 
         compiler_ctx.asts.insert(source_id, ast);
 
-        utils::bail_on_errors(&compiler_ctx.report_ctx)?;
+        bail_on_errors(&compiler_ctx.report_ctx)?;
 
         Ok(())
     }
@@ -125,7 +121,7 @@ impl Compiler {
 
         let output = codegen.codegen(&mut compiler_ctx.report_ctx, t_ast);
 
-        utils::bail_on_errors(&compiler_ctx.report_ctx)?;
+        bail_on_errors(&compiler_ctx.report_ctx)?;
 
         Ok(output)
     }

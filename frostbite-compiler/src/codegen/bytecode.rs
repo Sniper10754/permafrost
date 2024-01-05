@@ -10,10 +10,6 @@ use crate::tir::{self, FunctionType, Type, TypedAst, TypedExpression, TypedFunct
 
 use super::CodegenBackend;
 
-extern crate std;
-
-use std::dbg;
-
 #[derive(Debug, Default)]
 pub struct BytecodeCodegenBackend {
     functions: SecondaryMap<tir::TypeIndex, FunctionIndex>,
@@ -85,8 +81,6 @@ impl BytecodeCodegenBackend {
             TypedExpression::Block { expressions, .. } => expressions
                 .iter()
                 .for_each(|expr| self.compile_node(t_ast, instructions, globals, expr)),
-
-            TypedExpression::Poisoned | TypedExpression::Uninitialized => unreachable!(),
         }
     }
 
@@ -180,7 +174,7 @@ impl BytecodeCodegenBackend {
         let dummy_function_index = globals.functions.insert(Function { body: vec![] });
 
         self.functions
-            .insert(function.type_index, dummy_function_index);
+            .insert(function.function_index, dummy_function_index);
 
         globals.functions[dummy_function_index] =
             self.compile_function(t_ast, globals, &function.body);
@@ -214,27 +208,29 @@ impl BytecodeCodegenBackend {
         callee: &tir::Callable,
         arguments_exprs: &[TypedExpression],
     ) {
-        let function_type_index = callee.calling_function_type();
+        match callee {
+            tir::Callable::Function(function_type_index, _) => {
+                let Type::Function(FunctionType {
+                    arguments,
+                    return_type: _,
+                }) = &t_ast.types_arena[*function_type_index]
+                else {
+                    unreachable!()
+                };
 
-        let Type::Function(FunctionType {
-            arguments,
-            return_type: _,
-        }) = &t_ast.types_arena[function_type_index]
-        else {
-            unreachable!()
-        };
+                Iterator::zip(arguments.keys(), arguments_exprs.iter()).for_each(
+                    |(argument_name, argument_expr)| {
+                        self.compile_node(t_ast, instructions, globals, argument_expr);
 
-        Iterator::zip(arguments.keys(), arguments_exprs.iter()).for_each(
-            |(argument_name, argument_expr)| {
-                self.compile_node(t_ast, instructions, globals, argument_expr);
+                        instructions.push(Instruction::StoreName(argument_name.into()));
+                    },
+                );
 
-                instructions.push(Instruction::StoreName(argument_name.into()));
-            },
-        );
+                let function_index = self.functions[*function_type_index];
 
-        let function_index = self.functions[function_type_index];
-
-        instructions.push(Instruction::Call(function_index));
+                instructions.push(Instruction::Call(function_index));
+            }
+        }
     }
 }
 

@@ -209,7 +209,7 @@ pub enum Expr {
 
     Function {
         fn_token: FunctionToken,
-        name: Option<Spanned<String>>,
+        name: Spanned<String>,
         lpt: LeftParenthesisToken,
         arguments: Vec<Argument>,
         rpt: RightParenthesisToken,

@@ -237,24 +237,18 @@ impl<'report_context> Parser<'report_context> {
             Some(Spanned(fn_token_span, Token::Fn)) => {
                 let fn_token = FunctionToken(fn_token_span);
 
-                let mut name = None;
-
-                if matches!(
-                    self.token_stream.peek(),
-                    Some(Spanned(.., Token::Ident(..)))
-                ) {
-                    let Spanned(span, fn_name) = consume_token!(
-                        parser: self,
-                        token: Token::Ident(..),
-                        description: "identifier"
-                    )?;
-
-                    let Token::Ident(fn_name) = fn_name else {
+                let name = consume_token!(
+                    parser: self,
+                    token: Token::Ident(..),
+                    description: "identifier"
+                )?
+                .map(|token| {
+                    if let Token::Ident(ident) = token {
+                        ident
+                    } else {
                         unreachable!()
-                    };
-
-                    name = Some(Spanned(span, fn_name));
-                }
+                    }
+                });
 
                 let Spanned(left_paren_span, _) = consume_token!(
                     parser: self,
@@ -572,7 +566,7 @@ mod tests {
             Program {
                 exprs: vec![Expr::Function {
                     fn_token: FunctionToken(0..8),
-                    name: Some(Spanned(9..13, "test".into())),
+                    name: Spanned(9..13, "test".into()),
                     lpt: LeftParenthesisToken(13..14),
                     arguments: vec![
                         Argument {
@@ -612,7 +606,7 @@ mod tests {
             Program {
                 exprs: vec![Expr::Function {
                     fn_token: FunctionToken(0..8),
-                    name: Some(Spanned(9..13, "test".into())),
+                    name: Spanned(9..13, "test".into()),
                     lpt: LeftParenthesisToken(13..14),
                     arguments: vec![
                         Argument {
