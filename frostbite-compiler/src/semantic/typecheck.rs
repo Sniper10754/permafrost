@@ -1,5 +1,9 @@
 #![allow(clippy::single_match)]
 
+extern crate std;
+
+use std::dbg;
+
 use core::{
     cmp::Ordering::{Equal, Greater, Less},
     ops::Range,
@@ -238,6 +242,7 @@ impl RecursiveTypechecker {
                 let Some(referred_to) = self
                     .scopes
                     .iter()
+                    .rev()
                     .find(|scope| scope.contains_key(spanned_str.1.as_str()))
                     .map(|scope| scope[spanned_str.1.as_str()])
                 else {
@@ -454,9 +459,9 @@ impl RecursiveTypechecker {
                                 return Err(TypecheckError::CannotAssignTo(source_id, lhs.span()))
                             }
                             None => {
-                                let inferred_type = self.infer_type(source_id, value, t_ast)?;
+                                let inferred_type = dbg!(self.infer_type(source_id, value, t_ast)?);
 
-                                let local_index = t_ast.locals.insert(inferred_type);
+                                let local_index = dbg!(t_ast.locals.insert(inferred_type));
 
                                 self.scopes
                                     .last_mut()
@@ -574,6 +579,7 @@ impl RecursiveTypechecker {
                     let Some(refers_to) = self
                         .scopes
                         .iter()
+                        .rev()
                         .find_map(|scope| scope.get(spanned_str.1.as_str()).cloned())
                     else {
                         return Err(TypecheckError::SymbolNotFound(
@@ -582,9 +588,9 @@ impl RecursiveTypechecker {
                         ));
                     };
 
-                    let type_idx = refers_to.into_type(t_ast);
+                    let type_idx = dbg!(refers_to.into_type(t_ast));
 
-                    let Type::Function(function) = &t_ast.types_arena[type_idx].clone() else {
+                    let Type::Function(function) = t_ast.types_arena[type_idx].clone() else {
                         return Err(TypecheckError::CannotCallNonFunction(
                             source_id,
                             callee.span(),

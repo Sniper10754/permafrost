@@ -24,14 +24,9 @@ new_key_type! {
     pub struct FunctionIndex;
 }
 
-#[derive(Debug, Clone, derive_more::Display, Serialize, Deserialize)]
-pub enum BytecodeVersion {
-    Experimental(),
-}
-
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Manifest {
-    pub bytecode_version: BytecodeVersion,
+    pub bytecode_version: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -83,6 +78,8 @@ pub enum ConstantValue {
     Float(f32),
     String(String),
     Bool(bool),
+    #[display(fmt = "fn ")]
+    Function(Function),
 
     Unit,
 }

@@ -4,7 +4,7 @@ package.edition = "2021"
 
 resolver = "2"
 
-members = ["frostbite-*", "web-frostbite-playground/backend"]
+members = ["frostbite-*"]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -14,6 +14,10 @@ members = ["frostbite-*", "web-frostbite-playground/backend"]
 derive_more = "0"
 cfg-if = "1"
 owo-colors = "4"
+
+[workspace.dependencies.log]
+version = "0.4"
+default-features = false
 
 [workspace.dependencies.serde]
 version = "1"

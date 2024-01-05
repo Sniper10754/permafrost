@@ -14,7 +14,7 @@ async fn main() {
 
     let app = Router::new()
         .route("/compile", post(compile_source_code))
-        .nest_service("/", ServeDir::new("../frontend"));
+        .nest_service("/", ServeDir::new("./frontend"));
 
     let listener = TcpListener::bind(SERVER_ADDRESS).await.unwrap();
 
@@ -32,8 +32,6 @@ async fn compile_source_code(body: String) {
         let result = compiler
             .compile_source_code(src_id, CodegenBackends::bytecode_backend())
             .map_err(|_| compiler.explode());
-
-        
     })
     .await
     .unwrap();

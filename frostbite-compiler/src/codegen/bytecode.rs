@@ -1,6 +1,6 @@
 use alloc::{vec, vec::Vec};
 use frostbite_bytecode::{
-    BytecodeVersion, ConstantValue, Function, FunctionIndex, Globals, Instruction, Manifest, Module,
+    ConstantValue, Function, FunctionIndex, Globals, Instruction, Manifest, Module,
 };
 use frostbite_parser::ast::{tokens::BinaryOperatorKind, Spanned};
 use frostbite_reports::ReportContext;
@@ -9,6 +9,10 @@ use slotmap::SecondaryMap;
 use crate::tir::{self, FunctionType, Type, TypedAst, TypedExpression, TypedFunctionExpr};
 
 use super::CodegenBackend;
+
+extern crate std;
+
+use std::dbg;
 
 #[derive(Debug, Default)]
 pub struct BytecodeCodegenBackend {
@@ -210,12 +214,12 @@ impl BytecodeCodegenBackend {
         callee: &tir::Callable,
         arguments_exprs: &[TypedExpression],
     ) {
-        let function_type = callee.calling_function_type();
+        let function_type_index = callee.calling_function_type();
 
         let Type::Function(FunctionType {
             arguments,
             return_type: _,
-        }) = &t_ast.types_arena[function_type]
+        }) = &t_ast.types_arena[function_type_index]
         else {
             unreachable!()
         };
@@ -223,17 +227,14 @@ impl BytecodeCodegenBackend {
         Iterator::zip(arguments.keys(), arguments_exprs.iter()).for_each(
             |(argument_name, argument_expr)| {
                 self.compile_node(t_ast, instructions, globals, argument_expr);
+
                 instructions.push(Instruction::StoreName(argument_name.into()));
             },
         );
 
-        match callee {
-            tir::Callable::Ident(type_index, _) => {
-                let function_index = self.functions[*type_index];
+        let function_index = self.functions[function_type_index];
 
-                instructions.push(Instruction::Call(function_index));
-            }
-        };
+        instructions.push(Instruction::Call(function_index));
     }
 }
 
@@ -243,7 +244,9 @@ impl CodegenBackend for BytecodeCodegenBackend {
     fn codegen(mut self, _report_ctx: &mut ReportContext, t_ast: &TypedAst) -> Self::Output {
         let mut module = Module {
             manifest: Manifest {
-                bytecode_version: BytecodeVersion::Experimental(),
+                bytecode_version: option_env!("PROJECT_VERSION")
+                    .unwrap_or(env!("CARGO_PKG_VERSION"))
+                    .into(),
             },
             globals: Globals::default(),
             body: Vec::new(),

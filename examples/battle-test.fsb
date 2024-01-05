@@ -1,7 +1,3 @@
-compare = function(a: any, b: any) -> bool = {
-    result = a == b;
-
-    return result == b;
-};
+compare = function(a: any, b: any) -> bool = a == b;
 
 compare(1, 2);
