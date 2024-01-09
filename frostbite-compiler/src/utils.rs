@@ -52,6 +52,14 @@ impl<V> Scopes<V> {
             .find_map(|scope| scope.local_mut(name))
     }
 
+    pub fn scopes(&self) -> impl Iterator<Item = &Scope<V>> {
+        self.scopes.iter()
+    }
+
+    pub fn scopes_mut(&mut self) -> impl Iterator<Item = &mut Scope<V>> {
+        self.scopes.iter_mut()
+    }
+
     pub fn len(&self) -> usize {
         self.scopes.len()
     }
