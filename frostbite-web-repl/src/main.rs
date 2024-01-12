@@ -1,7 +1,6 @@
-use axum::{http::StatusCode, routing::post, Router};
-use base64::{engine, Engine};
+use axum::{routing::post, Router};
 use frostbite_compiler::{
-    codegen::CodegenBackends, context::CompilerContext, CompilationResults, Compiler,
+    codegen::CodegenBackends, Compiler,
 };
 use tokio::net::TcpListener;
 use tower_http::services::ServeDir;

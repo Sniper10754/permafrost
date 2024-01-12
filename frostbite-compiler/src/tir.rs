@@ -197,7 +197,7 @@ impl Spannable for Callable {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, derive_more::From)]
 pub enum RefersTo {
     Local(LocalIndex),
     Type(TypeIndex),

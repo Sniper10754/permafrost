@@ -12,13 +12,13 @@ mod stack_value;
 use frames::Frame;
 use stack_value::StackValue;
 
-pub struct FrostbiteVm {
+pub struct VM {
     frames: Vec<Frame>,
     stack: Vec<StackValue>,
     registers: Registers,
 }
 
-impl FrostbiteVm {
+impl VM {
     pub fn new() -> Self {
         Self {
             frames: vec![Frame::default()],
@@ -124,7 +124,10 @@ impl FrostbiteVm {
             Instruction::Add => lhs.clone() + rhs.clone(),
             Instruction::Subtract => lhs.clone() - rhs.clone(),
             Instruction::Multiply => lhs.clone() * rhs.clone(),
-            Instruction::Divide => lhs.clone() / rhs.clone(),
+            Instruction::Divide => match lhs.clone() / rhs.clone() {
+                Ok(value) => value,
+                Err(_) => panic!("Divide by zero error"),
+            },
 
             _ => unreachable!(),
         };
@@ -141,7 +144,7 @@ impl FrostbiteVm {
     }
 }
 
-impl Default for FrostbiteVm {
+impl Default for VM {
     fn default() -> Self {
         Self::new()
     }

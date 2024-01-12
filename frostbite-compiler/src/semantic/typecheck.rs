@@ -10,13 +10,7 @@ use core::{
 };
 
 use alloc::{
-    borrow::Cow,
-    boxed::Box,
-    collections::BTreeMap,
-    format,
-    string::{String, ToString},
-    vec,
-    vec::Vec,
+    borrow::Cow, boxed::Box, collections::BTreeMap, format, string::String, vec, vec::Vec,
 };
 
 use frostbite_parser::ast::{
@@ -240,7 +234,7 @@ impl RecursiveTypechecker {
             Expr::String(_) => Ok(t_ast.types_arena.insert(Type::String)),
             Expr::Bool(_) => Ok(t_ast.types_arena.insert(Type::Bool)),
             Expr::Ident(spanned_str) => {
-                let Some(referred_to) = self.scopes.local(&spanned_str.1).copied() else {
+                let Some(referred_to) = self.scopes.local(spanned_str.value()).copied() else {
                     return Err(TypecheckError::SymbolNotFound(
                         source_id,
                         spanned_str.clone(),
@@ -323,10 +317,10 @@ impl RecursiveTypechecker {
                         .iter()
                         .map(|argument| {
                             (
-                                argument.name.1.clone(),
+                                argument.name.value().clone(),
                                 t_ast
                                     .types_arena
-                                    .insert(argument.type_annotation.1.clone().into()),
+                                    .insert(argument.type_annotation.value().clone().into()),
                             )
                         })
                         .collect(),
@@ -349,7 +343,7 @@ impl RecursiveTypechecker {
                 right_paren: _,
             } => match &**callee {
                 Expr::Ident(spanned_str) => {
-                    let Some(referred_to) = self.scopes.local(&spanned_str.1).copied() else {
+                    let Some(referred_to) = self.scopes.local(spanned_str.value()).copied() else {
                         return Err(TypecheckError::SymbolNotFound(
                             source_id,
                             spanned_str.clone(),
@@ -394,11 +388,9 @@ impl RecursiveTypechecker {
             Expr::Int(value) => TypedExpression::Int(value.as_ref().map(|value| *value)),
             Expr::Float(value) => TypedExpression::Float(value.as_ref().map(|value| *value)),
             Expr::Bool(value) => TypedExpression::Bool(value.as_ref().map(|value| *value)),
-            Expr::String(value) => {
-                TypedExpression::String(value.as_ref().map(|value| value.into()))
-            }
+            Expr::String(value) => TypedExpression::String(value.as_ref().map(Into::into)),
             Expr::Ident(spanned_ident) => {
-                let Some(refers_to) = self.scopes.local(&spanned_ident.1).copied() else {
+                let Some(refers_to) = self.scopes.local(spanned_ident.value()).copied() else {
                     return Err(TypecheckError::SymbolNotFound(
                         source_id,
                         spanned_ident.clone(),
@@ -410,7 +402,7 @@ impl RecursiveTypechecker {
                 TypedExpression::Ident {
                     type_index,
                     refers_to,
-                    str_value: spanned_ident.clone().map(|name| name),
+                    str_value: spanned_ident.clone(),
                 }
             }
             Expr::BinaryOperation { lhs, operator, rhs } => {
@@ -444,7 +436,7 @@ impl RecursiveTypechecker {
                             let local_index = dbg!(t_ast.locals.insert(inferred_type));
 
                             self.scopes
-                                .insert_local(&spanned_str.1, RefersTo::Local(local_index));
+                                .insert_local(spanned_str.value(), RefersTo::Local(local_index));
 
                             local_index
                         }
@@ -468,7 +460,7 @@ impl RecursiveTypechecker {
             }
             Expr::Function {
                 fn_token,
-                name,
+                name: spanned_name,
                 lpt: _,
                 arguments,
                 rpt: _,
@@ -480,7 +472,7 @@ impl RecursiveTypechecker {
                 let fn_type_index = self.infer_type(source_id, expr, t_ast)?;
 
                 self.scopes
-                    .insert_local(&name.1, RefersTo::Type(fn_type_index));
+                    .insert_local(spanned_name.value(), RefersTo::Type(fn_type_index));
 
                 let arguments = arguments
                     .iter()
@@ -489,7 +481,7 @@ impl RecursiveTypechecker {
                              name: Spanned(_, arg_name),
                              type_annotation,
                          }| {
-                            (arg_name.into(), Type::from(type_annotation.1.clone()))
+                            (arg_name.into(), Type::from(type_annotation.value().clone()))
                         },
                     )
                     .map(|(name, ty)| (name, t_ast.types_arena.insert(ty)))
@@ -520,7 +512,7 @@ impl RecursiveTypechecker {
                 let function = TypedFunctionExpr {
                     function_index: fn_type_index,
                     fn_token: fn_token.clone(),
-                    name: name.as_ref().map(Into::into),
+                    name: spanned_name.as_ref().map(Into::into),
                     arguments,
                     return_type,
                     body: Box::new(t_ast_body),
@@ -541,7 +533,7 @@ impl RecursiveTypechecker {
                 right_paren,
             } => match &**callee {
                 Expr::Ident(spanned_str) => {
-                    let Some(refers_to) = self.scopes.local(&spanned_str.1) else {
+                    let Some(refers_to) = self.scopes.local(spanned_str.value()) else {
                         return Err(TypecheckError::SymbolNotFound(
                             source_id,
                             spanned_str.clone(),

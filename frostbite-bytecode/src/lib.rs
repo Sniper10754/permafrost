@@ -29,7 +29,7 @@ pub struct Manifest {
     pub bytecode_version: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[repr(u8)]
 pub enum Instruction {
     /// Loads a constant element into the stack from the constants pool
@@ -78,6 +78,7 @@ pub enum ConstantValue {
     Float(f32),
     String(String),
     Bool(bool),
+
     #[display(fmt = "fn ")]
     Function(Function),
 

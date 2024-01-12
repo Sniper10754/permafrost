@@ -1,5 +1,5 @@
 use alloc::{boxed::Box, string::String, vec::Vec};
-use core::ops::Range;
+use core::ops::{Deref, DerefMut, Range};
 
 use derive_more::From;
 
@@ -104,6 +104,28 @@ pub struct Spanned<T>(pub Span, pub T);
 impl<T> Spanned<T> {
     pub fn new(span: Span, t: T) -> Self {
         Self(span, t)
+    }
+
+    pub fn value(&self) -> &T {
+        &self.1
+    }
+
+    pub fn value_mut(&mut self) -> &mut T {
+        &mut self.1
+    }
+
+    pub fn as_deref<O>(&self) -> &O
+    where
+        T: Deref<Target = O>,
+    {
+        self.1.deref()
+    }
+
+    pub fn as_deref_mut<O>(&mut self) -> &mut O
+    where
+        T: DerefMut<Target = O>,
+    {
+        self.1.deref_mut()
     }
 
     pub fn as_ref(&self) -> Spanned<&T> {
