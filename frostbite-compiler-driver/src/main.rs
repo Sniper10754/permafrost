@@ -7,7 +7,7 @@ use frostbite_reports::{
     diagnostic_printer::{DefaultPrintBackend, DiagnosticPrinter},
     Report,
 };
-use log::{LevelFilter, info};
+use log::{info};
 
 #[derive(clap::Parser)]
 pub struct CliArgs

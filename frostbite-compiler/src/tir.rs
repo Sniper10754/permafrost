@@ -24,7 +24,7 @@ pub mod display
     use frostbite_parser::ast::Spanned;
 
     use super::{FunctionType, TypeKey, TypedAst, TypedExpression};
-    use crate::tir::{Assignable, Callable, RefersTo, Type::*, TypedExpressionKind, TypedFunction};
+    use crate::tir::{Assignable, Callable, Type::*, TypedExpressionKind, TypedFunction};
 
     fn join_map_into_string<K, V>(mut map: impl Iterator<Item = (K, V)>) -> String
     where

@@ -602,7 +602,7 @@ impl RecursiveTypechecker
             ));
         };
 
-        let type_key = refers_to.into_type(t_ast);
+        let _type_key = refers_to.into_type(t_ast);
 
         Ok(TypedExpressionKind::Ident {
             refers_to,
@@ -642,7 +642,7 @@ impl RecursiveTypechecker
         value: &Expr,
     ) -> Result<TypedExpressionKind, TypecheckError>
     {
-        let local_index = match lhs {
+        let _local_index = match lhs {
             Expr::Ident(spanned_str) => match self.scopes.local(&spanned_str.1).copied() {
                 Some(RefersTo::Local(local_index)) => local_index,
                 Some(RefersTo::Type(_)) => {
