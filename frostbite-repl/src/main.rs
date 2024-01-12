@@ -9,7 +9,8 @@ use frostbite_reports::{
 use reedline::{DefaultPrompt, DefaultPromptSegment, Reedline, Signal};
 use std::error::Error;
 
-fn main() -> Result<(), Box<dyn Error>> {
+fn main() -> Result<(), Box<dyn Error>>
+{
     // Create a default reedline object to handle user input
 
     let mut line_editor = Reedline::create()
@@ -67,7 +68,8 @@ fn main() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-fn compile_code(code: &str) -> Result<frostbite_bytecode::Module, CompilerContext> {
+fn compile_code(code: &str) -> Result<frostbite_bytecode::Module, CompilerContext>
+{
     let mut compiler = Compiler::new();
 
     let src_id = compiler.add_source("REPL".to_string(), code);

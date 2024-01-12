@@ -6,7 +6,8 @@ use tower_http::services::ServeDir;
 const SERVER_ADDRESS: &str = "0.0.0.0:63219";
 
 #[tokio::main]
-async fn main() {
+async fn main()
+{
     tracing_subscriber::fmt::init();
 
     let app = Router::new()
@@ -20,7 +21,8 @@ async fn main() {
     axum::serve(listener, app).await.unwrap();
 }
 
-async fn compile_source_code(body: String) {
+async fn compile_source_code(body: String)
+{
     tokio::task::spawn_blocking(move || {
         let mut compiler = Compiler::new();
 

@@ -1,9 +1,13 @@
-#![allow(clippy::single_match)]
+#![allow(clippy::too_many_arguments)]
+
+extern crate std;
 
 use core::{
     cmp::Ordering::{Equal, Greater, Less},
     ops::Range,
 };
+
+use std::dbg;
 
 use alloc::{
     borrow::Cow, boxed::Box, collections::BTreeMap, format, string::String, vec, vec::Vec,
@@ -29,8 +33,10 @@ use crate::{
 };
 
 #[derive(Debug)]
-pub enum TypecheckError {
-    TypeMismatch {
+pub enum TypecheckError
+{
+    TypeMismatch
+    {
         source_id: SourceId,
         span: Range<usize>,
 
@@ -38,7 +44,8 @@ pub enum TypecheckError {
         found: Cow<'static, str>,
     },
     SymbolNotFound(SourceId, Spanned<String>),
-    IncompatibleOperands {
+    IncompatibleOperands
+    {
         source_id: SourceId,
         span: Range<usize>,
 
@@ -48,28 +55,33 @@ pub enum TypecheckError {
     CannotAssignTo(SourceId, Range<usize>),
     CannotCallNonIdent(SourceId, Range<usize>),
     CannotCallNonFunction(SourceId, Range<usize>),
-    TooManyArguments {
+    TooManyArguments
+    {
         source_id: SourceId,
         span: Range<usize>,
 
         call_arguments_len: usize,
         function_arguments_len: usize,
     },
-    NotEnoughArguments {
+    NotEnoughArguments
+    {
         source_id: SourceId,
         span: Range<usize>,
 
         call_arguments_len: usize,
         function_arguments_len: usize,
     },
-    FunctionDoesntReturn {
+    FunctionDoesntReturn
+    {
         source_id: SourceId,
         faulty_branch_position: Range<usize>,
     },
 }
 
-impl IntoReport for TypecheckError {
-    fn into_report(self) -> Report {
+impl IntoReport for TypecheckError
+{
+    fn into_report(self) -> Report
+    {
         match self {
             TypecheckError::TypeMismatch {
                 source_id,
@@ -172,7 +184,11 @@ impl IntoReport for TypecheckError {
     }
 }
 
-pub fn check_types(compiler_ctx: &mut CompilerContext, source_id: SourceId) {
+pub fn check_types(
+    compiler_ctx: &mut CompilerContext,
+    source_id: SourceId,
+)
+{
     let mut rts = RecursiveTypechecker::new();
     let mut typed_ast = TypedAst::default();
 
@@ -188,18 +204,26 @@ pub fn check_types(compiler_ctx: &mut CompilerContext, source_id: SourceId) {
     compiler_ctx.t_asts.insert(source_id, typed_ast);
 }
 
-struct RecursiveTypechecker {
+struct RecursiveTypechecker
+{
     scopes: Scopes<RefersTo>,
 }
 
-impl RecursiveTypechecker {
-    fn new() -> Self {
+impl RecursiveTypechecker
+{
+    fn new() -> Self
+    {
         Self {
             scopes: Scopes::new(),
         }
     }
 
-    fn unify(t_ast: &mut TypedAst, a: TypeKey, b: TypeKey) -> Result<(), ()> {
+    fn unify(
+        t_ast: &mut TypedAst,
+        a: TypeKey,
+        b: TypeKey,
+    ) -> Result<(), ()>
+    {
         match (t_ast.types_arena[a].clone(), t_ast.types_arena[b].clone()) {
             (Type::Object(left), Type::Object(right)) if left == right => Ok(()),
 
@@ -230,7 +254,8 @@ impl RecursiveTypechecker {
         source_id: SourceId,
         expr: &Expr,
         t_ast: &mut TypedAst,
-    ) -> Result<TypeKey, TypecheckError> {
+    ) -> Result<TypeKey, TypecheckError>
+    {
         match expr {
             Expr::Int(_) => Ok(t_ast.types_arena.insert(Type::Int)),
             Expr::Float(_) => Ok(t_ast.types_arena.insert(Type::Float)),
@@ -277,7 +302,7 @@ impl RecursiveTypechecker {
                         | (Type::Int, Type::Float),
                     ) => Ok(t_ast.types_arena.insert(Type::Float)),
 
-                    (BinaryOperatorKind::Equal, (_, _)) => {
+                    (BinaryOperatorKind::Equal, (..)) => {
                         if Self::unify(t_ast, lhs_type_key, rhs_type_key).is_ok() {
                             Ok(t_ast.types_arena.insert(Type::Bool))
                         } else {
@@ -314,15 +339,13 @@ impl RecursiveTypechecker {
                 equals: _,
                 body: _,
             } => {
+                // Memoize the function inferring
                 if let Some(Spanned(_, name)) = name {
-                    match self.scopes.local(name) {
-                        Some(RefersTo::Type(type_key)) => {
-                            if let Type::Function(_) = &t_ast.types_arena[*type_key] {
-                                return Ok(*type_key);
-                            }
+                    if let Some(refers_to) = self.scopes.local(name) {
+                        let type_key = refers_to.into_type(t_ast);
+                        if let Type::Function(_) = &t_ast.types_arena[type_key] {
+                            return Ok(type_key);
                         }
-
-                        _ => (),
                     }
                 }
 
@@ -398,7 +421,8 @@ impl RecursiveTypechecker {
         source_id: SourceId,
         expr: &Expr,
         t_ast: &mut TypedAst,
-    ) -> Result<TypedExpression, TypecheckError> {
+    ) -> Result<TypedExpression, TypecheckError>
+    {
         let old_len = self.scopes.len();
 
         let t_expr = match expr {
@@ -476,7 +500,8 @@ impl RecursiveTypechecker {
         source_id: SourceId,
         t_ast: &mut TypedAst,
         function: &TypedFunctionExpr,
-    ) -> Result<(), TypecheckError> {
+    ) -> Result<(), TypecheckError>
+    {
         self.check_fn_body_branches(source_id, &function.body)?;
         Self::typecheck_fn_body_returns(source_id, t_ast, function.return_type, &function.body)?;
 
@@ -488,7 +513,8 @@ impl RecursiveTypechecker {
         t_ast: &mut TypedAst,
         expected_type: TypeKey,
         expr: &TypedExpression,
-    ) -> Result<(), TypecheckError> {
+    ) -> Result<(), TypecheckError>
+    {
         use TypedExpression::*;
 
         match expr {
@@ -519,7 +545,8 @@ impl RecursiveTypechecker {
         &mut self,
         source_id: SourceId,
         expr: &TypedExpression,
-    ) -> Result<(), TypecheckError> {
+    ) -> Result<(), TypecheckError>
+    {
         if let Err(span) = Self::check_branches_for_return(expr) {
             Err(TypecheckError::FunctionDoesntReturn {
                 source_id,
@@ -530,7 +557,8 @@ impl RecursiveTypechecker {
         }
     }
 
-    fn check_branches_for_return(expr: &TypedExpression) -> Result<(), Range<usize>> {
+    fn check_branches_for_return(expr: &TypedExpression) -> Result<(), Range<usize>>
+    {
         match expr {
             Return(..) => Ok(()),
 
@@ -559,7 +587,8 @@ impl RecursiveTypechecker {
         source_id: SourceId,
         span: &Range<usize>,
         ident: &str,
-    ) -> Result<TypedExpression, TypecheckError> {
+    ) -> Result<TypedExpression, TypecheckError>
+    {
         let Some(refers_to) = self.scopes.local(ident).copied() else {
             return Err(TypecheckError::SymbolNotFound(
                 source_id,
@@ -584,7 +613,8 @@ impl RecursiveTypechecker {
         lhs: &Expr,
         operator: Operator,
         rhs: &Expr,
-    ) -> Result<TypedExpression, TypecheckError> {
+    ) -> Result<TypedExpression, TypecheckError>
+    {
         self.infer_type(source_id, expr, t_ast)?;
 
         let (t_ast_lhs, t_ast_rhs) = (
@@ -605,7 +635,8 @@ impl RecursiveTypechecker {
         source_id: SourceId,
         lhs: &Expr,
         value: &Expr,
-    ) -> Result<TypedExpression, TypecheckError> {
+    ) -> Result<TypedExpression, TypecheckError>
+    {
         let local_index = match lhs {
             Expr::Ident(spanned_str) => match self.scopes.local(&spanned_str.1).copied() {
                 Some(RefersTo::Local(local_index)) => local_index,
@@ -615,7 +646,7 @@ impl RecursiveTypechecker {
                 None => {
                     let inferred_type = self.infer_type(source_id, value, t_ast)?;
 
-                    let local_index = t_ast.locals.insert(inferred_type);
+                    let local_index = dbg!(t_ast.locals.insert(dbg!(inferred_type)));
 
                     self.scopes
                         .insert_local(spanned_str.value(), RefersTo::Local(local_index));
@@ -651,8 +682,9 @@ impl RecursiveTypechecker {
         arguments: &[Argument],
         return_type_annotation: Option<Spanned<TypeAnnotation>>,
         body: &Expr,
-    ) -> Result<TypedExpression, TypecheckError> {
-        let fn_type_key = self.infer_type(source_id, expr, t_ast)?;
+    ) -> Result<TypedExpression, TypecheckError>
+    {
+        let fn_type_key = dbg!(self.infer_type(source_id, expr, t_ast)?);
 
         if let Some(name) = name.as_ref() {
             self.scopes
@@ -695,7 +727,6 @@ impl RecursiveTypechecker {
         self.scopes.leave_scope();
 
         let function = TypedFunctionExpr {
-            function_index: fn_type_key,
             fn_token: fn_token.clone(),
             name,
             arguments,
@@ -721,7 +752,8 @@ impl RecursiveTypechecker {
         left_paren: &LeftParenthesisToken,
         arguments: &[Expr],
         right_paren: &RightParenthesisToken,
-    ) -> Result<TypedExpression, TypecheckError> {
+    ) -> Result<TypedExpression, TypecheckError>
+    {
         let call_arguments = arguments;
 
         match callee {
@@ -816,7 +848,8 @@ impl RecursiveTypechecker {
         source_id: SourceId,
         return_token: ReturnToken,
         ret_expr: Option<&Expr>,
-    ) -> Result<TypedExpression, TypecheckError> {
+    ) -> Result<TypedExpression, TypecheckError>
+    {
         let return_value_type = if let Some(ret_expr) = ret_expr {
             self.infer_type(source_id, ret_expr, t_ast)?
         } else {
@@ -845,7 +878,8 @@ impl RecursiveTypechecker {
         left_brace: &LeftBraceToken,
         expressions: &[Expr],
         right_brace: &RightBraceToken,
-    ) -> Result<TypedExpression, TypecheckError> {
+    ) -> Result<TypedExpression, TypecheckError>
+    {
         Ok(TypedExpression::Block {
             left_brace: left_brace.clone(),
             expressions: expressions

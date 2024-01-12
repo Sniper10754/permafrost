@@ -10,7 +10,8 @@ use crate::{
 
 pub struct AriadnePrintBackend;
 
-mod utils {
+mod utils
+{
     use super::std;
 
     use std::{borrow::ToOwned, boxed::Box, fmt, fmt::Debug, io, string::String};
@@ -19,12 +20,18 @@ mod utils {
 
     use crate::sourcemap::{SourceId, SourceMap};
 
-    pub struct FmtWriteAsIoWrite<'a, W: fmt::Write + ?Sized> {
+    pub struct FmtWriteAsIoWrite<'a, W: fmt::Write + ?Sized>
+    {
         pub destination: &'a mut W,
     }
 
-    impl<'a, W: fmt::Write + ?Sized> io::Write for FmtWriteAsIoWrite<'a, W> {
-        fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+    impl<'a, W: fmt::Write + ?Sized> io::Write for FmtWriteAsIoWrite<'a, W>
+    {
+        fn write(
+            &mut self,
+            buf: &[u8],
+        ) -> io::Result<usize>
+        {
             let uft8_string = String::from_utf8_lossy(buf);
 
             self.destination
@@ -34,20 +41,24 @@ mod utils {
             Ok(buf.len())
         }
 
-        fn flush(&mut self) -> io::Result<()> {
+        fn flush(&mut self) -> io::Result<()>
+        {
             Ok(())
         }
     }
 
     #[allow(clippy::type_complexity)]
-    pub struct SourceMapCache<'src_map> {
+    pub struct SourceMapCache<'src_map>
+    {
         fn_cache:
             FnCache<SourceId, Box<dyn Fn(&SourceId) -> Result<String, Box<dyn Debug>> + 'src_map>>,
         src_map: &'src_map SourceMap,
     }
 
-    impl<'src_map> SourceMapCache<'src_map> {
-        pub fn new(src_map: &'src_map SourceMap) -> Self {
+    impl<'src_map> SourceMapCache<'src_map>
+    {
+        pub fn new(src_map: &'src_map SourceMap) -> Self
+        {
             Self {
                 fn_cache: FnCache::new(Box::new(|id: &_| {
                     let (_, source) = src_map.iter().find(|(src_id, _)| *src_id == *id).unwrap();
@@ -60,12 +71,21 @@ mod utils {
         }
     }
 
-    impl<'src_map> Cache<SourceId> for SourceMapCache<'src_map> {
-        fn fetch(&mut self, id: &SourceId) -> Result<&ariadne::Source, Box<dyn fmt::Debug + '_>> {
+    impl<'src_map> Cache<SourceId> for SourceMapCache<'src_map>
+    {
+        fn fetch(
+            &mut self,
+            id: &SourceId,
+        ) -> Result<&ariadne::Source, Box<dyn fmt::Debug + '_>>
+        {
             self.fn_cache.fetch(id)
         }
 
-        fn display<'a>(&self, id: &'a SourceId) -> Option<Box<dyn fmt::Display + 'a>> {
+        fn display<'a>(
+            &self,
+            id: &'a SourceId,
+        ) -> Option<Box<dyn fmt::Display + 'a>>
+        {
             self.src_map
                 .get(*id)
                 .map(|source_description| Box::new(source_description.url.clone()))
@@ -74,12 +94,14 @@ mod utils {
     }
 }
 
-impl PrintBackend for AriadnePrintBackend {
+impl PrintBackend for AriadnePrintBackend
+{
     fn write_report_to<'id, W: fmt::Write + ?Sized>(
         destination: &mut W,
         source_map: &SourceMap,
         diagnostic: &Diagnostic,
-    ) -> Result<(), diagnostic_printer::PrintingError> {
+    ) -> Result<(), diagnostic_printer::PrintingError>
+    {
         let Diagnostic {
             level,
             span,
@@ -132,8 +154,10 @@ impl PrintBackend for AriadnePrintBackend {
     }
 }
 
-impl From<Level> for ariadne::ReportKind<'static> {
-    fn from(value: Level) -> Self {
+impl From<Level> for ariadne::ReportKind<'static>
+{
+    fn from(value: Level) -> Self
+    {
         match value {
             Level::Error => ariadne::ReportKind::Error,
             Level::Warn => ariadne::ReportKind::Warning,

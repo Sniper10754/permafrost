@@ -6,7 +6,10 @@ use crate::{Instruction, Module};
 const INSTRUCTION_PADDING: usize = 15;
 const CONSTANT_PADDING: usize = 20;
 
-pub fn print_bytecode<W>(w: &mut W, module: &Module) -> fmt::Result
+pub fn print_bytecode<W>(
+    w: &mut W,
+    module: &Module,
+) -> fmt::Result
 where
     W: fmt::Write,
 {
@@ -66,7 +69,11 @@ where
     Ok(())
 }
 
-fn print_instruction<W>(w: &mut W, instruction: &Instruction, module: &Module) -> fmt::Result
+fn print_instruction<W>(
+    w: &mut W,
+    instruction: &Instruction,
+    module: &Module,
+) -> fmt::Result
 where
     W: fmt::Write,
 {

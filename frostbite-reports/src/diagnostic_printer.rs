@@ -14,7 +14,8 @@ pub type DefaultPrintBackend = ariadne::AriadnePrintBackend;
 compile_error!("No backend selected");
 
 #[derive(Debug, Display, From)]
-pub enum PrintingError {
+pub enum PrintingError
+{
     Fmt(core::fmt::Error),
 
     Other(&'static str),
@@ -22,8 +23,10 @@ pub enum PrintingError {
 
 pub struct DiagnosticPrinter<'output, O: fmt::Write>(&'output mut O);
 
-impl<'output, O: fmt::Write> DiagnosticPrinter<'output, O> {
-    pub fn new(output: &'output mut O) -> Self {
+impl<'output, O: fmt::Write> DiagnosticPrinter<'output, O>
+{
+    pub fn new(output: &'output mut O) -> Self
+    {
         Self(output)
     }
 
@@ -33,12 +36,14 @@ impl<'output, O: fmt::Write> DiagnosticPrinter<'output, O> {
         self,
         source_map: &SourceMap,
         report: &Diagnostic,
-    ) -> Result<(), PrintingError> {
+    ) -> Result<(), PrintingError>
+    {
         B::write_report_to(self.0, source_map, report)
     }
 }
 
-pub trait PrintBackend {
+pub trait PrintBackend
+{
     fn write_report_to<W: Write>(
         destination: &mut W,
         source_map: &SourceMap,

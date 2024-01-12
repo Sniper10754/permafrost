@@ -3,15 +3,18 @@ use std::{fs, path::PathBuf};
 use color_eyre::eyre::{self};
 
 #[derive(clap::Parser)]
-enum CliArgs {
+enum CliArgs
+{
     #[command(about = "Disassemble a file")]
-    Disassemble {
+    Disassemble
+    {
         #[arg(help = "The file path to disassemble")]
         filepath: PathBuf,
     },
 }
 
-fn main() -> eyre::Result<()> {
+fn main() -> eyre::Result<()>
+{
     let cil_args: CliArgs = clap::Parser::parse();
 
     color_eyre::install()?;

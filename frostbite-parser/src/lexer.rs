@@ -5,7 +5,8 @@ use logos::{Logos, Span};
 
 use crate::ast::{tokens::BinaryOperatorKind, Spanned};
 
-mod helpers {
+mod helpers
+{
     use alloc::string::String;
 
     use logos::Lexer;
@@ -15,14 +16,16 @@ mod helpers {
 
     use super::{LexerErrorKind, Token};
 
-    pub fn parse_number<N: Num>(lexer: &Lexer<'_, Token>) -> Result<N, LexerErrorKind> {
+    pub fn parse_number<N: Num>(lexer: &Lexer<'_, Token>) -> Result<N, LexerErrorKind>
+    {
         let slice = lexer.slice();
 
         N::from_str_radix(slice, 10)
             .map_err(|_| LexerErrorKind::NumberTooBig { span: lexer.span() })
     }
 
-    pub fn parse_operator(lexer: &Lexer<'_, Token>) -> BinaryOperatorKind {
+    pub fn parse_operator(lexer: &Lexer<'_, Token>) -> BinaryOperatorKind
+    {
         match lexer.slice() {
             "+" => BinaryOperatorKind::Add,
             "-" => BinaryOperatorKind::Sub,
@@ -34,7 +37,8 @@ mod helpers {
         }
     }
 
-    pub fn unquote_str(lexer: &Lexer<'_, Token>) -> String {
+    pub fn unquote_str(lexer: &Lexer<'_, Token>) -> String
+    {
         let input = lexer.slice();
 
         input[1..(input.len() - 1)].into()
@@ -44,27 +48,33 @@ mod helpers {
 pub type SpannedToken = Spanned<Token>;
 
 #[derive(Debug, PartialEq, Clone)]
-pub struct LexerError {
+pub struct LexerError
+{
     source_id: SourceId,
     kind: LexerErrorKind,
 }
 
 #[derive(Debug, PartialEq, Clone, Default)]
-pub enum LexerErrorKind {
-    NumberTooBig {
-        span: Span,
+pub enum LexerErrorKind
+{
+    NumberTooBig
+    {
+        span: Span
     },
 
-    UnknownToken {
-        span: Span,
+    UnknownToken
+    {
+        span: Span
     },
 
     #[default]
     GenericLexerError,
 }
 
-impl IntoReport for LexerError {
-    fn into_report(self) -> frostbite_reports::Report {
+impl IntoReport for LexerError
+{
+    fn into_report(self) -> frostbite_reports::Report
+    {
         let source_id = self.source_id;
 
         let location;
@@ -104,7 +114,8 @@ impl IntoReport for LexerError {
 #[derive(Logos, Debug, Clone, PartialEq)]
 #[logos(error = LexerErrorKind)]
 #[logos(skip r"[\t\n\r ]+")]
-pub enum Token {
+pub enum Token
+{
     #[regex("-?[0-9]+", helpers::parse_number::<i32>)]
     Int(i32),
 
@@ -164,27 +175,36 @@ pub enum Token {
 }
 
 #[derive(Debug, Clone)]
-pub struct TokenStream {
+pub struct TokenStream
+{
     tokens: VecDeque<SpannedToken>,
     index: usize,
 }
 
-impl TokenStream {
-    pub fn with_vec_deque(tokens: impl Into<VecDeque<SpannedToken>>) -> Self {
+impl TokenStream
+{
+    pub fn with_vec_deque(tokens: impl Into<VecDeque<SpannedToken>>) -> Self
+    {
         let tokens = tokens.into();
         Self { tokens, index: 0 }
     }
 
-    pub fn with_iter(tokens: impl IntoIterator<Item = SpannedToken>) -> Self {
+    pub fn with_iter(tokens: impl IntoIterator<Item = SpannedToken>) -> Self
+    {
         let tokens = tokens.into_iter().collect::<VecDeque<_>>();
         Self { tokens, index: 0 }
     }
 
-    pub fn skip_token(&mut self) -> Option<SpannedToken> {
+    pub fn skip_token(&mut self) -> Option<SpannedToken>
+    {
         self.next()
     }
 
-    pub fn skip_tokens(stream: &mut TokenStream, count: usize) -> Vec<SpannedToken> {
+    pub fn skip_tokens(
+        stream: &mut TokenStream,
+        count: usize,
+    ) -> Vec<SpannedToken>
+    {
         let mut taken_tokens = vec![];
 
         for _ in 0..count {
@@ -199,7 +219,8 @@ impl TokenStream {
     }
 
     #[allow(clippy::should_implement_trait)]
-    pub fn next(&mut self) -> Option<SpannedToken> {
+    pub fn next(&mut self) -> Option<SpannedToken>
+    {
         if self.index < self.tokens.len() {
             let token = self.tokens[self.index].clone();
 
@@ -212,11 +233,15 @@ impl TokenStream {
     }
 
     #[must_use]
-    pub fn peek(&self) -> Option<&SpannedToken> {
+    pub fn peek(&self) -> Option<&SpannedToken>
+    {
         self.tokens.get(self.index)
     }
 
-    pub fn take_while<P>(stream: &mut TokenStream, predicate: P) -> Vec<SpannedToken>
+    pub fn take_while<P>(
+        stream: &mut TokenStream,
+        predicate: P,
+    ) -> Vec<SpannedToken>
     where
         P: Fn(&SpannedToken) -> bool,
     {
@@ -236,7 +261,8 @@ impl TokenStream {
     }
 
     #[must_use]
-    pub fn previous(&self) -> Option<SpannedToken> {
+    pub fn previous(&self) -> Option<SpannedToken>
+    {
         if self.index > 0 {
             Some(self.tokens[self.index - 1].clone())
         } else {
@@ -245,7 +271,12 @@ impl TokenStream {
     }
 }
 
-pub fn tokenize(report_ctx: &mut ReportContext, source_id: SourceId, input: &str) -> TokenStream {
+pub fn tokenize(
+    report_ctx: &mut ReportContext,
+    source_id: SourceId,
+    input: &str,
+) -> TokenStream
+{
     let lexer = Token::lexer(input).spanned();
     let mut tokens = Vec::new();
 

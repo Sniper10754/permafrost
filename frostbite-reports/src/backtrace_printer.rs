@@ -5,14 +5,17 @@ use alloc::{format, string::ToString};
 use crate::{sourcemap::SourceMap, utils::get_line_from_location, Backtrace};
 
 #[derive(Debug, Hash, PartialEq, Eq, PartialOrd, Ord)]
-pub struct BacktracePrinter<'a, W: fmt::Write> {
+pub struct BacktracePrinter<'a, W: fmt::Write>
+{
     use_colors: bool,
 
     output: &'a mut W,
 }
 
-impl<'a, W: fmt::Write> BacktracePrinter<'a, W> {
-    pub fn new(output: &'a mut W) -> Self {
+impl<'a, W: fmt::Write> BacktracePrinter<'a, W>
+{
+    pub fn new(output: &'a mut W) -> Self
+    {
         BacktracePrinter {
             use_colors: true,
 
@@ -20,7 +23,12 @@ impl<'a, W: fmt::Write> BacktracePrinter<'a, W> {
         }
     }
 
-    pub fn print(&mut self, backtrace: &Backtrace, source_map: &SourceMap) -> fmt::Result {
+    pub fn print(
+        &mut self,
+        backtrace: &Backtrace,
+        source_map: &SourceMap,
+    ) -> fmt::Result
+    {
         writeln!(self.output, "{}: {}", backtrace.reason, backtrace.message)?;
 
         for frame in &backtrace.frames {

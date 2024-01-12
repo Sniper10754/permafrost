@@ -22,7 +22,8 @@ use lexer::{Token, TokenStream};
 
 use crate::{ast::tokens::FunctionToken, error::Error};
 
-mod utils {
+mod utils
+{
     #[macro_export]
     macro_rules! consume_token {
         (parser: $parser:expr, token: $token:pat, description: $token_description:expr) => {
@@ -67,19 +68,22 @@ mod utils {
 
 /// A Backend-agnostic wrapper around lalrpop
 #[derive(Debug)]
-pub struct Parser<'report_context> {
+pub struct Parser<'report_context>
+{
     token_stream: TokenStream,
     report_ctx: &'report_context mut ReportContext,
     source_id: SourceId,
 }
 
-impl<'report_context> Parser<'report_context> {
+impl<'report_context> Parser<'report_context>
+{
     #[must_use]
     pub fn with_tokenstream(
         report_ctx: &'report_context mut ReportContext,
         token_stream: TokenStream,
         source_id: SourceId,
-    ) -> Self {
+    ) -> Self
+    {
         Self {
             token_stream,
             report_ctx,
@@ -87,7 +91,8 @@ impl<'report_context> Parser<'report_context> {
         }
     }
 
-    pub fn parse(mut self) -> Program {
+    pub fn parse(mut self) -> Program
+    {
         let mut exprs = vec![];
 
         while self.token_stream.peek().is_some() {
@@ -121,7 +126,8 @@ impl<'report_context> Parser<'report_context> {
         Program { exprs }
     }
 
-    pub fn parse_expr(&mut self) -> Option<Expr> {
+    pub fn parse_expr(&mut self) -> Option<Expr>
+    {
         let mut expression = self.parse_atom_expr()?;
 
         loop {
@@ -212,7 +218,8 @@ impl<'report_context> Parser<'report_context> {
         Some(expression)
     }
 
-    fn parse_atom_expr(&mut self) -> Option<Expr> {
+    fn parse_atom_expr(&mut self) -> Option<Expr>
+    {
         match self.token_stream.next() {
             Some(Spanned(span, Token::Int(value))) => Some(Expr::Int(Spanned(span, value))),
             Some(Spanned(span, Token::Float(value))) => Some(Expr::Float(Spanned(span, value))),
@@ -428,7 +435,8 @@ impl<'report_context> Parser<'report_context> {
         }
     }
 
-    fn parse_type_annotation(&mut self) -> Option<Spanned<TypeAnnotation>> {
+    fn parse_type_annotation(&mut self) -> Option<Spanned<TypeAnnotation>>
+    {
         match self.token_stream.next() {
             Some(Spanned(span, Token::Ident(ident))) if ident == "int" => {
                 Some(Spanned(span, TypeAnnotation::Int))
@@ -476,7 +484,8 @@ impl<'report_context> Parser<'report_context> {
 }
 
 #[cfg(test)]
-mod tests {
+mod tests
+{
     #![allow(unused_extern_crates)]
 
     extern crate std;
@@ -516,7 +525,8 @@ mod tests {
     }
 
     #[test]
-    fn test_parser_operation() {
+    fn test_parser_operation()
+    {
         let (report_ctx, program) = parser!("1 + 2 + 3");
 
         assert!(report_ctx.is_empty());
@@ -544,7 +554,8 @@ mod tests {
     }
 
     #[test]
-    fn test_parser_assign() {
+    fn test_parser_assign()
+    {
         let (report_ctx, parsed) = parser!("a = 1;");
 
         assert!(report_ctx.is_empty());
@@ -562,7 +573,8 @@ mod tests {
     }
 
     #[test]
-    fn test_parser_function() {
+    fn test_parser_function()
+    {
         let (report_ctx, parsed) = parser!("function test(x: int, y: int) = x + y;");
 
         assert!(report_ctx.is_empty());
@@ -602,7 +614,8 @@ mod tests {
     }
 
     #[test]
-    fn test_parser_function_with_return() {
+    fn test_parser_function_with_return()
+    {
         let (report_ctx, parsed) = parser!("function test(x: int, y: int) -> int = (x * y) + y;");
 
         assert!(report_ctx.is_empty());
@@ -642,7 +655,8 @@ mod tests {
     }
 
     #[test]
-    fn test_parser_call() {
+    fn test_parser_call()
+    {
         let (report_ctx, parsed) = parser!("bilo(a);");
 
         assert!(report_ctx.is_empty());
@@ -661,7 +675,8 @@ mod tests {
     }
 
     #[test]
-    fn test_parser_block() {
+    fn test_parser_block()
+    {
         let (report_ctx, parsed) = parser!(
             "{
             a;

@@ -8,7 +8,8 @@ use slotmap::SecondaryMap;
 use crate::{intrinsic::IntrinsicContext, tir::TypedAst};
 
 #[derive(Debug, Default)]
-pub struct CompilerContext {
+pub struct CompilerContext
+{
     pub src_map: SourceMap,
     pub report_ctx: ReportContext,
     pub intrinsic_ctx: IntrinsicContext,
@@ -17,12 +18,14 @@ pub struct CompilerContext {
     pub t_asts: SecondaryMap<SourceId, TypedAst>,
 }
 
-impl CompilerContext {
+impl CompilerContext
+{
     pub fn new(
         src_map: SourceMap,
         report_ctx: ReportContext,
         intrinsic_ctx: IntrinsicContext,
-    ) -> Self {
+    ) -> Self
+    {
         Self {
             src_map,
             report_ctx,

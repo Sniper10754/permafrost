@@ -23,24 +23,29 @@ use cfg_if::cfg_if;
 
 use derive_more::Display;
 
-pub trait IntoReport {
+pub trait IntoReport
+{
     fn into_report(self) -> Report;
 }
 
-impl IntoReport for Infallible {
-    fn into_report(self) -> Report {
+impl IntoReport for Infallible
+{
+    fn into_report(self) -> Report
+    {
         match self {}
     }
 }
 
 #[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub enum Report {
+pub enum Report
+{
     Diagnostic(Diagnostic),
     Backtrace(Backtrace),
 }
 
-impl Report {
+impl Report
+{
     pub fn new_diagnostic(
         level: Level,
         location: Range<usize>,
@@ -49,7 +54,8 @@ impl Report {
         description: Option<impl Into<Cow<'static, str>>>,
         infos: impl IntoIterator<Item = Label>,
         helps: impl IntoIterator<Item = Label>,
-    ) -> Self {
+    ) -> Self
+    {
         Self::Diagnostic(Diagnostic {
             level,
             span: location,
@@ -65,7 +71,8 @@ impl Report {
         reason: impl Into<Cow<'static, str>>,
         message: impl Into<Cow<'static, str>>,
         frames: Vec<Frame>,
-    ) -> Self {
+    ) -> Self
+    {
         Self::Backtrace(Backtrace {
             reason: reason.into(),
             message: message.into(),
@@ -76,7 +83,8 @@ impl Report {
 
 #[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct Diagnostic {
+pub struct Diagnostic
+{
     level: Level,
     span: Range<usize>,
     source_id: SourceId,
@@ -88,18 +96,21 @@ pub struct Diagnostic {
 
 #[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct Label {
+pub struct Label
+{
     pub info: Cow<'static, str>,
     pub span: Option<Range<usize>>,
     pub src_id: SourceId,
 }
 
-impl Label {
+impl Label
+{
     pub fn new(
         info: impl Into<Cow<'static, str>>,
         location: impl Into<Option<Range<usize>>>,
         src_id: impl Into<SourceId>,
-    ) -> Self {
+    ) -> Self
+    {
         Self {
             info: info.into(),
             span: location.into(),
@@ -110,7 +121,8 @@ impl Label {
 
 #[derive(Debug, Display, Clone, Copy, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub enum Level {
+pub enum Level
+{
     Error,
     Warn,
     Info,
@@ -118,7 +130,8 @@ pub enum Level {
 
 #[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct Backtrace {
+pub struct Backtrace
+{
     pub reason: Cow<'static, str>,
     pub message: Cow<'static, str>,
     pub frames: Vec<Frame>,
@@ -126,26 +139,31 @@ pub struct Backtrace {
 
 #[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct Frame {
+pub struct Frame
+{
     pub source_id: SourceId,
     pub position: Option<Position>,
 }
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq, derive_more::From)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub enum Position {
+pub enum Position
+{
     Span(Range<usize>),
     Line(usize),
 }
 
 #[derive(Debug, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct ReportContext {
+pub struct ReportContext
+{
     reports: Vec<Report>,
 }
 
-impl ReportContext {
-    pub fn has_errors(&self) -> bool {
+impl ReportContext
+{
+    pub fn has_errors(&self) -> bool
+    {
         self.reports.iter().any(|report| match report {
             Report::Diagnostic(diagnostic) => diagnostic.level == Level::Error,
             Report::Backtrace(_) => true,
@@ -153,22 +171,31 @@ impl ReportContext {
     }
 }
 
-impl core::ops::DerefMut for ReportContext {
-    fn deref_mut(&mut self) -> &mut Self::Target {
+impl core::ops::DerefMut for ReportContext
+{
+    fn deref_mut(&mut self) -> &mut Self::Target
+    {
         &mut self.reports
     }
 }
 
-impl core::ops::Deref for ReportContext {
+impl core::ops::Deref for ReportContext
+{
     type Target = Vec<Report>;
 
-    fn deref(&self) -> &Self::Target {
+    fn deref(&self) -> &Self::Target
+    {
         &self.reports
     }
 }
 
-impl Extend<Report> for ReportContext {
-    fn extend<T: IntoIterator<Item = Report>>(&mut self, iter: T) {
+impl Extend<Report> for ReportContext
+{
+    fn extend<T: IntoIterator<Item = Report>>(
+        &mut self,
+        iter: T,
+    )
+    {
         self.reports.extend(iter)
     }
 }

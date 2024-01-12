@@ -6,28 +6,34 @@ use frostbite_reports::{sourcemap::SourceId, IntoReport, Label, Level, Report};
 use crate::ast::Span;
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct Error {
+pub struct Error
+{
     pub kind: ErrorKind,
     pub source_id: SourceId,
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub enum ErrorKind {
-    UnrecognizedToken {
-        span: Span,
-        expected: &'static str,
+pub enum ErrorKind
+{
+    UnrecognizedToken
+    {
+        span: Span, expected: &'static str
     },
-    UnrecognizedEof {
+    UnrecognizedEof
+    {
         expected: &'static [&'static str],
         previous_element_span: Span,
     },
-    NumberTooBig {
-        span: Span,
+    NumberTooBig
+    {
+        span: Span
     },
 }
 
-impl IntoReport for Error {
-    fn into_report(self) -> frostbite_reports::Report {
+impl IntoReport for Error
+{
+    fn into_report(self) -> frostbite_reports::Report
+    {
         let source_id = self.source_id;
 
         match self.kind {

@@ -20,10 +20,10 @@ pub mod context;
 pub mod intrinsic;
 pub mod semantic;
 pub mod tir;
+pub mod utils;
 
-mod utils;
-
-fn bail_on_errors(report_ctx: &ReportContext) -> Result<(), CompilerError> {
+fn bail_on_errors(report_ctx: &ReportContext) -> Result<(), CompilerError>
+{
     if report_ctx.has_errors() {
         Err(CompilerError)
     } else {
@@ -35,21 +35,30 @@ fn bail_on_errors(report_ctx: &ReportContext) -> Result<(), CompilerError> {
 pub struct CompilerError;
 
 #[derive(Debug)]
-pub struct CompilationResults<C: CodegenBackend> {
+pub struct CompilationResults<C: CodegenBackend>
+{
     pub codegen_output: C::Output,
 }
 
 #[derive(Debug, Default)]
-pub struct Compiler {
+pub struct Compiler
+{
     ctx: CompilerContext,
 }
 
-impl Compiler {
-    pub fn new() -> Self {
+impl Compiler
+{
+    pub fn new() -> Self
+    {
         Self::default()
     }
 
-    pub fn add_source(&mut self, url: impl Into<SourceUrl>, source: impl Into<String>) -> SourceId {
+    pub fn add_source(
+        &mut self,
+        url: impl Into<SourceUrl>,
+        source: impl Into<String>,
+    ) -> SourceId
+    {
         self.ctx.src_map.insert(SourceDescription {
             url: url.into(),
             source_code: source.into(),
@@ -60,7 +69,8 @@ impl Compiler {
         &mut self,
         source_id: SourceId,
         codegen: C,
-    ) -> Result<CompilationResults<C>, CompilerError> {
+    ) -> Result<CompilationResults<C>, CompilerError>
+    {
         let source = self
             .ctx
             .src_map
@@ -89,7 +99,8 @@ impl Compiler {
         report_ctx: &mut ReportContext,
         source_id: SourceId,
         source: &str,
-    ) -> Result<TokenStream, CompilerError> {
+    ) -> Result<TokenStream, CompilerError>
+    {
         let token_stream = tokenize(report_ctx, source_id, source);
 
         bail_on_errors(report_ctx)?;
@@ -101,7 +112,8 @@ impl Compiler {
         compiler_ctx: &mut CompilerContext,
         token_stream: TokenStream,
         source_id: SourceId,
-    ) -> Result<(), CompilerError> {
+    ) -> Result<(), CompilerError>
+    {
         let ast =
             Parser::with_tokenstream(&mut compiler_ctx.report_ctx, token_stream, source_id).parse();
 
@@ -116,7 +128,8 @@ impl Compiler {
         compiler_ctx: &mut CompilerContext,
         main_source_id: SourceId,
         codegen: C,
-    ) -> Result<C::Output, CompilerError> {
+    ) -> Result<C::Output, CompilerError>
+    {
         let t_ast = &compiler_ctx.t_asts[main_source_id];
 
         let output = codegen.codegen(&mut compiler_ctx.report_ctx, t_ast);
@@ -126,11 +139,13 @@ impl Compiler {
         Ok(output)
     }
 
-    pub fn ctx(&self) -> &CompilerContext {
+    pub fn ctx(&self) -> &CompilerContext
+    {
         &self.ctx
     }
 
-    pub fn explode(self) -> CompilerContext {
+    pub fn explode(self) -> CompilerContext
+    {
         self.ctx
     }
 }

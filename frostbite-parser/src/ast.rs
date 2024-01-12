@@ -10,7 +10,8 @@ use self::tokens::{
 
 pub type Span = Range<usize>;
 
-pub mod tokens {
+pub mod tokens
+{
     use derive_more::Display;
 
     use super::{Span, Spannable};
@@ -19,38 +20,46 @@ pub mod tokens {
 
     macro_rules! token {
         ($name:ident) => {
-            #[derive(Debug, Clone, PartialEq)]
+            #[derive(Debug, Clone, PartialEq, Hash)]
             pub struct $name(pub crate::ast::Span);
 
-            impl Spannable for $name {
-                fn span(&self) -> crate::ast::Span {
+            impl Spannable for $name
+            {
+                fn span(&self) -> crate::ast::Span
+                {
                     self.0.clone()
                 }
             }
 
-            impl From<Span> for $name {
-                fn from(span: Span) -> Self {
+            impl From<Span> for $name
+            {
+                fn from(span: Span) -> Self
+                {
                     Self(span)
                 }
             }
         };
     }
 
-    #[derive(Debug, Clone, PartialEq, Display)]
+    #[derive(Debug, Clone, Hash, PartialEq, Display)]
     #[display(fmt = "{kind}")]
-    pub struct Operator {
+    pub struct Operator
+    {
         pub span: Span,
         pub kind: BinaryOperatorKind,
     }
 
-    impl Spannable for Operator {
-        fn span(&self) -> Span {
+    impl Spannable for Operator
+    {
+        fn span(&self) -> Span
+        {
             self.span.clone()
         }
     }
 
-    #[derive(Debug, Clone, Copy, PartialEq, Display)]
-    pub enum BinaryOperatorKind {
+    #[derive(Debug, Clone, Copy, PartialEq, Hash, Display)]
+    pub enum BinaryOperatorKind
+    {
         #[display(fmt = "+")]
         Add,
         #[display(fmt = "-")]
@@ -64,7 +73,8 @@ pub mod tokens {
     }
 
     #[derive(Debug, Clone, PartialEq, Display)]
-    pub enum TypeAnnotation {
+    pub enum TypeAnnotation
+    {
         #[display(fmt = "int")]
         Int,
         #[display(fmt = "float")]
@@ -94,23 +104,31 @@ pub mod tokens {
     token!(ReturnToken);
 }
 
-pub trait Spannable {
+pub trait Spannable
+{
     fn span(&self) -> Span;
 }
 
-#[derive(Debug, Clone, PartialEq, From)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, From)]
 pub struct Spanned<T>(pub Span, pub T);
 
-impl<T> Spanned<T> {
-    pub fn new(span: Span, t: T) -> Self {
+impl<T> Spanned<T>
+{
+    pub fn new(
+        span: Span,
+        t: T,
+    ) -> Self
+    {
         Self(span, t)
     }
 
-    pub fn value(&self) -> &T {
+    pub fn value(&self) -> &T
+    {
         &self.1
     }
 
-    pub fn value_mut(&mut self) -> &mut T {
+    pub fn value_mut(&mut self) -> &mut T
+    {
         &mut self.1
     }
 
@@ -128,23 +146,34 @@ impl<T> Spanned<T> {
         self.1.deref_mut()
     }
 
-    pub fn as_ref(&self) -> Spanned<&T> {
+    pub fn as_ref(&self) -> Spanned<&T>
+    {
         Spanned(self.0.clone(), &self.1)
     }
 
-    pub fn as_mut(&mut self) -> Spanned<&mut T> {
+    pub fn as_mut(&mut self) -> Spanned<&mut T>
+    {
         Spanned(self.0.clone(), &mut self.1)
     }
 
-    pub fn map<U, F>(self, f: F) -> Spanned<U>
+    pub fn map<U, F>(
+        self,
+        f: F,
+    ) -> Spanned<U>
     where
         F: FnOnce(T) -> U,
     {
         Spanned(self.0, f(self.1))
     }
+
+    pub fn into_span(self) -> (Range<usize>, T)
+    {
+        (self.0, self.1)
+    }
 }
 
-impl<T> Spanned<&T> {
+impl<T> Spanned<&T>
+{
     pub fn cloned(&self) -> Spanned<T>
     where
         T: Clone,
@@ -160,7 +189,8 @@ impl<T> Spanned<&T> {
     }
 }
 
-impl<T> Spanned<&mut T> {
+impl<T> Spanned<&mut T>
+{
     pub fn cloned(&self) -> Spanned<T>
     where
         T: Clone,
@@ -176,25 +206,32 @@ impl<T> Spanned<&mut T> {
     }
 }
 
-impl<T> Spannable for Spanned<T> {
-    fn span(&self) -> Span {
+impl<T> Spannable for Spanned<T>
+{
+    fn span(&self) -> Span
+    {
         self.0.clone()
     }
 }
 
-impl<T> From<(&Span, T)> for Spanned<T> {
-    fn from((span, value): (&Span, T)) -> Self {
+impl<T> From<(&Span, T)> for Spanned<T>
+{
+    fn from((span, value): (&Span, T)) -> Self
+    {
         Self(span.clone(), value)
     }
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct Program {
+pub struct Program
+{
     pub exprs: Vec<Expr>,
 }
 
-impl Spannable for Expr {
-    fn span(&self) -> Span {
+impl Spannable for Expr
+{
+    fn span(&self) -> Span
+    {
         match self {
             Expr::Int(Spanned(span, _))
             | Expr::Float(Spanned(span, _))
@@ -242,26 +279,30 @@ impl Spannable for Expr {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub enum Expr {
+pub enum Expr
+{
     Int(Spanned<i32>),
     Float(Spanned<f32>),
     Ident(Spanned<String>),
     Bool(Spanned<bool>),
     String(Spanned<String>),
 
-    BinaryOperation {
+    BinaryOperation
+    {
         lhs: Box<Self>,
         operator: Operator,
         rhs: Box<Self>,
     },
 
-    Assign {
+    Assign
+    {
         lhs: Box<Self>,
         eq_token: tokens::Eq,
         value: Box<Self>,
     },
 
-    Function {
+    Function
+    {
         fn_token: FunctionToken,
         name: Option<Spanned<String>>,
         lpt: LeftParenthesisToken,
@@ -273,14 +314,16 @@ pub enum Expr {
         body: Box<Self>,
     },
 
-    Call {
+    Call
+    {
         callee: Box<Self>,
         left_paren: LeftParenthesisToken,
         arguments: Vec<Expr>,
         right_paren: RightParenthesisToken,
     },
 
-    Block {
+    Block
+    {
         left_brace: LeftBraceToken,
         expressions: Vec<Self>,
         right_brace: RightBraceToken,
@@ -292,7 +335,8 @@ pub enum Expr {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct Argument {
+pub struct Argument
+{
     pub name: Spanned<String>,
     pub type_annotation: Spanned<TypeAnnotation>,
 }

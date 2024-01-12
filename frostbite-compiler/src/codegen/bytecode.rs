@@ -2,7 +2,7 @@ extern crate std;
 
 use std::dbg;
 
-use alloc::{vec, vec::Vec};
+use alloc::{collections::BTreeMap, vec, vec::Vec};
 use frostbite_bytecode::{
     ConstantValue, Function, FunctionIndex, Globals, Instruction, Manifest, Module,
 };
@@ -15,12 +15,19 @@ use crate::tir::{self, FunctionType, Type, TypedAst, TypedExpression, TypedFunct
 use super::CodegenBackend;
 
 #[derive(Debug, Default)]
-pub struct BytecodeCodegenBackend {
+pub struct BytecodeCodegenBackend
+{
     functions: SecondaryMap<tir::TypeKey, FunctionIndex>,
 }
 
-impl BytecodeCodegenBackend {
-    fn compile_program(&mut self, t_ast: &TypedAst, module: &mut Module) {
+impl BytecodeCodegenBackend
+{
+    fn compile_program(
+        &mut self,
+        t_ast: &TypedAst,
+        module: &mut Module,
+    )
+    {
         let body = &mut module.body;
         let globals = &mut module.globals;
 
@@ -35,7 +42,8 @@ impl BytecodeCodegenBackend {
         instructions: &mut Vec<Instruction>,
         globals: &mut Globals,
         t_expr: &TypedExpression,
-    ) {
+    )
+    {
         match t_expr {
             TypedExpression::Int(..)
             | TypedExpression::Float(..)
@@ -93,7 +101,8 @@ impl BytecodeCodegenBackend {
         instructions: &mut Vec<Instruction>,
         globals: &mut Globals,
         node: &TypedExpression,
-    ) {
+    )
+    {
         let constant_index = globals.constants_pool.insert(match node {
             TypedExpression::Int(Spanned(_, constant)) => (*constant).into(),
             TypedExpression::Float(Spanned(_, constant)) => (*constant).into(),
@@ -114,7 +123,8 @@ impl BytecodeCodegenBackend {
         lhs: &TypedExpression,
         operator: BinaryOperatorKind,
         rhs: &TypedExpression,
-    ) {
+    )
+    {
         self.compile_node(t_ast, instructions, globals, rhs);
         self.compile_node(t_ast, instructions, globals, lhs);
 
@@ -159,7 +169,8 @@ impl BytecodeCodegenBackend {
         instructions: &mut Vec<Instruction>,
         lhs: &tir::Assignable,
         value: &TypedExpression,
-    ) {
+    )
+    {
         self.compile_node(t_ast, instructions, globals, value);
 
         match lhs {
@@ -174,11 +185,11 @@ impl BytecodeCodegenBackend {
         t_ast: &TypedAst,
         globals: &mut Globals,
         function: &TypedFunctionExpr,
-    ) {
+    )
+    {
         let dummy_function_index = globals.functions.insert(Function { body: vec![] });
 
-        self.functions
-            .insert(dbg!(function.function_index), dummy_function_index);
+        self.functions.insert(todo!(), dummy_function_index);
 
         globals.functions[dummy_function_index] =
             self.compile_function(t_ast, globals, &function.body);
@@ -189,7 +200,8 @@ impl BytecodeCodegenBackend {
         t_ast: &TypedAst,
         globals: &mut Globals,
         function_body: &TypedExpression,
-    ) -> frostbite_bytecode::Function {
+    ) -> frostbite_bytecode::Function
+    {
         let mut bytecode_function_body = Vec::new();
 
         self.compile_node(t_ast, &mut bytecode_function_body, globals, function_body);
@@ -198,7 +210,8 @@ impl BytecodeCodegenBackend {
     }
 
     /// Caller must guarantee that the return type is on the stack before calling this function
-    fn compile_function_with_body(mut body: Vec<Instruction>) -> frostbite_bytecode::Function {
+    fn compile_function_with_body(mut body: Vec<Instruction>) -> frostbite_bytecode::Function
+    {
         body.push(Instruction::Return);
 
         Function { body }
@@ -211,10 +224,11 @@ impl BytecodeCodegenBackend {
         instructions: &mut Vec<Instruction>,
         callee: &tir::Callable,
         arguments_exprs: &[TypedExpression],
-    ) {
+    )
+    {
         match callee {
             tir::Callable::Function(refers_to, _) => {
-                let function_type_key = refers_to.into_type(t_ast);
+                let function_type_key = dbg!(refers_to).into_type(t_ast);
 
                 let Type::Function(FunctionType {
                     arguments,
@@ -232,7 +246,7 @@ impl BytecodeCodegenBackend {
                     },
                 );
 
-                let function_index = self.functions[dbg!(function_type_key)];
+                let function_index = self.functions[function_type_key];
 
                 instructions.push(Instruction::Call(function_index));
             }
@@ -240,10 +254,16 @@ impl BytecodeCodegenBackend {
     }
 }
 
-impl CodegenBackend for BytecodeCodegenBackend {
+impl CodegenBackend for BytecodeCodegenBackend
+{
     type Output = Module;
 
-    fn codegen(mut self, _report_ctx: &mut ReportContext, t_ast: &TypedAst) -> Self::Output {
+    fn codegen(
+        mut self,
+        _report_ctx: &mut ReportContext,
+        t_ast: &TypedAst,
+    ) -> Self::Output
+    {
         let mut module = Module {
             manifest: Manifest {
                 bytecode_version: option_env!("PROJECT_VERSION")

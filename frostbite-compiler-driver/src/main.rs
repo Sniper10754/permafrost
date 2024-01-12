@@ -9,15 +9,18 @@ use frostbite_reports::{
 };
 
 #[derive(clap::Parser)]
-pub struct CliArgs {
+pub struct CliArgs
+{
     #[clap(subcommand)]
     subcommand: CliSubcommand,
 }
 
 #[derive(clap::Subcommand)]
-pub enum CliSubcommand {
+pub enum CliSubcommand
+{
     #[command(about = "Compile a file")]
-    Compile {
+    Compile
+    {
         #[arg(help = "File to compile")]
         file: PathBuf,
 
@@ -26,7 +29,8 @@ pub enum CliSubcommand {
     },
 }
 
-fn main() -> eyre::Result<()> {
+fn main() -> eyre::Result<()>
+{
     let args = CliArgs::try_parse()?;
 
     color_eyre::install()?;

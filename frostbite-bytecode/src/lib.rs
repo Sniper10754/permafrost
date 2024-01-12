@@ -25,13 +25,15 @@ new_key_type! {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Manifest {
+pub struct Manifest
+{
     pub bytecode_version: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[repr(u8)]
-pub enum Instruction {
+pub enum Instruction
+{
     /// Loads a constant element into the stack from the constants pool
     LoadConstant(ConstantIndex),
 
@@ -73,7 +75,8 @@ pub enum Instruction {
 }
 
 #[derive(Debug, Clone, derive_more::Display, Serialize, Deserialize, derive_more::From)]
-pub enum ConstantValue {
+pub enum ConstantValue
+{
     Int(i32),
     Float(f32),
     String(String),
@@ -86,19 +89,22 @@ pub enum ConstantValue {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Function {
+pub struct Function
+{
     pub body: Vec<Instruction>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Module {
+pub struct Module
+{
     pub manifest: Manifest,
     pub globals: Globals,
     pub body: Vec<Instruction>,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
-pub struct Globals {
+pub struct Globals
+{
     pub constants_pool: SlotMap<ConstantIndex, ConstantValue>,
     pub functions: SlotMap<FunctionIndex, Function>,
 }
@@ -107,17 +113,24 @@ pub struct Globals {
 #[cfg_attr(feature = "std", derive(derive_more::Error))]
 pub struct DeserializationError;
 
-impl<T> From<Error<T>> for DeserializationError {
-    fn from(_: Error<T>) -> Self {
+impl<T> From<Error<T>> for DeserializationError
+{
+    fn from(_: Error<T>) -> Self
+    {
         Self
     }
 }
 
-pub fn encode(module: &Module, buf: &mut Vec<u8>) {
+pub fn encode(
+    module: &Module,
+    buf: &mut Vec<u8>,
+)
+{
     ciborium::into_writer(module, buf).unwrap();
 }
 
-pub fn decode(bytes: &[u8]) -> Result<Module, DeserializationError> {
+pub fn decode(bytes: &[u8]) -> Result<Module, DeserializationError>
+{
     let module = ciborium::from_reader(bytes)?;
 
     Ok(module)
