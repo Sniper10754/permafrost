@@ -79,19 +79,30 @@ impl Compiler
             .source_code
             .as_str();
 
+        log::trace!("Lexing...");
         let token_stream = Self::lex(&mut self.ctx.report_ctx, source_id, source)?;
 
+        log::trace!("Parsing...");
         // AST is stored in the compiler context
         Self::parse(&mut self.ctx, token_stream, source_id)?;
 
         // TAST is stored in the compiler context
+        log::trace!("Running semantic checks...");
         run_semantic_checks(&mut self.ctx, source_id);
+
+        log::debug!(
+            "Typed Internal representation: {}",
+            tir::display::display_tree(&self.ctx.t_asts[source_id])
+        );
+
         bail_on_errors(&self.ctx.report_ctx)?;
 
+        log::trace!("Codegenning...");
         let codegen_output = Self::codegen(&mut self.ctx, source_id, codegen)?;
 
         let compilation_results = CompilationResults { codegen_output };
 
+        log::trace!("Done...");
         Ok(compilation_results)
     }
 

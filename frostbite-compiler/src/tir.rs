@@ -9,17 +9,22 @@ use frostbite_parser::ast::{
 use slotmap::{new_key_type, SlotMap};
 
 new_key_type! {
+    #[derive(derive_more::Display)]
+    #[display(fmt = "{}", "self.0.as_ffi() as u32")]
     pub struct LocalKey;
+    #[derive(derive_more::Display)]
+    #[display(fmt = "{}", "self.0.as_ffi() as u32")]
     pub struct TypeKey;
 }
 
 pub mod display
 {
     use alloc::{borrow::Cow, format, string::String};
-    use core::fmt::{Display, Write as _};
+    use core::fmt::{self, Display, Write as _};
+    use frostbite_parser::ast::Spanned;
 
-    use super::{FunctionType, TypeKey, TypedAst};
-    use crate::tir::Type::*;
+    use super::{FunctionType, TypeKey, TypedAst, TypedExpression};
+    use crate::tir::{Assignable, Callable, RefersTo, Type::*, TypedExpressionKind, TypedFunction};
 
     fn join_map_into_string<K, V>(mut map: impl Iterator<Item = (K, V)>) -> String
     where
@@ -40,11 +45,11 @@ pub mod display
     }
 
     pub fn display_type(
-        type_index: TypeKey,
+        type_key: TypeKey,
         t_ast: &TypedAst,
     ) -> Cow<'static, str>
     {
-        match &t_ast.types_arena[type_index] {
+        let type_name: Cow<'_, _> = match &t_ast.types_arena[type_key] {
             Int => "int".into(),
             Float => "float".into(),
             String => "str".into(),
@@ -65,6 +70,159 @@ pub mod display
             Object(object_name) => format!("object {object_name}").into(),
             Any => "any".into(),
             Bool => "bool".into(),
+        };
+
+        format!("{type_name} ({})", type_key).into()
+    }
+
+    pub fn display_tree(t_ast: &TypedAst) -> String
+    {
+        let mut buf = String::new();
+
+        t_ast
+            .nodes
+            .iter()
+            .try_for_each::<_, fmt::Result>(|node| {
+                display_node(&mut buf, t_ast, node)?;
+
+                writeln!(buf)?;
+
+                Ok(())
+            })
+            .expect("infallible");
+
+        buf
+    }
+
+    pub fn display_node(
+        buf: &mut String,
+        t_ast: &TypedAst,
+        node: &TypedExpression,
+    ) -> fmt::Result
+    {
+        use TypedExpressionKind::*;
+
+        match &node.typed_expression_kind {
+            Int(Spanned(_, value)) => write!(buf, "{value}"),
+            Float(Spanned(_, value)) => write!(buf, "{value}"),
+            Bool(Spanned(_, value)) => write!(buf, "{value}"),
+            String(Spanned(_, value)) => write!(buf, "{value}"),
+            Ident {
+                refers_to,
+                str_value: Spanned(_, name),
+            } => {
+                write!(buf, "{name} (")?;
+
+                write!(buf, "{}", display_type(refers_to.into_type(t_ast), t_ast))?;
+
+                write!(buf, ")")?;
+
+                Ok(())
+            }
+            BinaryOperation { lhs, operator, rhs } => {
+                display_node(buf, t_ast, lhs)?;
+
+                write!(buf, "{}", operator.kind)?;
+
+                display_node(buf, t_ast, rhs)?;
+
+                Ok(())
+            }
+            Assign { lhs, value } => {
+                match lhs {
+                    Assignable::Ident(type_key, Spanned(_, name)) => {
+                        write!(buf, "{name} ({type_key})")?;
+                    }
+                }
+
+                write!(buf, "=")?;
+
+                display_node(buf, t_ast, value)?;
+
+                Ok(())
+            }
+            Function(TypedFunction {
+                fn_token: _,
+                name,
+                arguments,
+                return_type,
+                body,
+            }) => {
+                write!(buf, "function ")?;
+
+                if let Some(Spanned(_, name)) = name {
+                    write!(buf, "{name}")?;
+                }
+
+                write!(buf, "(")?;
+
+                {
+                    let mut arguments_iter = arguments.iter();
+
+                    if let Some((name, type_key)) = arguments_iter.next() {
+                        write!(buf, ", {name}: {}", display_type(*type_key, t_ast))?;
+
+                        arguments_iter.try_for_each(|(name, type_key)| {
+                            write!(buf, ", {name}: {}", display_type(*type_key, t_ast))
+                        })?;
+                    }
+                }
+
+                write!(buf, ") ")?;
+
+                write!(buf, "-> {}", display_type(*return_type, t_ast))?;
+
+                write!(buf, " = ")?;
+
+                display_node(buf, t_ast, body)?;
+
+                Ok(())
+            }
+            Call {
+                callee,
+                right_parent: _,
+                arguments,
+                left_parent: _,
+                return_type,
+            } => {
+                match callee {
+                    Callable::Function(refers_to, Spanned(_, name)) => {
+                        write!(
+                            buf,
+                            "{name} {}",
+                            display_type(refers_to.into_type(t_ast), t_ast)
+                        )?;
+                    }
+                }
+
+                write!(buf, "(")?;
+
+                arguments
+                    .iter()
+                    .try_for_each(|argument| display_node(buf, t_ast, argument))?;
+
+                write!(buf, ")")?;
+
+                write!(buf, "(returns {})", display_type(*return_type, t_ast))?;
+
+                Ok(())
+            }
+            Return(..) => todo!(),
+            Block {
+                left_brace: _,
+                expressions,
+                right_brace: _,
+            } => {
+                writeln!(buf, "{{")?;
+
+                expressions
+                    .iter()
+                    .try_for_each(|expr| display_node(buf, t_ast, expr))?;
+
+                writeln!(buf, "}}")?;
+
+                Ok(())
+            }
         }
     }
 }
@@ -82,7 +240,7 @@ pub struct TypedAst
 }
 
 #[derive(Debug, Clone)]
-pub struct TypedFunctionExpr
+pub struct TypedFunction
 {
     pub fn_token: FunctionToken,
     pub name: Option<Spanned<String>>,
@@ -91,16 +249,26 @@ pub struct TypedFunctionExpr
     pub body: Box<TypedExpression>,
 }
 
-impl TypedFunctionExpr
+#[derive(Debug, Clone)]
+pub struct TypedExpression
+{
+    pub type_key: TypeKey,
+    pub typed_expression_kind: TypedExpressionKind,
+}
+
+impl TypedFunction
 {
     pub fn is_body_block(&self) -> bool
     {
-        matches!(&*self.body, TypedExpression::Block { .. })
+        matches!(
+            &self.body.typed_expression_kind,
+            TypedExpressionKind::Block { .. }
+        )
     }
 }
 
 #[derive(Debug, Clone, derive_more::IsVariant)]
-pub enum TypedExpression
+pub enum TypedExpressionKind
 {
     Int(Spanned<i32>),
     Float(Spanned<f32>),
@@ -109,89 +277,84 @@ pub enum TypedExpression
 
     Ident
     {
-        type_key: TypeKey,
         refers_to: RefersTo,
         str_value: Spanned<String>,
     },
 
     BinaryOperation
     {
-        lhs: Box<Self>,
+        lhs: Box<TypedExpression>,
         operator: Operator,
-        rhs: Box<Self>,
+        rhs: Box<TypedExpression>,
     },
 
     Assign
     {
-        local_index: LocalKey,
         lhs: Assignable,
-        value: Box<Self>,
+        value: Box<TypedExpression>,
     },
 
-    Function(TypedFunctionExpr),
+    Function(TypedFunction),
 
     Call
     {
         callee: Callable,
         right_parent: RightParenthesisToken,
-        arguments: Vec<Self>,
+        arguments: Vec<TypedExpression>,
         left_parent: LeftParenthesisToken,
         return_type: TypeKey,
     },
 
-    Return(TypeKey, ReturnToken, Option<Box<Self>>),
+    Return(TypeKey, ReturnToken, Option<Box<TypedExpression>>),
 
     Block
     {
         left_brace: LeftBraceToken,
-        expressions: Vec<Self>,
+        expressions: Vec<TypedExpression>,
         right_brace: RightBraceToken,
     },
 }
 
-impl Spannable for TypedExpression
+impl Spannable for TypedExpressionKind
 {
     fn span(&self) -> frostbite_parser::ast::Span
     {
+        use TypedExpressionKind::*;
+
         match self {
-            TypedExpression::Int(Spanned(span, _)) => span.clone(),
-            TypedExpression::Float(Spanned(span, _)) => span.clone(),
-            TypedExpression::Bool(Spanned(span, _)) => span.clone(),
-            TypedExpression::String(Spanned(span, _)) => span.clone(),
-            TypedExpression::Ident {
-                type_key: _,
+            Int(Spanned(span, _)) => span.clone(),
+            Float(Spanned(span, _)) => span.clone(),
+            Bool(Spanned(span, _)) => span.clone(),
+            String(Spanned(span, _)) => span.clone(),
+            Ident {
                 refers_to: _,
                 str_value: Spanned(span, _),
             } => span.clone(),
-            TypedExpression::BinaryOperation {
+            BinaryOperation {
                 lhs,
                 operator: _,
                 rhs,
-            } => (lhs.span().start)..(rhs.span().end),
-            TypedExpression::Assign {
-                local_index: _,
-                lhs,
-                value,
-            } => (lhs.span().start)..(value.span().end),
-            TypedExpression::Function(TypedFunctionExpr { fn_token, body, .. }) => {
-                (fn_token.span().start)..(body.span().end)
+            } => (lhs.typed_expression_kind.span().start)..(rhs.typed_expression_kind.span().end),
+            Assign { lhs, value } => (lhs.span().start)..(value.typed_expression_kind.span().end),
+            Function(TypedFunction { fn_token, body, .. }) => {
+                (fn_token.span().start)..(body.typed_expression_kind.span().end)
             }
-            TypedExpression::Call {
+            Call {
                 callee: _,
                 left_parent,
                 arguments: _,
                 right_parent,
                 return_type: _,
             } => (left_parent.span().start)..(right_parent.0.end),
-            TypedExpression::Return(_, ret_token, value) => {
+            Return(_, ret_token, value) => {
                 (ret_token.0.start)
                     ..(value
                         .as_ref()
-                        .map(|value| value.span())
+                        .map(|value| value.typed_expression_kind.span())
                         .map(|span| span.start)
                         .unwrap_or(ret_token.span().end))
             }
-            TypedExpression::Block {
+            Block {
                 left_brace,
                 expressions: _,
                 right_brace,
@@ -260,12 +423,13 @@ impl TryFrom<TypedExpression> for Assignable
 
     fn try_from(value: TypedExpression) -> Result<Self, Self::Error>
     {
-        match value {
-            TypedExpression::Ident {
-                type_key: ty,
+        use TypedExpressionKind::*;
+
+        match value.typed_expression_kind {
+            Ident {
                 refers_to: _,
                 str_value: ident,
-            } => Ok(Assignable::Ident(ty, ident)),
+            } => Ok(Assignable::Ident(value.type_key, ident)),
 
             _ => Err(()),
         }

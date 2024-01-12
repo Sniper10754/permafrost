@@ -21,13 +21,12 @@ use frostbite_parser::ast::{
     Argument, Expr, Spannable, Spanned,
 };
 use frostbite_reports::{sourcemap::SourceId, IntoReport, Label, Level, Report};
-use TypedExpression::*;
 
 use crate::{
     context::CompilerContext,
     tir::{
         display::display_type, Assignable, Callable, FunctionType, RefersTo, Type, TypeKey,
-        TypedAst, TypedExpression, TypedFunctionExpr,
+        TypedAst, TypedExpression, TypedExpressionKind, TypedFunction,
     },
     utils::Scopes,
 };
@@ -425,12 +424,12 @@ impl RecursiveTypechecker
     {
         let old_len = self.scopes.len();
 
-        let t_expr = match expr {
-            Expr::Int(value) => TypedExpression::Int(value.clone()),
-            Expr::Float(value) => TypedExpression::Float(value.clone()),
-            Expr::Bool(value) => TypedExpression::Bool(value.clone()),
+        let typed_expression_kind = match expr {
+            Expr::Int(value) => TypedExpressionKind::Int(value.clone()),
+            Expr::Float(value) => TypedExpressionKind::Float(value.clone()),
+            Expr::Bool(value) => TypedExpressionKind::Bool(value.clone()),
             Expr::String(value) => {
-                TypedExpression::String(value.as_ref().map(|value| value.into()))
+                TypedExpressionKind::String(value.as_ref().map(|value| value.into()))
             }
             Expr::Ident(Spanned(span, ident)) => self.visit_ident(t_ast, source_id, span, ident)?,
             Expr::BinaryOperation { lhs, operator, rhs } => {
@@ -489,7 +488,10 @@ impl RecursiveTypechecker
 
         self.scopes.truncate(old_len);
 
-        Ok(t_expr)
+        Ok(TypedExpression {
+            type_key: self.infer_type(source_id, expr, t_ast)?,
+            typed_expression_kind,
+        })
     }
 
     /// Rules for this algorithm:
@@ -499,7 +501,7 @@ impl RecursiveTypechecker
         &mut self,
         source_id: SourceId,
         t_ast: &mut TypedAst,
-        function: &TypedFunctionExpr,
+        function: &TypedFunction,
     ) -> Result<(), TypecheckError>
     {
         self.check_fn_body_branches(source_id, &function.body)?;
@@ -515,9 +517,9 @@ impl RecursiveTypechecker
         expr: &TypedExpression,
     ) -> Result<(), TypecheckError>
     {
-        use TypedExpression::*;
+        use TypedExpressionKind::*;
 
-        match expr {
+        match &expr.typed_expression_kind {
             Return(return_type_index, return_token, value) => {
                 match Self::unify(t_ast, *return_type_index, expected_type) {
                     Ok(_) => Ok(()),
@@ -525,7 +527,7 @@ impl RecursiveTypechecker
                         source_id,
                         span: value
                             .as_ref()
-                            .map(|expr| expr.span())
+                            .map(|expr| expr.typed_expression_kind.span())
                             .unwrap_or(return_token.span()),
                         expected: display_type(expected_type, t_ast),
                         found: display_type(*return_type_index, t_ast),
@@ -547,7 +549,7 @@ impl RecursiveTypechecker
         expr: &TypedExpression,
     ) -> Result<(), TypecheckError>
     {
-        if let Err(span) = Self::check_branches_for_return(expr) {
+        if let Err(span) = Self::check_branches_for_return(&expr.typed_expression_kind) {
             Err(TypecheckError::FunctionDoesntReturn {
                 source_id,
                 faulty_branch_position: span,
@@ -557,18 +559,22 @@ impl RecursiveTypechecker
         }
     }
 
-    fn check_branches_for_return(expr: &TypedExpression) -> Result<(), Range<usize>>
+    fn check_branches_for_return(expr: &TypedExpressionKind) -> Result<(), Range<usize>>
     {
+        use TypedExpressionKind::*;
+
         match expr {
             Return(..) => Ok(()),
 
             Block { expressions, .. } => {
-                let scope_has_return = expressions.iter().any(|expr| matches!(expr, Return(..)));
+                let scope_has_return = expressions
+                    .iter()
+                    .any(|expr| matches!(&expr.typed_expression_kind, Return(..)));
 
                 if scope_has_return {
                     expressions
                         .iter()
-                        .map(Self::check_branches_for_return)
+                        .map(|t_ast| Self::check_branches_for_return(&t_ast.typed_expression_kind))
                         .collect::<Result<Vec<_>, _>>()?;
 
                     Ok(())
@@ -587,7 +593,7 @@ impl RecursiveTypechecker
         source_id: SourceId,
         span: &Range<usize>,
         ident: &str,
-    ) -> Result<TypedExpression, TypecheckError>
+    ) -> Result<TypedExpressionKind, TypecheckError>
     {
         let Some(refers_to) = self.scopes.local(ident).copied() else {
             return Err(TypecheckError::SymbolNotFound(
@@ -598,8 +604,7 @@ impl RecursiveTypechecker
 
         let type_key = refers_to.into_type(t_ast);
 
-        Ok(TypedExpression::Ident {
-            type_key,
+        Ok(TypedExpressionKind::Ident {
             refers_to,
             str_value: Spanned(span.clone(), ident.into()),
         })
@@ -613,7 +618,7 @@ impl RecursiveTypechecker
         lhs: &Expr,
         operator: Operator,
         rhs: &Expr,
-    ) -> Result<TypedExpression, TypecheckError>
+    ) -> Result<TypedExpressionKind, TypecheckError>
     {
         self.infer_type(source_id, expr, t_ast)?;
 
@@ -622,7 +627,7 @@ impl RecursiveTypechecker
             self.visit_expr(source_id, rhs, t_ast)?,
         );
 
-        Ok(TypedExpression::BinaryOperation {
+        Ok(TypedExpressionKind::BinaryOperation {
             lhs: Box::new(t_ast_lhs),
             operator: operator.clone(),
             rhs: Box::new(t_ast_rhs),
@@ -635,7 +640,7 @@ impl RecursiveTypechecker
         source_id: SourceId,
         lhs: &Expr,
         value: &Expr,
-    ) -> Result<TypedExpression, TypecheckError>
+    ) -> Result<TypedExpressionKind, TypecheckError>
     {
         let local_index = match lhs {
             Expr::Ident(spanned_str) => match self.scopes.local(&spanned_str.1).copied() {
@@ -665,8 +670,7 @@ impl RecursiveTypechecker
 
         let assignable = Assignable::try_from(t_ast_lhs).unwrap();
 
-        Ok(TypedExpression::Assign {
-            local_index,
+        Ok(TypedExpressionKind::Assign {
             lhs: assignable,
             value: Box::new(t_ast_value),
         })
@@ -682,13 +686,13 @@ impl RecursiveTypechecker
         arguments: &[Argument],
         return_type_annotation: Option<Spanned<TypeAnnotation>>,
         body: &Expr,
-    ) -> Result<TypedExpression, TypecheckError>
+    ) -> Result<TypedExpressionKind, TypecheckError>
     {
-        let fn_type_key = dbg!(self.infer_type(source_id, expr, t_ast)?);
+        let type_key = dbg!(self.infer_type(source_id, expr, t_ast)?);
 
         if let Some(name) = name.as_ref() {
             self.scopes
-                .insert_local(name.value(), RefersTo::Type(fn_type_key));
+                .insert_local(name.value(), RefersTo::Type(type_key));
         }
 
         let arguments = arguments
@@ -726,7 +730,7 @@ impl RecursiveTypechecker
 
         self.scopes.leave_scope();
 
-        let function = TypedFunctionExpr {
+        let function = TypedFunction {
             fn_token: fn_token.clone(),
             name,
             arguments,
@@ -735,12 +739,15 @@ impl RecursiveTypechecker
         };
 
         if !matches!(&t_ast.types_arena[function.return_type], Type::Unit)
-            && matches!(&*function.body, TypedExpression::Block { .. })
+            && matches!(
+                &function.body.typed_expression_kind,
+                TypedExpressionKind::Block { .. }
+            )
         {
             self.typecheck_function_body_returns(source_id, t_ast, &function)?;
         }
 
-        Ok(TypedExpression::Function(function))
+        Ok(TypedExpressionKind::Function(function))
     }
 
     fn visit_call(
@@ -752,7 +759,7 @@ impl RecursiveTypechecker
         left_paren: &LeftParenthesisToken,
         arguments: &[Expr],
         right_paren: &RightParenthesisToken,
-    ) -> Result<TypedExpression, TypecheckError>
+    ) -> Result<TypedExpressionKind, TypecheckError>
     {
         let call_arguments = arguments;
 
@@ -829,7 +836,7 @@ impl RecursiveTypechecker
                     arguments.push(node);
                 }
 
-                Ok(TypedExpression::Call {
+                Ok(TypedExpressionKind::Call {
                     callee: Callable::Function(refers_to, Spanned(span.clone(), name.into())),
                     left_parent: left_paren.clone(),
                     arguments,
@@ -848,7 +855,7 @@ impl RecursiveTypechecker
         source_id: SourceId,
         return_token: ReturnToken,
         ret_expr: Option<&Expr>,
-    ) -> Result<TypedExpression, TypecheckError>
+    ) -> Result<TypedExpressionKind, TypecheckError>
     {
         let return_value_type = if let Some(ret_expr) = ret_expr {
             self.infer_type(source_id, ret_expr, t_ast)?
@@ -864,7 +871,7 @@ impl RecursiveTypechecker
             value = Some(temp_val);
         }
 
-        Ok(TypedExpression::Return(
+        Ok(TypedExpressionKind::Return(
             return_value_type,
             return_token.clone(),
             value.map(Box::new),
@@ -878,9 +885,9 @@ impl RecursiveTypechecker
         left_brace: &LeftBraceToken,
         expressions: &[Expr],
         right_brace: &RightBraceToken,
-    ) -> Result<TypedExpression, TypecheckError>
+    ) -> Result<TypedExpressionKind, TypecheckError>
     {
-        Ok(TypedExpression::Block {
+        Ok(TypedExpressionKind::Block {
             left_brace: left_brace.clone(),
             expressions: expressions
                 .iter()

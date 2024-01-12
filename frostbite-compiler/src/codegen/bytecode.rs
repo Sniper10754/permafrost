@@ -2,7 +2,7 @@ extern crate std;
 
 use std::dbg;
 
-use alloc::{collections::BTreeMap, vec, vec::Vec};
+use alloc::{vec, vec::Vec};
 use frostbite_bytecode::{
     ConstantValue, Function, FunctionIndex, Globals, Instruction, Manifest, Module,
 };
@@ -10,7 +10,9 @@ use frostbite_parser::ast::{tokens::BinaryOperatorKind, Spanned};
 use frostbite_reports::ReportContext;
 use slotmap::SecondaryMap;
 
-use crate::tir::{self, FunctionType, Type, TypedAst, TypedExpression, TypedFunctionExpr};
+use crate::tir::{
+    self, FunctionType, Type, TypedAst, TypedExpression, TypedExpressionKind, TypedFunction,
+};
 
 use super::CodegenBackend;
 
@@ -44,41 +46,38 @@ impl BytecodeCodegenBackend
         t_expr: &TypedExpression,
     )
     {
-        match t_expr {
-            TypedExpression::Int(..)
-            | TypedExpression::Float(..)
-            | TypedExpression::Bool(..)
-            | TypedExpression::String(..) => self.compile_constant(instructions, globals, t_expr),
+        match &t_expr.typed_expression_kind {
+            TypedExpressionKind::Int(..)
+            | TypedExpressionKind::Float(..)
+            | TypedExpressionKind::Bool(..)
+            | TypedExpressionKind::String(..) => {
+                self.compile_constant(instructions, globals, t_expr)
+            }
 
-            TypedExpression::Ident {
-                type_key: _,
+            TypedExpressionKind::Ident {
                 refers_to: _,
                 str_value: Spanned(_, name),
             } => {
                 instructions.push(Instruction::LoadName(name.into()));
             }
 
-            TypedExpression::BinaryOperation { lhs, operator, rhs } => {
+            TypedExpressionKind::BinaryOperation { lhs, operator, rhs } => {
                 self.compile_binary_operation(t_ast, instructions, globals, lhs, operator.kind, rhs)
             }
 
-            TypedExpression::Assign {
-                local_index: _,
-                lhs,
-                value,
-            } => {
+            TypedExpressionKind::Assign { lhs, value } => {
                 self.compile_assignment(t_ast, globals, instructions, lhs, value);
             }
 
-            TypedExpression::Function(function_expr) => {
-                self.compile_function_node(t_ast, globals, function_expr)
+            TypedExpressionKind::Function(function_expr) => {
+                self.compile_function_node(t_ast, globals, t_expr.type_key, function_expr)
             }
 
-            TypedExpression::Call {
+            TypedExpressionKind::Call {
                 callee, arguments, ..
             } => self.compile_function_call(t_ast, globals, instructions, callee, arguments),
 
-            TypedExpression::Return(_, _, return_value) => {
+            TypedExpressionKind::Return(_, _, return_value) => {
                 if let Some(value) = return_value {
                     self.compile_node(t_ast, instructions, globals, value);
                 } else {
@@ -90,7 +89,7 @@ impl BytecodeCodegenBackend
                 instructions.push(Instruction::Return);
             }
 
-            TypedExpression::Block { expressions, .. } => expressions
+            TypedExpressionKind::Block { expressions, .. } => expressions
                 .iter()
                 .for_each(|expr| self.compile_node(t_ast, instructions, globals, expr)),
         }
@@ -103,14 +102,16 @@ impl BytecodeCodegenBackend
         node: &TypedExpression,
     )
     {
-        let constant_index = globals.constants_pool.insert(match node {
-            TypedExpression::Int(Spanned(_, constant)) => (*constant).into(),
-            TypedExpression::Float(Spanned(_, constant)) => (*constant).into(),
-            TypedExpression::Bool(Spanned(_, bool)) => (*bool).into(),
-            TypedExpression::String(Spanned(_, constant)) => constant.clone().into(),
+        let constant_index = globals
+            .constants_pool
+            .insert(match &node.typed_expression_kind {
+                TypedExpressionKind::Int(Spanned(_, constant)) => (*constant).into(),
+                TypedExpressionKind::Float(Spanned(_, constant)) => (*constant).into(),
+                TypedExpressionKind::Bool(Spanned(_, bool)) => (*bool).into(),
+                TypedExpressionKind::String(Spanned(_, constant)) => constant.clone().into(),
 
-            _ => unreachable!(),
-        });
+                _ => unreachable!(),
+            });
 
         instructions.push(Instruction::LoadConstant(constant_index));
     }
@@ -184,12 +185,13 @@ impl BytecodeCodegenBackend
         &mut self,
         t_ast: &TypedAst,
         globals: &mut Globals,
-        function: &TypedFunctionExpr,
+        type_key: tir::TypeKey,
+        function: &TypedFunction,
     )
     {
         let dummy_function_index = globals.functions.insert(Function { body: vec![] });
 
-        self.functions.insert(todo!(), dummy_function_index);
+        self.functions.insert(dbg!(type_key), dummy_function_index);
 
         globals.functions[dummy_function_index] =
             self.compile_function(t_ast, globals, &function.body);
