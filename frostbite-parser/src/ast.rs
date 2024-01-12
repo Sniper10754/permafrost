@@ -144,6 +144,38 @@ impl<T> Spanned<T> {
     }
 }
 
+impl<T> Spanned<&T> {
+    pub fn cloned(&self) -> Spanned<T>
+    where
+        T: Clone,
+    {
+        Spanned(self.0.clone(), self.1.clone())
+    }
+
+    pub fn copied(&self) -> Spanned<T>
+    where
+        T: Copy,
+    {
+        Spanned(self.0.clone(), *self.1)
+    }
+}
+
+impl<T> Spanned<&mut T> {
+    pub fn cloned(&self) -> Spanned<T>
+    where
+        T: Clone,
+    {
+        Spanned(self.0.clone(), self.1.clone())
+    }
+
+    pub fn copied(&self) -> Spanned<T>
+    where
+        T: Copy,
+    {
+        Spanned(self.0.clone(), *self.1)
+    }
+}
+
 impl<T> Spannable for Spanned<T> {
     fn span(&self) -> Span {
         self.0.clone()
@@ -231,7 +263,7 @@ pub enum Expr {
 
     Function {
         fn_token: FunctionToken,
-        name: Spanned<String>,
+        name: Option<Spanned<String>>,
         lpt: LeftParenthesisToken,
         arguments: Vec<Argument>,
         rpt: RightParenthesisToken,

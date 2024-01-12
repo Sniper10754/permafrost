@@ -41,11 +41,15 @@ impl<V> Scopes<V> {
         self.scopes.last_mut().unwrap().insert_local(local, v)
     }
 
-    pub fn local(&self, name: &str) -> Option<&V> {
+    pub fn local(&self, name: impl AsRef<str>) -> Option<&V> {
+        let name = name.as_ref();
+
         self.scopes.iter().rev().find_map(|scope| scope.local(name))
     }
 
-    pub fn local_mut(&mut self, name: &str) -> Option<&mut V> {
+    pub fn local_mut(&mut self, name: impl AsRef<str>) -> Option<&mut V> {
+        let name = name.as_ref();
+
         self.scopes
             .iter_mut()
             .rev()

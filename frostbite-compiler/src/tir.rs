@@ -9,15 +9,15 @@ use frostbite_parser::ast::{
 use slotmap::{new_key_type, SlotMap};
 
 new_key_type! {
-    pub struct LocalIndex;
-    pub struct TypeIndex;
+    pub struct LocalKey;
+    pub struct TypeKey;
 }
 
 pub mod display {
     use alloc::{borrow::Cow, format, string::String};
     use core::fmt::{Display, Write as _};
 
-    use super::{FunctionType, TypeIndex, TypedAst};
+    use super::{FunctionType, TypeKey, TypedAst};
     use crate::tir::Type::*;
 
     fn join_map_into_string<K, V>(mut map: impl Iterator<Item = (K, V)>) -> String
@@ -38,7 +38,7 @@ pub mod display {
         buffer
     }
 
-    pub fn display_type(type_index: TypeIndex, t_ast: &TypedAst) -> Cow<'static, str> {
+    pub fn display_type(type_index: TypeKey, t_ast: &TypedAst) -> Cow<'static, str> {
         match &t_ast.types_arena[type_index] {
             Int => "int".into(),
             Float => "float".into(),
@@ -65,23 +65,23 @@ pub mod display {
 }
 
 #[derive(Debug, derive_more::From, derive_more::Into)]
-pub struct Typed<T>(TypeIndex, T);
+pub struct Typed<T>(TypeKey, T);
 
 /// A High level representation of the input
 #[derive(Debug, Default)]
 pub struct TypedAst {
     pub nodes: Vec<TypedExpression>,
-    pub locals: SlotMap<LocalIndex, TypeIndex>,
-    pub types_arena: SlotMap<TypeIndex, Type>,
+    pub locals: SlotMap<LocalKey, TypeKey>,
+    pub types_arena: SlotMap<TypeKey, Type>,
 }
 
 #[derive(Debug, Clone)]
 pub struct TypedFunctionExpr {
-    pub function_index: TypeIndex,
+    pub function_index: TypeKey,
     pub fn_token: FunctionToken,
-    pub name: Spanned<String>,
-    pub arguments: BTreeMap<String, TypeIndex>,
-    pub return_type: TypeIndex,
+    pub name: Option<Spanned<String>>,
+    pub arguments: BTreeMap<String, TypeKey>,
+    pub return_type: TypeKey,
     pub body: Box<TypedExpression>,
 }
 
@@ -99,7 +99,7 @@ pub enum TypedExpression {
     String(Spanned<String>),
 
     Ident {
-        type_index: TypeIndex,
+        type_key: TypeKey,
         refers_to: RefersTo,
         str_value: Spanned<String>,
     },
@@ -111,7 +111,7 @@ pub enum TypedExpression {
     },
 
     Assign {
-        local_index: LocalIndex,
+        local_index: LocalKey,
         lhs: Assignable,
         value: Box<Self>,
     },
@@ -123,10 +123,10 @@ pub enum TypedExpression {
         right_parent: RightParenthesisToken,
         arguments: Vec<Self>,
         left_parent: LeftParenthesisToken,
-        return_type: TypeIndex,
+        return_type: TypeKey,
     },
 
-    Return(TypeIndex, ReturnToken, Option<Box<Self>>),
+    Return(TypeKey, ReturnToken, Option<Box<Self>>),
 
     Block {
         left_brace: LeftBraceToken,
@@ -143,7 +143,7 @@ impl Spannable for TypedExpression {
             TypedExpression::Bool(Spanned(span, _)) => span.clone(),
             TypedExpression::String(Spanned(span, _)) => span.clone(),
             TypedExpression::Ident {
-                type_index: _,
+                type_key: _,
                 refers_to: _,
                 str_value: Spanned(span, _),
             } => span.clone(),
@@ -186,7 +186,7 @@ impl Spannable for TypedExpression {
 
 #[derive(Debug, Clone)]
 pub enum Callable {
-    Function(TypeIndex, Spanned<String>),
+    Function(RefersTo, Spanned<String>),
 }
 
 impl Spannable for Callable {
@@ -199,12 +199,12 @@ impl Spannable for Callable {
 
 #[derive(Debug, Clone, Copy, derive_more::From)]
 pub enum RefersTo {
-    Local(LocalIndex),
-    Type(TypeIndex),
+    Local(LocalKey),
+    Type(TypeKey),
 }
 
 impl RefersTo {
-    pub fn into_type(self, t_ast: &TypedAst) -> TypeIndex {
+    pub fn into_type(self, t_ast: &TypedAst) -> TypeKey {
         match self {
             RefersTo::Local(local_index) => t_ast.locals[local_index],
             RefersTo::Type(type_index) => type_index,
@@ -215,7 +215,7 @@ impl RefersTo {
 #[non_exhaustive]
 #[derive(Debug, Clone)]
 pub enum Assignable {
-    Ident(TypeIndex, Spanned<String>),
+    Ident(TypeKey, Spanned<String>),
 }
 
 impl Spannable for Assignable {
@@ -232,7 +232,7 @@ impl TryFrom<TypedExpression> for Assignable {
     fn try_from(value: TypedExpression) -> Result<Self, Self::Error> {
         match value {
             TypedExpression::Ident {
-                type_index: ty,
+                type_key: ty,
                 refers_to: _,
                 str_value: ident,
             } => Ok(Assignable::Ident(ty, ident)),
@@ -244,8 +244,8 @@ impl TryFrom<TypedExpression> for Assignable {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct FunctionType {
-    pub arguments: BTreeMap<String, TypeIndex>,
-    pub return_type: TypeIndex,
+    pub arguments: BTreeMap<String, TypeKey>,
+    pub return_type: TypeKey,
 }
 
 #[derive(Debug, Clone, PartialEq)]

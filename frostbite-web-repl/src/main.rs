@@ -1,7 +1,5 @@
 use axum::{routing::post, Router};
-use frostbite_compiler::{
-    codegen::CodegenBackends, Compiler,
-};
+use frostbite_compiler::{codegen::CodegenBackends, Compiler};
 use tokio::net::TcpListener;
 use tower_http::services::ServeDir;
 
@@ -28,7 +26,7 @@ async fn compile_source_code(body: String) {
 
         let src_id = compiler.add_source("anonymous-file".to_string(), body);
 
-        let result = compiler
+        let _ = compiler
             .compile_source_code(src_id, CodegenBackends::bytecode_backend())
             .map_err(|_| compiler.explode());
     })

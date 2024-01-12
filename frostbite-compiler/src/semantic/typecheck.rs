@@ -1,9 +1,5 @@
 #![allow(clippy::single_match)]
 
-extern crate std;
-
-use std::dbg;
-
 use core::{
     cmp::Ordering::{Equal, Greater, Less},
     ops::Range,
@@ -23,7 +19,7 @@ use TypedExpression::*;
 use crate::{
     context::CompilerContext,
     tir::{
-        display::display_type, Assignable, Callable, FunctionType, RefersTo, Type, TypeIndex,
+        display::display_type, Assignable, Callable, FunctionType, RefersTo, Type, TypeKey,
         TypedAst, TypedExpression, TypedFunctionExpr,
     },
     utils::Scopes,
@@ -200,7 +196,7 @@ impl RecursiveTypechecker {
         }
     }
 
-    fn unify(t_ast: &mut TypedAst, a: TypeIndex, b: TypeIndex) -> Result<(), ()> {
+    fn unify(t_ast: &mut TypedAst, a: TypeKey, b: TypeKey) -> Result<(), ()> {
         match (t_ast.types_arena[a].clone(), t_ast.types_arena[b].clone()) {
             (Type::Object(left), Type::Object(right)) if left == right => Ok(()),
 
@@ -231,7 +227,7 @@ impl RecursiveTypechecker {
         source_id: SourceId,
         expr: &Expr,
         t_ast: &mut TypedAst,
-    ) -> Result<TypeIndex, TypecheckError> {
+    ) -> Result<TypeKey, TypecheckError> {
         match expr {
             Expr::Int(_) => Ok(t_ast.types_arena.insert(Type::Int)),
             Expr::Float(_) => Ok(t_ast.types_arena.insert(Type::Float)),
@@ -246,12 +242,12 @@ impl RecursiveTypechecker {
                 };
 
                 match referred_to {
-                    RefersTo::Local(local_index) => Ok(t_ast.locals[local_index]),
-                    RefersTo::Type(type_index) => Ok(type_index),
+                    RefersTo::Local(local_key) => Ok(t_ast.locals[local_key]),
+                    RefersTo::Type(type_key) => Ok(type_key),
                 }
             }
             Expr::BinaryOperation { lhs, operator, rhs } => {
-                let (lhs_type_idx, rhs_type_idx) = (
+                let (lhs_type_key, rhs_type_key) = (
                     self.infer_type(source_id, lhs, t_ast)?,
                     self.infer_type(source_id, rhs, t_ast)?,
                 );
@@ -259,8 +255,8 @@ impl RecursiveTypechecker {
                 match (
                     operator.kind,
                     (
-                        &t_ast.types_arena[lhs_type_idx],
-                        &t_ast.types_arena[rhs_type_idx],
+                        &t_ast.types_arena[lhs_type_key],
+                        &t_ast.types_arena[rhs_type_key],
                     ),
                 ) {
                     (
@@ -279,14 +275,14 @@ impl RecursiveTypechecker {
                     ) => Ok(t_ast.types_arena.insert(Type::Float)),
 
                     (BinaryOperatorKind::Equal, (_, _)) => {
-                        if Self::unify(t_ast, lhs_type_idx, rhs_type_idx).is_ok() {
+                        if Self::unify(t_ast, lhs_type_key, rhs_type_key).is_ok() {
                             Ok(t_ast.types_arena.insert(Type::Bool))
                         } else {
                             Err(TypecheckError::TypeMismatch {
                                 source_id,
                                 span: expr.span(),
-                                expected: display_type(lhs_type_idx, t_ast),
-                                found: display_type(rhs_type_idx, t_ast),
+                                expected: display_type(lhs_type_key, t_ast),
+                                found: display_type(rhs_type_key, t_ast),
                             })
                         }
                     }
@@ -294,8 +290,8 @@ impl RecursiveTypechecker {
                     _ => Err(TypecheckError::IncompatibleOperands {
                         source_id,
                         span: expr.span(),
-                        left: display_type(lhs_type_idx, t_ast),
-                        right: display_type(rhs_type_idx, t_ast),
+                        left: display_type(lhs_type_key, t_ast),
+                        right: display_type(rhs_type_key, t_ast),
                     }),
                 }
             }
@@ -306,7 +302,7 @@ impl RecursiveTypechecker {
             } => Ok(t_ast.types_arena.insert(Type::Unit)),
             Expr::Function {
                 fn_token: _,
-                name: _,
+                name,
                 lpt: _,
                 arguments,
                 rpt: _,
@@ -315,6 +311,18 @@ impl RecursiveTypechecker {
                 equals: _,
                 body: _,
             } => {
+                if let Some(Spanned(_, name)) = name {
+                    match self.scopes.local(name) {
+                        Some(RefersTo::Type(type_key)) => {
+                            if let Type::Function(_) = &t_ast.types_arena[*type_key] {
+                                return Ok(*type_key);
+                            }
+                        }
+
+                        _ => (),
+                    }
+                }
+
                 let fn_type = Type::Function(FunctionType {
                     arguments: arguments
                         .iter()
@@ -356,12 +364,12 @@ impl RecursiveTypechecker {
                         ));
                     };
 
-                    let type_index = referred_to.into_type(t_ast);
+                    let type_key = referred_to.into_type(t_ast);
 
                     if let Type::Function(FunctionType {
                         arguments: _,
                         return_type,
-                    }) = &t_ast.types_arena[type_index]
+                    }) = &t_ast.types_arena[type_key]
                     {
                         Ok(*return_type)
                     } else {
@@ -391,9 +399,9 @@ impl RecursiveTypechecker {
         let old_len = self.scopes.len();
 
         let t_expr = match expr {
-            Expr::Int(value) => TypedExpression::Int(value.as_ref().map(|value| *value)),
-            Expr::Float(value) => TypedExpression::Float(value.as_ref().map(|value| *value)),
-            Expr::Bool(value) => TypedExpression::Bool(value.as_ref().map(|value| *value)),
+            Expr::Int(value) => TypedExpression::Int(value.clone()),
+            Expr::Float(value) => TypedExpression::Float(value.clone()),
+            Expr::Bool(value) => TypedExpression::Bool(value.clone()),
             Expr::String(value) => {
                 TypedExpression::String(value.as_ref().map(|value| value.into()))
             }
@@ -405,10 +413,10 @@ impl RecursiveTypechecker {
                     ));
                 };
 
-                let type_index = refers_to.into_type(t_ast);
+                let type_key = refers_to.into_type(t_ast);
 
                 TypedExpression::Ident {
-                    type_index,
+                    type_key,
                     refers_to,
                     str_value: Spanned(span.clone(), ident.into()),
                 }
@@ -439,9 +447,9 @@ impl RecursiveTypechecker {
                             return Err(TypecheckError::CannotAssignTo(source_id, lhs.span()))
                         }
                         None => {
-                            let inferred_type = dbg!(self.infer_type(source_id, value, t_ast)?);
+                            let inferred_type = self.infer_type(source_id, value, t_ast)?;
 
-                            let local_index = dbg!(t_ast.locals.insert(inferred_type));
+                            let local_index = t_ast.locals.insert(inferred_type);
 
                             self.scopes
                                 .insert_local(spanned_str.value(), RefersTo::Local(local_index));
@@ -468,7 +476,7 @@ impl RecursiveTypechecker {
             }
             Expr::Function {
                 fn_token,
-                name: Spanned(name_span, name),
+                name,
                 lpt: _,
                 arguments,
                 rpt: _,
@@ -477,10 +485,12 @@ impl RecursiveTypechecker {
                 equals: _,
                 body,
             } => {
-                let fn_type_index = self.infer_type(source_id, expr, t_ast)?;
+                let fn_type_key = self.infer_type(source_id, expr, t_ast)?;
 
-                self.scopes
-                    .insert_local(name, RefersTo::Type(fn_type_index));
+                if let Some(name) = name {
+                    self.scopes
+                        .insert_local(name.value(), RefersTo::Type(fn_type_key));
+                }
 
                 let arguments = arguments
                     .iter()
@@ -518,9 +528,9 @@ impl RecursiveTypechecker {
                 self.scopes.leave_scope();
 
                 let function = TypedFunctionExpr {
-                    function_index: fn_type_index,
+                    function_index: fn_type_key,
                     fn_token: fn_token.clone(),
-                    name: Spanned(name_span.clone(), name.into()),
+                    name: name.as_ref().cloned(),
                     arguments,
                     return_type,
                     body: Box::new(t_ast_body),
@@ -541,16 +551,16 @@ impl RecursiveTypechecker {
                 right_paren,
             } => match &**callee {
                 Expr::Ident(spanned_str) => {
-                    let Some(refers_to) = self.scopes.local(spanned_str.value()) else {
+                    let Some(refers_to) = self.scopes.local(spanned_str.value()).copied() else {
                         return Err(TypecheckError::SymbolNotFound(
                             source_id,
                             spanned_str.clone(),
                         ));
                     };
 
-                    let type_idx = dbg!(refers_to.into_type(t_ast));
+                    let type_key = refers_to.into_type(t_ast);
 
-                    let Type::Function(function) = t_ast.types_arena[type_idx].clone() else {
+                    let Type::Function(function) = t_ast.types_arena[type_key].clone() else {
                         return Err(TypecheckError::CannotCallNonFunction(
                             source_id,
                             callee.span(),
@@ -613,7 +623,7 @@ impl RecursiveTypechecker {
                     }
 
                     TypedExpression::Call {
-                        callee: Callable::Function(type_idx, spanned_str.clone().map(Into::into)),
+                        callee: Callable::Function(refers_to, spanned_str.clone().map(Into::into)),
                         left_parent: left_paren.clone(),
                         arguments,
                         right_parent: right_paren.clone(),
@@ -684,7 +694,7 @@ impl RecursiveTypechecker {
     fn typecheck_fn_body_returns(
         source_id: SourceId,
         t_ast: &mut TypedAst,
-        expected_type: TypeIndex,
+        expected_type: TypeKey,
         expr: &TypedExpression,
     ) -> Result<(), TypecheckError> {
         use TypedExpression::*;

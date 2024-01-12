@@ -1,3 +1,7 @@
+extern crate std;
+
+use std::dbg;
+
 use alloc::{vec, vec::Vec};
 use frostbite_bytecode::{
     ConstantValue, Function, FunctionIndex, Globals, Instruction, Manifest, Module,
@@ -12,7 +16,7 @@ use super::CodegenBackend;
 
 #[derive(Debug, Default)]
 pub struct BytecodeCodegenBackend {
-    functions: SecondaryMap<tir::TypeIndex, FunctionIndex>,
+    functions: SecondaryMap<tir::TypeKey, FunctionIndex>,
 }
 
 impl BytecodeCodegenBackend {
@@ -39,7 +43,7 @@ impl BytecodeCodegenBackend {
             | TypedExpression::String(..) => self.compile_constant(instructions, globals, t_expr),
 
             TypedExpression::Ident {
-                type_index: _,
+                type_key: _,
                 refers_to: _,
                 str_value: Spanned(_, name),
             } => {
@@ -174,7 +178,7 @@ impl BytecodeCodegenBackend {
         let dummy_function_index = globals.functions.insert(Function { body: vec![] });
 
         self.functions
-            .insert(function.function_index, dummy_function_index);
+            .insert(dbg!(function.function_index), dummy_function_index);
 
         globals.functions[dummy_function_index] =
             self.compile_function(t_ast, globals, &function.body);
@@ -209,11 +213,13 @@ impl BytecodeCodegenBackend {
         arguments_exprs: &[TypedExpression],
     ) {
         match callee {
-            tir::Callable::Function(function_type_index, _) => {
+            tir::Callable::Function(refers_to, _) => {
+                let function_type_key = refers_to.into_type(t_ast);
+
                 let Type::Function(FunctionType {
                     arguments,
                     return_type: _,
-                }) = &t_ast.types_arena[*function_type_index]
+                }) = &t_ast.types_arena[function_type_key]
                 else {
                     unreachable!()
                 };
@@ -226,7 +232,7 @@ impl BytecodeCodegenBackend {
                     },
                 );
 
-                let function_index = self.functions[*function_type_index];
+                let function_index = self.functions[dbg!(function_type_key)];
 
                 instructions.push(Instruction::Call(function_index));
             }

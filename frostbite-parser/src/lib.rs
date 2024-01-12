@@ -237,18 +237,24 @@ impl<'report_context> Parser<'report_context> {
             Some(Spanned(fn_token_span, Token::Fn)) => {
                 let fn_token = FunctionToken(fn_token_span);
 
-                let name = consume_token!(
-                    parser: self,
-                    token: Token::Ident(..),
-                    description: "identifier"
-                )?
-                .map(|token| {
-                    if let Token::Ident(ident) = token {
-                        ident
-                    } else {
-                        unreachable!()
-                    }
-                });
+                let mut name = None;
+
+                if let Some(Spanned(_, Token::Ident(_))) = self.token_stream.peek() {
+                    name = Some(
+                        consume_token!(
+                            parser: self,
+                            token: Token::Ident(..),
+                            description: "identifier"
+                        )?
+                        .map(|token| {
+                            if let Token::Ident(ident) = token {
+                                ident
+                            } else {
+                                unreachable!()
+                            }
+                        }),
+                    );
+                }
 
                 let Spanned(left_paren_span, _) = consume_token!(
                     parser: self,
@@ -566,7 +572,7 @@ mod tests {
             Program {
                 exprs: vec![Expr::Function {
                     fn_token: FunctionToken(0..8),
-                    name: Spanned(9..13, "test".into()),
+                    name: Some(Spanned(9..13, "test".into())),
                     lpt: LeftParenthesisToken(13..14),
                     arguments: vec![
                         Argument {
@@ -606,7 +612,7 @@ mod tests {
             Program {
                 exprs: vec![Expr::Function {
                     fn_token: FunctionToken(0..8),
-                    name: Spanned(9..13, "test".into()),
+                    name: Some(Spanned(9..13, "test".into())),
                     lpt: LeftParenthesisToken(13..14),
                     arguments: vec![
                         Argument {
