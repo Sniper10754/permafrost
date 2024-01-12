@@ -468,7 +468,7 @@ impl RecursiveTypechecker {
             }
             Expr::Function {
                 fn_token,
-                name: spanned_name,
+                name: Spanned(name_span, name),
                 lpt: _,
                 arguments,
                 rpt: _,
@@ -480,7 +480,7 @@ impl RecursiveTypechecker {
                 let fn_type_index = self.infer_type(source_id, expr, t_ast)?;
 
                 self.scopes
-                    .insert_local(spanned_name.value(), RefersTo::Type(fn_type_index));
+                    .insert_local(name, RefersTo::Type(fn_type_index));
 
                 let arguments = arguments
                     .iter()
@@ -520,7 +520,7 @@ impl RecursiveTypechecker {
                 let function = TypedFunctionExpr {
                     function_index: fn_type_index,
                     fn_token: fn_token.clone(),
-                    name: name.clone(),
+                    name: Spanned(name_span.clone(), name.into()),
                     arguments,
                     return_type,
                     body: Box::new(t_ast_body),
