@@ -4,7 +4,16 @@ package.edition = "2021"
 
 resolver = "2"
 
-members = ["frostbite-*"]
+members = [
+    "frostbite-parser",
+    "frostbite-reports",
+    "frostbite-compiler",
+    "frostbite-compiler-driver",
+    "frostbite-bytecode",
+    "frostbite-disassembler",
+    "frostbite-repl",
+    "frostbite-web-repl",
+]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
