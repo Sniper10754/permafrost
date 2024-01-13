@@ -7,7 +7,6 @@ use frostbite_reports::{
     diagnostic_printer::{DefaultPrintBackend, DiagnosticPrinter},
     Report,
 };
-use log::{info};
 
 #[derive(clap::Parser)]
 pub struct CliArgs
@@ -32,18 +31,22 @@ pub enum CliSubcommand
 
 fn main() -> eyre::Result<()>
 {
+    fern::Dispatch::new()
+        .format(|out, message, record| {
+            out.finish(format_args!(
+                "[{} {}] {}",
+                record.level(),
+                record.target(),
+                message
+            ))
+        })
+        .level(log::LevelFilter::Trace)
+        .chain(std::io::stdout())
+        .apply()?;
+
     let args = CliArgs::try_parse()?;
 
     color_eyre::install()?;
-
-    pretty_env_logger::try_init().unwrap();
-
-    #[cfg(debug_assertions)]
-    {
-        // log::set_max_level(LevelFilter::Trace);
-    }
-
-    info!("Hi");
 
     match args.subcommand {
         CliSubcommand::Compile { file, output_file } => {

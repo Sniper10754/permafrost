@@ -642,37 +642,32 @@ impl RecursiveTypechecker
         value: &Expr,
     ) -> Result<TypedExpressionKind, TypecheckError>
     {
-        let _local_index = match lhs {
-            Expr::Ident(spanned_str) => match self.scopes.local(&spanned_str.1).copied() {
-                Some(RefersTo::Local(local_index)) => local_index,
+        let value = self.visit_expr(source_id, value, t_ast)?;
+
+        match lhs {
+            Expr::Ident(spanned_str) => match self.scopes.local(spanned_str.value()).copied() {
+                Some(RefersTo::Local(_)) => {}
                 Some(RefersTo::Type(_)) => {
-                    return Err(TypecheckError::CannotAssignTo(source_id, lhs.span()))
+                    return Err(TypecheckError::CannotAssignTo(source_id, lhs.span()));
                 }
                 None => {
-                    let inferred_type = self.infer_type(source_id, value, t_ast)?;
-
-                    let local_index = dbg!(t_ast.locals.insert(dbg!(inferred_type)));
+                    let local_index = t_ast.locals.insert(value.type_key);
 
                     self.scopes
                         .insert_local(spanned_str.value(), RefersTo::Local(local_index));
-
-                    local_index
                 }
             },
 
             _ => return Err(TypecheckError::CannotAssignTo(source_id, lhs.span())),
-        };
+        }
 
-        let (t_ast_lhs, t_ast_value) = (
-            self.visit_expr(source_id, lhs, t_ast)?,
-            self.visit_expr(source_id, value, t_ast)?,
-        );
+        let lhs = self.visit_expr(source_id, lhs, t_ast)?;
 
-        let assignable = Assignable::try_from(t_ast_lhs).unwrap();
+        let assignable = Assignable::try_from(lhs).unwrap();
 
         Ok(TypedExpressionKind::Assign {
             lhs: assignable,
-            value: Box::new(t_ast_value),
+            value: Box::new(value),
         })
     }
 

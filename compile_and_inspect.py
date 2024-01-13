@@ -17,7 +17,6 @@ if __name__ == "__main__":
         result = subprocess.run([
             "cargo",
             "r",
-            "--quiet",
             "--bin",
             "frostbite-compiler-driver",
             "--",
@@ -39,7 +38,6 @@ if __name__ == "__main__":
         subprocess.run([
             "cargo",
             "r",
-            "--quiet",
             "--bin",
             "frostbite-disassembler",
             "--",

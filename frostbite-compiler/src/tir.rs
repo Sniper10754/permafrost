@@ -49,7 +49,7 @@ pub mod display
         t_ast: &TypedAst,
     ) -> Cow<'static, str>
     {
-        let type_name: Cow<'_, _> = match &t_ast.types_arena[type_key] {
+        let type_description: Cow<'_, _> = match &t_ast.types_arena[type_key] {
             Int => "int".into(),
             Float => "float".into(),
             String => "str".into(),
@@ -57,7 +57,7 @@ pub mod display
                 arguments,
                 return_type,
             }) => format!(
-                "fn ({}) -> {}",
+                "({}) -> {}",
                 join_map_into_string(
                     arguments
                         .iter()
@@ -72,7 +72,7 @@ pub mod display
             Bool => "bool".into(),
         };
 
-        format!("{type_name} ({})", type_key).into()
+        format!("{type_description} [{type_key}]").into()
     }
 
     pub fn display_tree(t_ast: &TypedAst) -> String
@@ -115,14 +115,14 @@ pub mod display
 
                 write!(buf, "{}", display_type(refers_to.into_type(t_ast), t_ast))?;
 
-                write!(buf, ")")?;
+                write!(buf, ") ")?;
 
                 Ok(())
             }
             BinaryOperation { lhs, operator, rhs } => {
                 display_node(buf, t_ast, lhs)?;
 
-                write!(buf, "{}", operator.kind)?;
+                write!(buf, "{} ", operator.kind)?;
 
                 display_node(buf, t_ast, rhs)?;
 
@@ -131,11 +131,11 @@ pub mod display
             Assign { lhs, value } => {
                 match lhs {
                     Assignable::Ident(type_key, Spanned(_, name)) => {
-                        write!(buf, "{name} ({type_key})")?;
+                        write!(buf, "{name} [{type_key}]")?;
                     }
                 }
 
-                write!(buf, "=")?;
+                write!(buf, " = ")?;
 
                 display_node(buf, t_ast, value)?;
 
@@ -160,7 +160,7 @@ pub mod display
                     let mut arguments_iter = arguments.iter();
 
                     if let Some((name, type_key)) = arguments_iter.next() {
-                        write!(buf, ", {name}: {}", display_type(*type_key, t_ast))?;
+                        write!(buf, "{name}: {}", display_type(*type_key, t_ast))?;
 
                         arguments_iter.try_for_each(|(name, type_key)| {
                             write!(buf, ", {name}: {}", display_type(*type_key, t_ast))
@@ -169,10 +169,9 @@ pub mod display
                 }
 
                 write!(buf, ") ")?;
-
                 write!(buf, "-> {}", display_type(*return_type, t_ast))?;
-
-                write!(buf, " = ")?;
+                writeln!(buf)?;
+                write!(buf, "\t= ")?;
 
                 display_node(buf, t_ast, body)?;
 
@@ -189,21 +188,31 @@ pub mod display
                     Callable::Function(refers_to, Spanned(_, name)) => {
                         write!(
                             buf,
-                            "{name} {}",
+                            "{name} (which has type {})",
                             display_type(refers_to.into_type(t_ast), t_ast)
                         )?;
                     }
                 }
 
                 write!(buf, "(")?;
+                {
+                    let mut arguments_iter = arguments.iter();
 
-                arguments
-                    .iter()
-                    .try_for_each(|argument| display_node(buf, t_ast, argument))?;
+                    if let Some(argument) = arguments_iter.next() {
+                        display_node(buf, t_ast, argument)?;
 
+                        arguments_iter.try_for_each(|argument| {
+                            write!(buf, ", ")?;
+
+                            display_node(buf, t_ast, argument)?;
+
+                            Ok(())
+                        })?;
+                    }
+                }
                 write!(buf, ")")?;
 
-                write!(buf, "(returns {})", display_type(*return_type, t_ast))?;
+                write!(buf, " # (returns {})", display_type(*return_type, t_ast))?;
 
                 Ok(())
             }

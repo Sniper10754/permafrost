@@ -90,11 +90,20 @@ impl Compiler
         log::trace!("Running semantic checks...");
         run_semantic_checks(&mut self.ctx, source_id);
 
-        log::debug!(
-            "Typed Internal representation: {}",
-            tir::display::display_tree(&self.ctx.t_asts[source_id])
-        );
+        {
+            use core::fmt::Write;
 
+            log::debug!(
+                "Typed Internal representation:\n{}",
+                tir::display::display_tree(&self.ctx.t_asts[source_id])
+                    .split('\n')
+                    .fold(String::new(), |mut acc, line| {
+                        writeln!(acc, "| {line}").unwrap();
+
+                        acc
+                    }),
+            );
+        }
         bail_on_errors(&self.ctx.report_ctx)?;
 
         log::trace!("Codegenning...");
