@@ -133,7 +133,11 @@ impl Compiler
     {
         let t_ast = &compiler_ctx.t_asts[main_source_id];
 
-        let output = codegen.codegen(&mut compiler_ctx.report_ctx, t_ast);
+        let output = codegen.codegen(
+            &mut compiler_ctx.report_ctx,
+            t_ast,
+            &compiler_ctx.types_arena,
+        );
 
         compiler_ctx.errors_as_result()?;
 

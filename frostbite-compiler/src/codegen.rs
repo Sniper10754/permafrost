@@ -4,7 +4,7 @@ mod bytecode;
 
 pub use bytecode::BytecodeCodegenBackend;
 
-use crate::tir::TypedAst;
+use crate::tir::{TypedAst, TypesArena};
 
 pub trait CodegenBackend
 {
@@ -14,6 +14,7 @@ pub trait CodegenBackend
         self,
         reports: &mut ReportContext,
         tree: &TypedAst,
+        types_arena: &TypesArena,
     ) -> Self::Output;
 }
 

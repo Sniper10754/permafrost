@@ -8,6 +8,7 @@ use slotmap::SecondaryMap;
 
 use crate::tir::{
     self, FunctionType, Type, TypedAst, TypedExpression, TypedExpressionKind, TypedFunction,
+    TypesArena,
 };
 
 use super::CodegenBackend;
@@ -23,6 +24,7 @@ impl BytecodeCodegenBackend
     fn compile_program(
         &mut self,
         t_ast: &TypedAst,
+        types_arena: &TypesArena,
         module: &mut Module,
     )
     {
@@ -30,13 +32,14 @@ impl BytecodeCodegenBackend
         let globals = &mut module.globals;
 
         for node in &t_ast.nodes {
-            self.compile_node(t_ast, body, globals, node);
+            self.compile_node(t_ast, types_arena, body, globals, node);
         }
     }
 
     fn compile_node(
         &mut self,
         t_ast: &TypedAst,
+        types_arena: &TypesArena,
         instructions: &mut Vec<Instruction>,
         globals: &mut Globals,
         t_expr: &TypedExpression,
@@ -57,16 +60,24 @@ impl BytecodeCodegenBackend
                 instructions.push(Instruction::LoadName(name.into()));
             }
 
-            TypedExpressionKind::BinaryOperation { lhs, operator, rhs } => {
-                self.compile_binary_operation(t_ast, instructions, globals, lhs, operator.kind, rhs)
-            }
+            TypedExpressionKind::BinaryOperation { lhs, operator, rhs } => self
+                .compile_binary_operation(
+                    t_ast,
+                    types_arena,
+                    instructions,
+                    globals,
+                    lhs,
+                    operator.kind,
+                    rhs,
+                ),
 
             TypedExpressionKind::Assign { lhs, value } => {
-                self.compile_assignment(t_ast, globals, instructions, lhs, value);
+                self.compile_assignment(t_ast, types_arena, globals, instructions, lhs, value);
             }
 
             TypedExpressionKind::Function(function_expr) => self.compile_function_node(
                 t_ast,
+                types_arena,
                 globals,
                 instructions,
                 t_expr.type_key,
@@ -75,11 +86,18 @@ impl BytecodeCodegenBackend
 
             TypedExpressionKind::Call {
                 callee, arguments, ..
-            } => self.compile_function_call(t_ast, globals, instructions, callee, arguments),
+            } => self.compile_function_call(
+                t_ast,
+                types_arena,
+                globals,
+                instructions,
+                callee,
+                arguments,
+            ),
 
             TypedExpressionKind::Return(_, _, return_value) => {
                 if let Some(value) = return_value {
-                    self.compile_node(t_ast, instructions, globals, value);
+                    self.compile_node(t_ast, types_arena, instructions, globals, value);
                 } else {
                     instructions.push(Instruction::LoadConstant(
                         globals.constants_pool.insert(ConstantValue::Unit),
@@ -89,9 +107,9 @@ impl BytecodeCodegenBackend
                 instructions.push(Instruction::Return);
             }
 
-            TypedExpressionKind::Block { expressions, .. } => expressions
-                .iter()
-                .for_each(|expr| self.compile_node(t_ast, instructions, globals, expr)),
+            TypedExpressionKind::Block { expressions, .. } => expressions.iter().for_each(|expr| {
+                self.compile_node(t_ast, types_arena, instructions, globals, expr)
+            }),
         }
     }
 
@@ -119,6 +137,7 @@ impl BytecodeCodegenBackend
     fn compile_binary_operation(
         &mut self,
         t_ast: &TypedAst,
+        types_arena: &TypesArena,
         instructions: &mut Vec<Instruction>,
         globals: &mut Globals,
         lhs: &TypedExpression,
@@ -126,8 +145,8 @@ impl BytecodeCodegenBackend
         rhs: &TypedExpression,
     )
     {
-        self.compile_node(t_ast, instructions, globals, rhs);
-        self.compile_node(t_ast, instructions, globals, lhs);
+        self.compile_node(t_ast, types_arena, instructions, globals, rhs);
+        self.compile_node(t_ast, types_arena, instructions, globals, lhs);
 
         match operator {
             BinaryOperatorKind::Add => instructions.push(Instruction::Add),
@@ -170,13 +189,14 @@ impl BytecodeCodegenBackend
     fn compile_assignment(
         &mut self,
         t_ast: &TypedAst,
+        types_arena: &TypesArena,
         globals: &mut Globals,
         instructions: &mut Vec<Instruction>,
         lhs: &tir::Assignable,
         value: &TypedExpression,
     )
     {
-        self.compile_node(t_ast, instructions, globals, value);
+        self.compile_node(t_ast, types_arena, instructions, globals, value);
 
         match lhs {
             tir::Assignable::Ident(_, Spanned(_, name)) => {
@@ -188,6 +208,7 @@ impl BytecodeCodegenBackend
     fn compile_function_node(
         &mut self,
         t_ast: &TypedAst,
+        types_arena: &TypesArena,
         globals: &mut Globals,
         instructions: &mut Vec<Instruction>,
         type_key: tir::TypeKey,
@@ -199,7 +220,7 @@ impl BytecodeCodegenBackend
         self.functions.insert(type_key, dummy_function_index);
 
         globals.functions[dummy_function_index] =
-            self.compile_function(t_ast, globals, &function.body);
+            self.compile_function(t_ast, types_arena, globals, &function.body);
 
         instructions.push(Instruction::LoadFunction(dummy_function_index));
 
@@ -211,13 +232,20 @@ impl BytecodeCodegenBackend
     fn compile_function(
         &mut self,
         t_ast: &TypedAst,
+        types_arena: &TypesArena,
         globals: &mut Globals,
         function_body: &TypedExpression,
     ) -> frostbite_bytecode::Function
     {
         let mut bytecode_function_body = Vec::new();
 
-        self.compile_node(t_ast, &mut bytecode_function_body, globals, function_body);
+        self.compile_node(
+            t_ast,
+            types_arena,
+            &mut bytecode_function_body,
+            globals,
+            function_body,
+        );
 
         BytecodeCodegenBackend::compile_function_with_body(bytecode_function_body)
     }
@@ -233,6 +261,7 @@ impl BytecodeCodegenBackend
     fn compile_function_call(
         &mut self,
         t_ast: &TypedAst,
+        types_arena: &TypesArena,
         globals: &mut Globals,
         instructions: &mut Vec<Instruction>,
         callee: &tir::Callable,
@@ -253,7 +282,7 @@ impl BytecodeCodegenBackend
 
                 Iterator::zip(arguments.keys(), arguments_exprs.iter()).for_each(
                     |(argument_name, argument_expr)| {
-                        self.compile_node(t_ast, instructions, globals, argument_expr);
+                        self.compile_node(t_ast, types_arena, instructions, globals, argument_expr);
 
                         instructions.push(Instruction::StoreName(argument_name.into()));
                     },
@@ -277,6 +306,7 @@ impl CodegenBackend for BytecodeCodegenBackend
         mut self,
         _report_ctx: &mut ReportContext,
         t_ast: &TypedAst,
+        types_arena: &TypesArena,
     ) -> Self::Output
     {
         let mut module = Module {
@@ -289,7 +319,7 @@ impl CodegenBackend for BytecodeCodegenBackend
             body: Vec::new(),
         };
 
-        self.compile_program(t_ast, &mut module);
+        self.compile_program(t_ast, types_arena, &mut module);
 
         module
     }
