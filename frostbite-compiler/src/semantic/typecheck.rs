@@ -223,7 +223,6 @@ impl RecursiveTypechecker
     }
 
     fn unify(
-        t_ast: &mut TypedAst,
         types_arena: &mut TypesArena,
         a: TypeKey,
         b: TypeKey,
@@ -237,7 +236,7 @@ impl RecursiveTypechecker
                     left_fn_type.arguments.values().copied(),
                     right_fn_type.arguments.values().copied(),
                 )
-                .try_for_each(|(left, right)| Self::unify(t_ast, types_arena, left, right))?;
+                .try_for_each(|(left, right)| Self::unify(types_arena, left, right))?;
 
                 Ok(())
             }
@@ -400,7 +399,7 @@ impl RecursiveTypechecker
             ) => Ok(types_arena.insert(Type::Float)),
 
             (BinaryOperatorKind::Equal, (..)) => {
-                if Self::unify(t_ast, types_arena, lhs_type_key, rhs_type_key).is_ok() {
+                if Self::unify(types_arena, lhs_type_key, rhs_type_key).is_ok() {
                     Ok(types_arena.insert(Type::Bool))
                 } else {
                     Err(TypecheckError::TypeMismatch {
@@ -565,7 +564,6 @@ impl RecursiveTypechecker
     fn typecheck_function_body_returns(
         &mut self,
         source_id: SourceId,
-        t_ast: &mut TypedAst,
         function: &TypedFunction,
         types_arena: &mut TypesArena,
     ) -> Result<(), TypecheckError>
@@ -573,7 +571,6 @@ impl RecursiveTypechecker
         self.check_fn_body_branches(source_id, &function.body)?;
         Self::typecheck_fn_body_returns(
             source_id,
-            t_ast,
             types_arena,
             function.return_type,
             &function.body,
@@ -584,7 +581,6 @@ impl RecursiveTypechecker
 
     fn typecheck_fn_body_returns(
         source_id: SourceId,
-        t_ast: &mut TypedAst,
         types_arena: &mut TypesArena,
         expected_type: TypeKey,
         expr: &TypedExpression,
@@ -594,7 +590,7 @@ impl RecursiveTypechecker
 
         match &expr.typed_expression_kind {
             Return(return_type_index, return_token, value) => {
-                match Self::unify(t_ast, types_arena, *return_type_index, expected_type) {
+                match Self::unify(types_arena, *return_type_index, expected_type) {
                     Ok(_) => Ok(()),
                     Err(_) => Err(TypecheckError::TypeMismatch {
                         source_id,
@@ -609,7 +605,7 @@ impl RecursiveTypechecker
             }
 
             Block { expressions, .. } => expressions.iter().try_for_each(|expr| {
-                Self::typecheck_fn_body_returns(source_id, t_ast, types_arena, expected_type, expr)
+                Self::typecheck_fn_body_returns(source_id, types_arena, expected_type, expr)
             }),
 
             _ => Ok(()),
@@ -815,7 +811,7 @@ impl RecursiveTypechecker
                 TypedExpressionKind::Block { .. }
             )
         {
-            self.typecheck_function_body_returns(source_id, t_ast, &function, types_arena)?;
+            self.typecheck_function_body_returns(source_id, &function, types_arena)?;
         }
 
         Ok(TypedExpressionKind::Function(function))
@@ -887,7 +883,7 @@ impl RecursiveTypechecker
                         .into_iter(),
                     function.arguments.values().copied(),
                 ) {
-                    match Self::unify(t_ast, types_arena, call_arg, func_arg) {
+                    match Self::unify(types_arena, call_arg, func_arg) {
                         Ok(_) => {}
                         Err(_) => {
                             return Err(TypecheckError::TypeMismatch {
