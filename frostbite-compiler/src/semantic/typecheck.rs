@@ -347,7 +347,7 @@ impl RecursiveTypechecker
     fn infer_ident(
         &mut self,
         t_ast: &TypedAst,
-        types_arena: &mut TypesArena,
+        _types_arena: &mut TypesArena,
         source_id: SourceId,
         name: &str,
         span: Range<usize>,
@@ -423,7 +423,7 @@ impl RecursiveTypechecker
 
     fn infer_function(
         &mut self,
-        t_ast: &mut TypedAst,
+        _t_ast: &mut TypedAst,
         types_arena: &mut TypesArena,
         _source_id: SourceId,
         _name: Option<Spanned<&str>>,
