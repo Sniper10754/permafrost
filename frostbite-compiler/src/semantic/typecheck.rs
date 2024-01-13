@@ -1,13 +1,9 @@
 #![allow(clippy::too_many_arguments)]
 
-extern crate std;
-
 use core::{
     cmp::Ordering::{Equal, Greater, Less},
     ops::Range,
 };
-
-use std::dbg;
 
 use alloc::{
     borrow::Cow, boxed::Box, collections::BTreeMap, format, string::String, vec, vec::Vec,
@@ -683,7 +679,7 @@ impl RecursiveTypechecker
         body: &Expr,
     ) -> Result<TypedExpressionKind, TypecheckError>
     {
-        let type_key = dbg!(self.infer_type(source_id, expr, t_ast)?);
+        let type_key = self.infer_type(source_id, expr, t_ast)?;
 
         if let Some(name) = name.as_ref() {
             self.scopes

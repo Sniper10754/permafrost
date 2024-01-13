@@ -17,11 +17,11 @@ pub mod text_repr;
 new_key_type! {
     #[derive(derive_more::Display)]
     #[display(fmt = "constant #{}", "_0.as_ffi() as u32")]
-    pub struct ConstantIndex;
+    pub struct ConstantKey;
 
     #[derive(derive_more::Display)]
     #[display(fmt = "function #{}", "_0.as_ffi() as u32")]
-    pub struct FunctionIndex;
+    pub struct FunctionKey;
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -35,7 +35,10 @@ pub struct Manifest
 pub enum Instruction
 {
     /// Loads a constant element into the stack from the constants pool
-    LoadConstant(ConstantIndex),
+    LoadConstant(ConstantKey),
+
+    /// Loads a function element into the stack from the functions pool
+    LoadFunction(FunctionKey),
 
     /// Stores the last value onto the stack as name
     StoreName(String),
@@ -47,7 +50,7 @@ pub enum Instruction
     Pop,
 
     /// Calls a function
-    Call(FunctionIndex),
+    Call,
 
     /// Returns from a function
     Return,
@@ -65,10 +68,10 @@ pub enum Instruction
     Cmp,
 
     /// Jumps to determinate function if the `CR` register is set to 1 | true
-    CallEq(FunctionIndex),
+    CallEq,
 
     /// Jumps to determinate function if the `CR` register is set to 0 | false
-    CallNe(FunctionIndex),
+    CallNe,
 
     /// Does nothing
     Nop,
@@ -105,8 +108,8 @@ pub struct Module
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct Globals
 {
-    pub constants_pool: SlotMap<ConstantIndex, ConstantValue>,
-    pub functions: SlotMap<FunctionIndex, Function>,
+    pub constants_pool: SlotMap<ConstantKey, ConstantValue>,
+    pub functions: SlotMap<FunctionKey, Function>,
 }
 
 #[derive(Debug, Clone, Copy, derive_more::Display)]

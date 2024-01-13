@@ -1,10 +1,6 @@
-extern crate std;
-
-use std::dbg;
-
 use alloc::{vec, vec::Vec};
 use frostbite_bytecode::{
-    ConstantValue, Function, FunctionIndex, Globals, Instruction, Manifest, Module,
+    ConstantValue, Function, FunctionKey, Globals, Instruction, Manifest, Module,
 };
 use frostbite_parser::ast::{tokens::BinaryOperatorKind, Spanned};
 use frostbite_reports::ReportContext;
@@ -19,7 +15,7 @@ use super::CodegenBackend;
 #[derive(Debug, Default)]
 pub struct BytecodeCodegenBackend
 {
-    functions: SecondaryMap<tir::TypeKey, FunctionIndex>,
+    functions: SecondaryMap<tir::TypeKey, FunctionKey>,
 }
 
 impl BytecodeCodegenBackend
@@ -69,9 +65,13 @@ impl BytecodeCodegenBackend
                 self.compile_assignment(t_ast, globals, instructions, lhs, value);
             }
 
-            TypedExpressionKind::Function(function_expr) => {
-                self.compile_function_node(t_ast, globals, t_expr.type_key, function_expr)
-            }
+            TypedExpressionKind::Function(function_expr) => self.compile_function_node(
+                t_ast,
+                globals,
+                instructions,
+                t_expr.type_key,
+                function_expr,
+            ),
 
             TypedExpressionKind::Call {
                 callee, arguments, ..
@@ -147,7 +147,9 @@ impl BytecodeCodegenBackend
                         [Instruction::LoadConstant(const_val_idx)].into(),
                     ));
 
-                    instructions.push(Instruction::CallEq(tmp_fn_idx))
+                    instructions.push(Instruction::LoadFunction(tmp_fn_idx));
+
+                    instructions.push(Instruction::CallEq)
                 }
 
                 {
@@ -157,7 +159,9 @@ impl BytecodeCodegenBackend
                         [Instruction::LoadConstant(const_val_idx)].into(),
                     ));
 
-                    instructions.push(Instruction::CallNe(tmp_fn_idx))
+                    instructions.push(Instruction::LoadFunction(tmp_fn_idx));
+
+                    instructions.push(Instruction::CallNe)
                 }
             }
         };
@@ -185,16 +189,23 @@ impl BytecodeCodegenBackend
         &mut self,
         t_ast: &TypedAst,
         globals: &mut Globals,
+        instructions: &mut Vec<Instruction>,
         type_key: tir::TypeKey,
         function: &TypedFunction,
     )
     {
         let dummy_function_index = globals.functions.insert(Function { body: vec![] });
 
-        self.functions.insert(dbg!(type_key), dummy_function_index);
+        self.functions.insert(type_key, dummy_function_index);
 
         globals.functions[dummy_function_index] =
             self.compile_function(t_ast, globals, &function.body);
+
+        instructions.push(Instruction::LoadFunction(dummy_function_index));
+
+        if let Some(Spanned(_, name)) = &function.name {
+            instructions.push(Instruction::StoreName(name.clone()));
+        }
     }
 
     fn compile_function(
@@ -230,7 +241,7 @@ impl BytecodeCodegenBackend
     {
         match callee {
             tir::Callable::Function(refers_to, _) => {
-                let function_type_key = dbg!(refers_to).into_type(t_ast);
+                let function_type_key = refers_to.into_type(t_ast);
 
                 let Type::Function(FunctionType {
                     arguments,
@@ -250,7 +261,9 @@ impl BytecodeCodegenBackend
 
                 let function_index = self.functions[function_type_key];
 
-                instructions.push(Instruction::Call(function_index));
+                instructions.push(Instruction::LoadFunction(function_index));
+
+                instructions.push(Instruction::Call);
             }
         }
     }

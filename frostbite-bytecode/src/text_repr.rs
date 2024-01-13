@@ -98,13 +98,16 @@ where
             index.cyan(),
             module.globals.constants_pool[*index]
         )?,
-        Instruction::CallEq(index) | Instruction::CallNe(index) | Instruction::Call(index) => {
-            write!(w, "{}", index.cyan())?
+        Instruction::LoadFunction(index) => {
+            write!(w, "{}", index.cyan())?;
         }
         Instruction::StoreName(name) => write!(w, "{:?}", name.bright_yellow())?,
         Instruction::LoadName(name) => write!(w, "{:?}", name.bright_yellow())?,
 
         Instruction::Pop
+        | Instruction::Call
+        | Instruction::CallEq
+        | Instruction::CallNe
         | Instruction::Return
         | Instruction::Add
         | Instruction::Subtract
