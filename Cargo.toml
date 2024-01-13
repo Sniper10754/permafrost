@@ -47,4 +47,4 @@ features = ["derive"]
 
 [workspace.lints.rust]
 rust_2018_idioms = "warn"
-unsafe_code = "forbid"
+unsafe_code = "deny"

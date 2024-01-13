@@ -34,4 +34,18 @@ impl CompilerContext
             t_asts: SecondaryMap::new(),
         }
     }
+
+    pub fn has_errors(&self) -> bool
+    {
+        self.report_ctx.has_errors()
+    }
+
+    pub fn errors_as_result<E>(&self) -> Result<(), E>
+    where
+        E: Default,
+    {
+        // Equivalent of 
+        // if self.has_errors() { Err(E::default()) } else { Ok(()) }
+        self.has_errors().then_some(()).ok_or(E::default())
+    }
 }

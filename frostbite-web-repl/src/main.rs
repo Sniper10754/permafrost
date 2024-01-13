@@ -30,7 +30,7 @@ async fn compile_source_code(body: String)
 
         let _ = compiler
             .compile_source_code(src_id, CodegenBackends::bytecode_backend())
-            .map_err(|_| compiler.explode());
+            .map_err(|_| compiler.move_ctx());
     })
     .await
     .unwrap();

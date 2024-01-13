@@ -9,10 +9,7 @@ use frostbite_parser::{
     lexer::{tokenize, TokenStream},
     Parser,
 };
-use frostbite_reports::{
-    sourcemap::{SourceDescription, SourceId, SourceUrl},
-    ReportContext,
-};
+use frostbite_reports::sourcemap::{SourceDescription, SourceId, SourceUrl};
 use semantic::run_semantic_checks;
 
 pub mod codegen;
@@ -21,15 +18,6 @@ pub mod intrinsic;
 pub mod semantic;
 pub mod tir;
 pub mod utils;
-
-fn bail_on_errors(report_ctx: &ReportContext) -> Result<(), CompilerError>
-{
-    if report_ctx.has_errors() {
-        Err(CompilerError)
-    } else {
-        Ok(())
-    }
-}
 
 #[derive(Debug, Clone, Copy, Default, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub struct CompilerError;
@@ -71,16 +59,8 @@ impl Compiler
         codegen: C,
     ) -> Result<CompilationResults<C>, CompilerError>
     {
-        let source = self
-            .ctx
-            .src_map
-            .get(source_id)
-            .unwrap()
-            .source_code
-            .as_str();
-
         log::trace!("Lexing...");
-        let token_stream = Self::lex(&mut self.ctx.report_ctx, source_id, source)?;
+        let token_stream = Self::lex(&mut self.ctx, source_id)?;
 
         log::trace!("Parsing...");
         // AST is stored in the compiler context
@@ -104,7 +84,7 @@ impl Compiler
                     }),
             );
         }
-        bail_on_errors(&self.ctx.report_ctx)?;
+        self.ctx.errors_as_result()?;
 
         log::trace!("Codegenning...");
         let codegen_output = Self::codegen(&mut self.ctx, source_id, codegen)?;
@@ -116,14 +96,15 @@ impl Compiler
     }
 
     fn lex(
-        report_ctx: &mut ReportContext,
+        compiler_ctx: &mut CompilerContext,
         source_id: SourceId,
-        source: &str,
     ) -> Result<TokenStream, CompilerError>
     {
-        let token_stream = tokenize(report_ctx, source_id, source);
+        let source = compiler_ctx.src_map[source_id].source_code.as_str();
 
-        bail_on_errors(report_ctx)?;
+        let token_stream = tokenize(&mut compiler_ctx.report_ctx, source_id, source);
+
+        compiler_ctx.errors_as_result()?;
 
         Ok(token_stream)
     }
@@ -139,7 +120,7 @@ impl Compiler
 
         compiler_ctx.asts.insert(source_id, ast);
 
-        bail_on_errors(&compiler_ctx.report_ctx)?;
+        compiler_ctx.errors_as_result()?;
 
         Ok(())
     }
@@ -154,7 +135,7 @@ impl Compiler
 
         let output = codegen.codegen(&mut compiler_ctx.report_ctx, t_ast);
 
-        bail_on_errors(&compiler_ctx.report_ctx)?;
+        compiler_ctx.errors_as_result()?;
 
         Ok(output)
     }
@@ -164,7 +145,15 @@ impl Compiler
         &self.ctx
     }
 
-    pub fn explode(self) -> CompilerContext
+    /// # Safety
+    /// Doesnt cause ub, can break invariants
+    #[allow(unsafe_code)]
+    pub unsafe fn ctx_mut(&mut self) -> &mut CompilerContext
+    {
+        &mut self.ctx
+    }
+
+    pub fn move_ctx(self) -> CompilerContext
     {
         self.ctx
     }

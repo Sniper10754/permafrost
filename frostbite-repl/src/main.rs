@@ -77,5 +77,5 @@ fn compile_code(code: &str) -> Result<frostbite_bytecode::Module, CompilerContex
     compiler
         .compile_source_code(src_id, CodegenBackends::bytecode_backend())
         .map(|CompilationResults { codegen_output }| codegen_output)
-        .map_err(|_| (compiler.explode()))
+        .map_err(|_| (compiler.move_ctx()))
 }
