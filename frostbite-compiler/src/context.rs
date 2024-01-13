@@ -1,3 +1,4 @@
+use alloc::string::String;
 use frostbite_parser::ast::Program;
 use frostbite_reports::{
     sourcemap::{SourceId, SourceMap},
@@ -7,7 +8,7 @@ use slotmap::{SecondaryMap, SlotMap};
 
 use crate::{
     intrinsic::IntrinsicContext,
-    tir::{Type, TypeKey, TypedAst},
+    tir::{Type, TypeKey, TypedAst, TypesArena},
 };
 
 #[derive(Debug, Default)]
@@ -38,6 +39,18 @@ impl CompilerContext
             t_asts: SecondaryMap::new(),
             types_arena: SlotMap::default(),
         }
+    }
+
+    pub fn insert_intrinsic<F>(
+        &mut self,
+        name: impl Into<String>,
+        f: F,
+    ) where
+        F: Fn(&mut TypesArena) -> TypeKey,
+    {
+        let value = f(&mut self.types_arena);
+
+        self.intrinsic_ctx.symbols.insert(name.into(), value);
     }
 
     pub fn has_errors(&self) -> bool

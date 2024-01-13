@@ -193,7 +193,7 @@ pub fn check_types(
         .intrinsic_ctx
         .symbols
         .iter()
-        .map(|(name, ty)| (name, types_arena.insert(ty.clone())))
+        .map(|(name, ty)| (name, *ty))
         .for_each(|(name, type_key)| rts.scopes.insert_local(name, RefersTo::Type(type_key)));
 
     let ast = &compiler_ctx.asts[source_id];

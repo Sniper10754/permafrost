@@ -1,9 +1,9 @@
 use alloc::{collections::BTreeMap, string::String};
 
-use crate::tir::Type;
+use crate::tir::TypeKey;
 
 #[derive(Debug, Default, derive_more::From)]
 pub struct IntrinsicContext
 {
-    pub symbols: BTreeMap<String, Type>,
+    pub symbols: BTreeMap<String, TypeKey>,
 }

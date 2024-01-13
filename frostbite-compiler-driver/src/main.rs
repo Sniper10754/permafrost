@@ -59,17 +59,14 @@ fn main() -> eyre::Result<()>
             let mut compiler = Compiler::new();
 
             #[allow(unsafe_code)]
-            (unsafe { compiler.ctx_mut() })
-                .intrinsic_ctx
-                .symbols
-                .insert("print".into(), {
-                    
-                    
-                    Type::Function(FunctionType {
-                        arguments: todo!(),
-                        return_type: todo!(),
-                    })
-                });
+            (unsafe { compiler.ctx_mut() }).insert_intrinsic("print", |types_arena| {
+                let return_type = types_arena.insert(Type::Unit);
+
+                types_arena.insert(Type::Function(FunctionType {
+                    arguments: [].into(),
+                    return_type,
+                }))
+            });
 
             let src_id = compiler.add_source(file.display().to_string(), src);
 
