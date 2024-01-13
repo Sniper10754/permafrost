@@ -19,7 +19,7 @@ color-eyre = { workspace = true }
 log = { workspace = true }
 
 clap = { version = "4", features = ["derive", "color"] }
-fern = { version = "0.6" }
+fern = { version = "0.6", features = ["colored"] }
 
 [lints]
 workspace = true

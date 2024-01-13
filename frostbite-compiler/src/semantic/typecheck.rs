@@ -406,8 +406,8 @@ impl RecursiveTypechecker
                     Err(TypecheckError::TypeMismatch {
                         source_id,
                         span,
-                        expected: display_type(lhs_type_key, types_arena, t_ast),
-                        found: display_type(rhs_type_key, types_arena, t_ast),
+                        expected: display_type(lhs_type_key, types_arena),
+                        found: display_type(rhs_type_key, types_arena),
                     })
                 }
             }
@@ -415,8 +415,8 @@ impl RecursiveTypechecker
             _ => Err(TypecheckError::IncompatibleOperands {
                 source_id,
                 span,
-                left: display_type(lhs_type_key, types_arena, t_ast),
-                right: display_type(rhs_type_key, types_arena, t_ast),
+                left: display_type(lhs_type_key, types_arena),
+                right: display_type(rhs_type_key, types_arena),
             }),
         }
     }
@@ -602,8 +602,8 @@ impl RecursiveTypechecker
                             .as_ref()
                             .map(|expr| expr.typed_expression_kind.span())
                             .unwrap_or(return_token.span()),
-                        expected: display_type(expected_type, types_arena, t_ast),
-                        found: display_type(*return_type_index, types_arena, t_ast),
+                        expected: display_type(expected_type, types_arena),
+                        found: display_type(*return_type_index, types_arena),
                     }),
                 }
             }
@@ -893,8 +893,8 @@ impl RecursiveTypechecker
                             return Err(TypecheckError::TypeMismatch {
                                 source_id,
                                 span: call_arg_span,
-                                expected: display_type(func_arg, types_arena, t_ast),
-                                found: display_type(call_arg, types_arena, t_ast),
+                                expected: display_type(func_arg, types_arena),
+                                found: display_type(call_arg, types_arena),
                             })
                         }
                     }

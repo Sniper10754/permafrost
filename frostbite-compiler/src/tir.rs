@@ -49,30 +49,30 @@ pub mod display
     pub fn display_type(
         type_key: TypeKey,
         types_arena: &TypesArena,
-        t_ast: &TypedAst,
     ) -> Cow<'static, str>
     {
-        let type_description: Cow<'_, _> = match &types_arena[type_key] {
-            Int => "int".into(),
-            Float => "float".into(),
-            String => "str".into(),
-            Function(FunctionType {
-                arguments,
-                return_type,
-            }) => format!(
-                "({}) -> {}",
-                join_map_into_string(arguments.iter().map(|(name, type_idx)| (
-                    name.as_str(),
-                    display_type(*type_idx, types_arena, t_ast)
-                ))),
-                display_type(*return_type, types_arena, t_ast)
-            )
-            .into(),
-            Unit => "()".into(),
-            Object(object_name) => format!("object {object_name}").into(),
-            Any => "any".into(),
-            Bool => "bool".into(),
-        };
+        let type_description: Cow<'_, _> =
+            match &types_arena[type_key] {
+                Int => "int".into(),
+                Float => "float".into(),
+                String => "str".into(),
+                Function(FunctionType {
+                    arguments,
+                    return_type,
+                }) => format!(
+                    "({}) -> {}",
+                    join_map_into_string(arguments.iter().map(|(name, type_idx)| (
+                        name.as_str(),
+                        display_type(*type_idx, types_arena)
+                    ))),
+                    display_type(*return_type, types_arena)
+                )
+                .into(),
+                Unit => "()".into(),
+                Object(object_name) => format!("object {object_name}").into(),
+                Any => "any".into(),
+                Bool => "bool".into(),
+            };
 
         format!("{type_description} [{type_key}]").into()
     }
@@ -122,7 +122,7 @@ pub mod display
                 write!(
                     buf,
                     "{}",
-                    display_type(refers_to.into_type(t_ast), types_arena, t_ast)
+                    display_type(refers_to.into_type(t_ast), types_arena)
                 )?;
 
                 write!(buf, ") ")?;
@@ -170,24 +170,16 @@ pub mod display
                     let mut arguments_iter = arguments.iter();
 
                     if let Some((name, type_key)) = arguments_iter.next() {
-                        write!(
-                            buf,
-                            "{name}: {}",
-                            display_type(*type_key, types_arena, t_ast)
-                        )?;
+                        write!(buf, "{name}: {}", display_type(*type_key, types_arena))?;
 
                         arguments_iter.try_for_each(|(name, type_key)| {
-                            write!(
-                                buf,
-                                ", {name}: {}",
-                                display_type(*type_key, types_arena, t_ast)
-                            )
+                            write!(buf, ", {name}: {}", display_type(*type_key, types_arena))
                         })?;
                     }
                 }
 
                 write!(buf, ") ")?;
-                write!(buf, "-> {}", display_type(*return_type, types_arena, t_ast))?;
+                write!(buf, "-> {}", display_type(*return_type, types_arena))?;
                 writeln!(buf)?;
                 write!(buf, "\t= ")?;
 
@@ -207,7 +199,7 @@ pub mod display
                         write!(
                             buf,
                             "{name} (which has type {})",
-                            display_type(refers_to.into_type(t_ast), types_arena, t_ast)
+                            display_type(refers_to.into_type(t_ast), types_arena)
                         )?;
                     }
                 }
@@ -233,7 +225,7 @@ pub mod display
                 write!(
                     buf,
                     " # (returns {})",
-                    display_type(*return_type, types_arena, t_ast)
+                    display_type(*return_type, types_arena)
                 )?;
 
                 Ok(())

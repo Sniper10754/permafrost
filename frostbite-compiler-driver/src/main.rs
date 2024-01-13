@@ -2,6 +2,7 @@ use std::{env, fs, io::Write, path::PathBuf, process};
 
 use clap::Parser;
 use color_eyre::eyre;
+
 use frostbite_compiler::{
     codegen::CodegenBackends,
     tir::{FunctionType, Type},
@@ -11,6 +12,8 @@ use frostbite_reports::{
     diagnostic_printer::{DefaultPrintBackend, DiagnosticPrinter},
     Report,
 };
+
+mod compile;
 
 #[derive(clap::Parser)]
 pub struct CliArgs
@@ -33,20 +36,39 @@ pub enum CliSubcommand
     },
 }
 
+fn setup_logger() -> eyre::Result<()>
+{
+    {
+        use fern::colors::{Color, ColoredLevelConfig};
+        use log::LevelFilter;
+
+        let colors = ColoredLevelConfig::new()
+            .info(Color::Green)
+            .warn(Color::BrightYellow)
+            .error(Color::BrightRed)
+            .debug(Color::BrightMagenta)
+            .trace(Color::BrightCyan);
+
+        fern::Dispatch::new()
+            .format(move |out, message, record| {
+                out.finish(format_args!(
+                    "[{} {}] {}",
+                    colors.color(record.level()),
+                    record.target(),
+                    message,
+                ))
+            })
+            .level(LevelFilter::Trace)
+            .chain(std::io::stdout())
+            .apply()?;
+    }
+
+    Ok(())
+}
+
 fn main() -> eyre::Result<()>
 {
-    fern::Dispatch::new()
-        .format(|out, message, record| {
-            out.finish(format_args!(
-                "[{} {}] {}",
-                record.level(),
-                record.target(),
-                message
-            ))
-        })
-        .level(log::LevelFilter::Trace)
-        .chain(std::io::stdout())
-        .apply()?;
+    setup_logger()?;
 
     let args = CliArgs::try_parse()?;
 
