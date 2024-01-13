@@ -2,7 +2,11 @@ use std::{env, fs, io::Write, path::PathBuf, process};
 
 use clap::Parser;
 use color_eyre::eyre;
-use frostbite_compiler::{codegen::CodegenBackends, CompilationResults, Compiler};
+use frostbite_compiler::{
+    codegen::CodegenBackends,
+    tir::{FunctionType, Type},
+    CompilationResults, Compiler,
+};
 use frostbite_reports::{
     diagnostic_printer::{DefaultPrintBackend, DiagnosticPrinter},
     Report,
@@ -53,6 +57,19 @@ fn main() -> eyre::Result<()>
             let src = fs::read_to_string(&file)?;
 
             let mut compiler = Compiler::new();
+
+            #[allow(unsafe_code)]
+            (unsafe { compiler.ctx_mut() })
+                .intrinsic_ctx
+                .symbols
+                .insert("print".into(), {
+                    
+                    
+                    Type::Function(FunctionType {
+                        arguments: todo!(),
+                        return_type: todo!(),
+                    })
+                });
 
             let src_id = compiler.add_source(file.display().to_string(), src);
 

@@ -246,7 +246,7 @@ impl BytecodeCodegenBackend
                 let Type::Function(FunctionType {
                     arguments,
                     return_type: _,
-                }) = &t_ast.types_arena[function_type_key]
+                }) = &types_arena[function_type_key]
                 else {
                     unreachable!()
                 };

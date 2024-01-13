@@ -40,6 +40,9 @@ pub enum Instruction
     /// Loads a function element into the stack from the functions pool
     LoadFunction(FunctionKey),
 
+    /// Loads a builtin from its name
+    LoadBuiltin(String),
+
     /// Stores the last value onto the stack as name
     StoreName(String),
 

@@ -132,18 +132,20 @@ impl<T> Spanned<T>
         &mut self.1
     }
 
-    pub fn as_deref<O>(&self) -> &O
+    pub fn as_deref<O>(&self) -> Spanned<&O>
     where
         T: Deref<Target = O>,
+        O: ?Sized,
     {
-        self.1.deref()
+        Spanned(self.0.clone(), self.1.deref())
     }
 
-    pub fn as_deref_mut<O>(&mut self) -> &mut O
+    pub fn as_deref_mut<O>(&mut self) -> Spanned<&mut O>
     where
         T: DerefMut<Target = O>,
+        O: ?Sized,
     {
-        self.1.deref_mut()
+        Spanned(self.0.clone(), self.1.deref_mut())
     }
 
     pub fn as_ref(&self) -> Spanned<&T>

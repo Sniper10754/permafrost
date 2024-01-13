@@ -8,6 +8,8 @@ use frostbite_parser::ast::{
 };
 use slotmap::{new_key_type, SlotMap};
 
+pub type TypesArena = SlotMap<TypeKey, Type>;
+
 new_key_type! {
     #[derive(derive_more::Display)]
     #[display(fmt = "{}", "self.0.as_ffi() as u32")]
@@ -23,7 +25,7 @@ pub mod display
     use core::fmt::{self, Display, Write as _};
     use frostbite_parser::ast::Spanned;
 
-    use super::{FunctionType, TypeKey, TypedAst, TypedExpression};
+    use super::{FunctionType, TypeKey, TypedAst, TypedExpression, TypesArena};
     use crate::tir::{Assignable, Callable, Type::*, TypedExpressionKind, TypedFunction};
 
     fn join_map_into_string<K, V>(mut map: impl Iterator<Item = (K, V)>) -> String
@@ -46,10 +48,11 @@ pub mod display
 
     pub fn display_type(
         type_key: TypeKey,
+        types_arena: &TypesArena,
         t_ast: &TypedAst,
     ) -> Cow<'static, str>
     {
-        let type_description: Cow<'_, _> = match &t_ast.types_arena[type_key] {
+        let type_description: Cow<'_, _> = match &types_arena[type_key] {
             Int => "int".into(),
             Float => "float".into(),
             String => "str".into(),
@@ -58,12 +61,11 @@ pub mod display
                 return_type,
             }) => format!(
                 "({}) -> {}",
-                join_map_into_string(
-                    arguments
-                        .iter()
-                        .map(|(name, type_idx)| (name.as_str(), display_type(*type_idx, t_ast)))
-                ),
-                display_type(*return_type, t_ast)
+                join_map_into_string(arguments.iter().map(|(name, type_idx)| (
+                    name.as_str(),
+                    display_type(*type_idx, types_arena, t_ast)
+                ))),
+                display_type(*return_type, types_arena, t_ast)
             )
             .into(),
             Unit => "()".into(),
@@ -75,7 +77,10 @@ pub mod display
         format!("{type_description} [{type_key}]").into()
     }
 
-    pub fn display_tree(t_ast: &TypedAst) -> String
+    pub fn display_tree(
+        t_ast: &TypedAst,
+        types_arena: &TypesArena,
+    ) -> String
     {
         let mut buf = String::new();
 
@@ -83,7 +88,7 @@ pub mod display
             .nodes
             .iter()
             .try_for_each::<_, fmt::Result>(|node| {
-                display_node(&mut buf, t_ast, node)?;
+                display_node(&mut buf, t_ast, types_arena, node)?;
 
                 writeln!(buf)?;
 
@@ -97,6 +102,7 @@ pub mod display
     pub fn display_node(
         buf: &mut String,
         t_ast: &TypedAst,
+        types_arena: &TypesArena,
         node: &TypedExpression,
     ) -> fmt::Result
     {
@@ -113,18 +119,22 @@ pub mod display
             } => {
                 write!(buf, "{name} (")?;
 
-                write!(buf, "{}", display_type(refers_to.into_type(t_ast), t_ast))?;
+                write!(
+                    buf,
+                    "{}",
+                    display_type(refers_to.into_type(t_ast), types_arena, t_ast)
+                )?;
 
                 write!(buf, ") ")?;
 
                 Ok(())
             }
             BinaryOperation { lhs, operator, rhs } => {
-                display_node(buf, t_ast, lhs)?;
+                display_node(buf, t_ast, types_arena, lhs)?;
 
                 write!(buf, "{} ", operator.kind)?;
 
-                display_node(buf, t_ast, rhs)?;
+                display_node(buf, t_ast, types_arena, rhs)?;
 
                 Ok(())
             }
@@ -137,7 +147,7 @@ pub mod display
 
                 write!(buf, " = ")?;
 
-                display_node(buf, t_ast, value)?;
+                display_node(buf, t_ast, types_arena, value)?;
 
                 Ok(())
             }
@@ -160,20 +170,28 @@ pub mod display
                     let mut arguments_iter = arguments.iter();
 
                     if let Some((name, type_key)) = arguments_iter.next() {
-                        write!(buf, "{name}: {}", display_type(*type_key, t_ast))?;
+                        write!(
+                            buf,
+                            "{name}: {}",
+                            display_type(*type_key, types_arena, t_ast)
+                        )?;
 
                         arguments_iter.try_for_each(|(name, type_key)| {
-                            write!(buf, ", {name}: {}", display_type(*type_key, t_ast))
+                            write!(
+                                buf,
+                                ", {name}: {}",
+                                display_type(*type_key, types_arena, t_ast)
+                            )
                         })?;
                     }
                 }
 
                 write!(buf, ") ")?;
-                write!(buf, "-> {}", display_type(*return_type, t_ast))?;
+                write!(buf, "-> {}", display_type(*return_type, types_arena, t_ast))?;
                 writeln!(buf)?;
                 write!(buf, "\t= ")?;
 
-                display_node(buf, t_ast, body)?;
+                display_node(buf, t_ast, types_arena, body)?;
 
                 Ok(())
             }
@@ -189,7 +207,7 @@ pub mod display
                         write!(
                             buf,
                             "{name} (which has type {})",
-                            display_type(refers_to.into_type(t_ast), t_ast)
+                            display_type(refers_to.into_type(t_ast), types_arena, t_ast)
                         )?;
                     }
                 }
@@ -199,12 +217,12 @@ pub mod display
                     let mut arguments_iter = arguments.iter();
 
                     if let Some(argument) = arguments_iter.next() {
-                        display_node(buf, t_ast, argument)?;
+                        display_node(buf, t_ast, types_arena, argument)?;
 
                         arguments_iter.try_for_each(|argument| {
                             write!(buf, ", ")?;
 
-                            display_node(buf, t_ast, argument)?;
+                            display_node(buf, t_ast, types_arena, argument)?;
 
                             Ok(())
                         })?;
@@ -212,7 +230,11 @@ pub mod display
                 }
                 write!(buf, ")")?;
 
-                write!(buf, " # (returns {})", display_type(*return_type, t_ast))?;
+                write!(
+                    buf,
+                    " # (returns {})",
+                    display_type(*return_type, types_arena, t_ast)
+                )?;
 
                 Ok(())
             }
@@ -226,7 +248,7 @@ pub mod display
 
                 expressions
                     .iter()
-                    .try_for_each(|expr| display_node(buf, t_ast, expr))?;
+                    .try_for_each(|expr| display_node(buf, t_ast, types_arena, expr))?;
 
                 writeln!(buf, "}}")?;
 
@@ -245,7 +267,6 @@ pub struct TypedAst
 {
     pub nodes: Vec<TypedExpression>,
     pub locals: SlotMap<LocalKey, TypeKey>,
-    pub types_arena: SlotMap<TypeKey, Type>,
 }
 
 #[derive(Debug, Clone)]

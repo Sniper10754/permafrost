@@ -101,6 +101,9 @@ where
         Instruction::LoadFunction(index) => {
             write!(w, "{}", index.cyan())?;
         }
+        Instruction::LoadBuiltin(name) => {
+            write!(w, "builtin {}", name.cyan())?;
+        }
         Instruction::StoreName(name) => write!(w, "{:?}", name.bright_yellow())?,
         Instruction::LoadName(name) => write!(w, "{:?}", name.bright_yellow())?,
 
