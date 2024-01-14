@@ -361,11 +361,11 @@ pub enum ImportDirectiveKind
     },
 }
 
-#[derive(Debug, Clone, PartialEq, Default)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct ModulePath
 {
-    pub parents: Vec<String>,
-    pub tail: String,
+    pub parents: Vec<Spanned<String>>,
+    pub tail: Spanned<String>,
 }
 
 impl Display for ModulePath
@@ -377,15 +377,15 @@ impl Display for ModulePath
     {
         let mut iter = self.parents.iter();
 
-        if let Some(parent) = iter.next() {
+        if let Some(Spanned(_, parent)) = iter.next() {
             write!(f, "{parent}")?;
 
-            for parent in iter {
+            for Spanned(_, parent) in iter {
                 write!(f, "::{parent}")?;
             }
         }
 
-        write!(f, "{}", self.tail)?;
+        write!(f, "{}", self.tail.value())?;
 
         Ok(())
     }
@@ -401,7 +401,7 @@ impl DerefMut for ModulePath
 
 impl Deref for ModulePath
 {
-    type Target = Vec<String>;
+    type Target = Vec<Spanned<String>>;
 
     fn deref(&self) -> &Self::Target
     {

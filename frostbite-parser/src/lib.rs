@@ -2,6 +2,8 @@
 
 extern crate alloc;
 
+use core::ops::Range;
+
 use alloc::{boxed::Box, vec};
 
 pub mod ast;
@@ -14,7 +16,7 @@ use ast::{
         ArrowToken, Eq, LeftBraceToken, LeftParenthesisToken, Operator, ReturnToken,
         RightBraceToken, RightParenthesisToken, TypeAnnotation,
     },
-    Argument, Expr, ModulePath, Program, Spanned,
+    Argument, Expr, ImportDirectiveKind, ModulePath, Program, Spanned,
 };
 use error::ErrorKind;
 use frostbite_reports::{sourcemap::SourceId, ReportContext};
@@ -229,14 +231,42 @@ impl<'report_context> Parser<'report_context>
             Some(Spanned(span, Token::Ident(value))) => Some(Expr::Ident(Spanned(span, value))),
             Some(Spanned(span, Token::String(value))) => Some(Expr::String(Spanned(span, value))),
 
+            Some(Spanned(Range { start, end: _ }, Token::Import)) => {
+                let Spanned(Range { start: _, end }, module) = self.parse_module_path()?;
+
+                Some(Expr::ImportDirective(Spanned(
+                    start..end,
+                    ImportDirectiveKind::ImportModule { module },
+                )))
+            }
+
+            Some(Spanned(Range { start, end: _ }, Token::From)) => {
+                let Spanned(Range { start: _, end }, module) = self.parse_module_path()?;
+
+                consume_token!(
+                    parser: self,
+                    token: Token::Import,
+                    description: "import"
+                )?;
+
+                let Spanned(_, Token::Ident(symbol)) = consume_token!(
+                    parser: self,
+                    token: Token::Ident(..),
+                    description: "A name"
+                )?
+                else {
+                    unreachable!()
+                };
+
+                Some(Expr::ImportDirective(Spanned(
+                    start..end,
+                    ImportDirectiveKind::FromModuleImportSymbol { module, symbol },
+                )))
+            }
+
             Some(Spanned(span, Token::True)) => Some(Expr::Bool(Spanned(span, true))),
             Some(Spanned(span, Token::False)) => Some(Expr::Bool(Spanned(span, false))),
 
-            // Some(Spanned(span, Token::Import)) => {
-            //     let span_start = span.start;
-
-            //     // let
-            // }
             Some(Spanned(_, Token::LParen)) => {
                 let expr = self.parse_expr()?;
 
@@ -490,13 +520,16 @@ impl<'report_context> Parser<'report_context>
         }
     }
 
-    fn parse_module_path(&mut self) -> Option<ModulePath>
+    fn parse_module_path(&mut self) -> Option<Spanned<ModulePath>>
     {
         let mut parents = Vec::new();
+        let span_start;
 
         match self.token_stream.next() {
-            Some(Spanned(span, Token::Ident(identifier))) => {
-                parents.push(identifier);
+            Some(Spanned(Range { start, end }, Token::Ident(identifier))) => {
+                span_start = start;
+
+                parents.push(Spanned(start..end, identifier));
 
                 loop {
                     match self.token_stream.peek() {
@@ -508,7 +541,7 @@ impl<'report_context> Parser<'report_context>
                             )
                             .unwrap();
 
-                            let Spanned(_, Token::Ident(name)) = consume_token!(
+                            let Spanned(span, Token::Ident(name)) = consume_token!(
                                 parser: self,
                                 token: Token::Ident(..),
                                 description: "Identifier"
@@ -517,7 +550,7 @@ impl<'report_context> Parser<'report_context>
                                 unreachable!()
                             };
 
-                            parents.push(name)
+                            parents.push(Spanned(span, name))
                         }
 
                         Some(_) => break,
@@ -551,9 +584,11 @@ impl<'report_context> Parser<'report_context>
             .pop()
             .expect("There's at least one parent inside the parents vec");
 
+        let span_end = tail.span().end;
+
         let module_path = ModulePath { parents, tail };
 
-        Some(module_path)
+        Some(Spanned(span_start..span_end, module_path))
     }
 }
 
