@@ -4,7 +4,7 @@ extern crate alloc;
 
 use core::ops::Range;
 
-use alloc::{boxed::Box, vec};
+use alloc::{boxed::Box, vec, vec::Vec};
 
 pub mod ast;
 pub mod error;
