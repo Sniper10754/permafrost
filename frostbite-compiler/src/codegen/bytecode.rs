@@ -341,7 +341,7 @@ impl CodegenBackend for BytecodeCodegenBackend
             .symbols
             .iter()
             .for_each(
-                |(name, type_key)| match &compiler_ctx.types_arena[*type_key] {
+                |(_name, type_key)| match &compiler_ctx.types_arena[*type_key] {
                     Type::Int => (),
                     Type::Float => (),
                     Type::String => (),

@@ -306,7 +306,7 @@ impl<'a> RecursiveTypechecker<'a>
                         ));
                     };
 
-                    let type_key = referred_to.into_type(&self.t_ast);
+                    let type_key = referred_to.into_type(self.t_ast);
 
                     if let Type::Function(FunctionType {
                         arguments: _,
@@ -393,8 +393,8 @@ impl<'a> RecursiveTypechecker<'a>
                     Err(TypecheckError::TypeMismatch {
                         source_id,
                         span,
-                        expected: display_type(lhs_type_key, &mut self.types_arena),
-                        found: display_type(rhs_type_key, &mut self.types_arena),
+                        expected: display_type(lhs_type_key, self.types_arena),
+                        found: display_type(rhs_type_key, self.types_arena),
                     })
                 }
             }
@@ -402,8 +402,8 @@ impl<'a> RecursiveTypechecker<'a>
             _ => Err(TypecheckError::IncompatibleOperands {
                 source_id,
                 span,
-                left: display_type(lhs_type_key, &mut self.types_arena),
-                right: display_type(rhs_type_key, &mut self.types_arena),
+                left: display_type(lhs_type_key, self.types_arena),
+                right: display_type(rhs_type_key, self.types_arena),
             }),
         }
     }
@@ -551,8 +551,8 @@ impl<'a> RecursiveTypechecker<'a>
                             .as_ref()
                             .map(|expr| expr.typed_expression_kind.span())
                             .unwrap_or(return_token.span()),
-                        expected: display_type(expected_type, &mut self.types_arena),
-                        found: display_type(*return_type_index, &mut self.types_arena),
+                        expected: display_type(expected_type, self.types_arena),
+                        found: display_type(*return_type_index, self.types_arena),
                     }),
                 }
             }
@@ -643,7 +643,7 @@ impl<'a> RecursiveTypechecker<'a>
             ));
         };
 
-        let _type_key = refers_to.into_type(&self.t_ast);
+        let _type_key = refers_to.into_type(self.t_ast);
 
         Ok(TypedExpressionKind::Ident {
             refers_to,
@@ -771,7 +771,7 @@ impl<'a> RecursiveTypechecker<'a>
             body: Box::new(t_ast_body),
         };
 
-        if !matches!(&self.types_arena[function.return_type], Type::Unit)
+        if !matches!(self.types_arena[function.return_type], Type::Unit)
             && matches!(
                 &function.body.typed_expression_kind,
                 TypedExpressionKind::Block { .. }
@@ -804,9 +804,9 @@ impl<'a> RecursiveTypechecker<'a>
                     ));
                 };
 
-                let type_key = refers_to.into_type(&self.t_ast);
+                let type_key = refers_to.into_type(self.t_ast);
 
-                let Type::Function(function) = &self.types_arena[type_key].clone() else {
+                let Type::Function(function) = self.types_arena[type_key].clone() else {
                     return Err(TypecheckError::CannotCallNonFunction(
                         source_id,
                         callee.span(),
@@ -853,8 +853,8 @@ impl<'a> RecursiveTypechecker<'a>
                             return Err(TypecheckError::TypeMismatch {
                                 source_id,
                                 span: call_arg_span,
-                                expected: display_type(func_arg, &mut self.types_arena),
-                                found: display_type(call_arg, &mut self.types_arena),
+                                expected: display_type(func_arg, self.types_arena),
+                                found: display_type(call_arg, self.types_arena),
                             })
                         }
                     }
