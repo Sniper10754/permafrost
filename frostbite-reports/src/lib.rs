@@ -12,9 +12,8 @@ cfg_if! {
     }
 }
 
-pub mod backtrace_printer;
 #[cfg(feature = "diagnostic_printer")]
-pub mod diagnostic_printer;
+pub mod printer;
 pub mod sourcemap;
 pub mod utils;
 
@@ -36,11 +35,23 @@ impl IntoReport for Infallible
 }
 
 #[derive(Debug, Clone, PartialEq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub enum Report
+pub struct Location
 {
-    Diagnostic(Diagnostic),
-    Backtrace(Backtrace),
+    span: Range<usize>,
+    source_id: SourceId,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct Report
+{
+    level: Level,
+    span: Range<usize>,
+    source_id: SourceId,
+    title: Cow<'static, str>,
+    description: Option<Cow<'static, str>>,
+    infos: Vec<Label>,
+    helps: Vec<Label>,
 }
 
 impl Report
@@ -55,7 +66,7 @@ impl Report
         helps: impl IntoIterator<Item = Label>,
     ) -> Self
     {
-        Self::Diagnostic(Diagnostic {
+        Self {
             level,
             span: location,
             source_id: source_id.into(),
@@ -63,34 +74,8 @@ impl Report
             description: description.map(Into::into),
             infos: infos.into_iter().collect(),
             helps: helps.into_iter().collect(),
-        })
+        }
     }
-
-    pub fn new_backtrace(
-        reason: impl Into<Cow<'static, str>>,
-        message: impl Into<Cow<'static, str>>,
-        frames: Vec<Frame>,
-    ) -> Self
-    {
-        Self::Backtrace(Backtrace {
-            reason: reason.into(),
-            message: message.into(),
-            frames,
-        })
-    }
-}
-
-#[derive(Debug, Clone, PartialEq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct Diagnostic
-{
-    level: Level,
-    span: Range<usize>,
-    source_id: SourceId,
-    title: Cow<'static, str>,
-    description: Option<Cow<'static, str>>,
-    infos: Vec<Label>,
-    helps: Vec<Label>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -127,23 +112,6 @@ pub enum Level
     Info,
 }
 
-#[derive(Debug, Clone, PartialEq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct Backtrace
-{
-    pub reason: Cow<'static, str>,
-    pub message: Cow<'static, str>,
-    pub frames: Vec<Frame>,
-}
-
-#[derive(Debug, Clone, PartialEq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct Frame
-{
-    pub source_id: SourceId,
-    pub position: Option<Position>,
-}
-
 #[derive(Debug, Clone, Hash, PartialEq, Eq, derive_more::From)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum Position
@@ -163,10 +131,9 @@ impl ReportContext
 {
     pub fn has_errors(&self) -> bool
     {
-        self.reports.iter().any(|report| match report {
-            Report::Diagnostic(diagnostic) => diagnostic.level == Level::Error,
-            Report::Backtrace(_) => true,
-        })
+        self.reports
+            .iter()
+            .any(|report| matches!(report.level, Level::Error))
     }
 }
 

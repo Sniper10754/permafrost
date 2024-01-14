@@ -21,8 +21,8 @@ use frostbite_reports::{sourcemap::SourceId, IntoReport, Label, Level, Report};
 use crate::{
     context::CompilerContext,
     tir::{
-        display::display_type, Assignable, Callable, FunctionType, RefersTo, Type, TypeKey,
-        TypedAst, TypedExpression, TypedExpressionKind, TypedFunction, TypesArena,
+        display::display_type, Assignable, Callable, FunctionType, ImportDirectiveKind, RefersTo,
+        Type, TypeKey, TypedAst, TypedExpression, TypedExpressionKind, TypedFunction, TypesArena,
     },
     utils::Scopes,
 };
@@ -184,9 +184,14 @@ pub fn check_types(
     source_id: SourceId,
 )
 {
+    let t_ast = &mut compiler_ctx.t_asts[source_id];
     let types_arena = &mut compiler_ctx.types_arena;
 
-    let mut rts = RecursiveTypechecker::new();
+    let mut rts = RecursiveTypechecker {
+        scopes: Scopes::new(),
+        t_ast,
+        types_arena,
+    };
     let mut typed_ast = TypedAst::default();
 
     compiler_ctx
@@ -199,7 +204,7 @@ pub fn check_types(
     let ast = &compiler_ctx.asts[source_id];
 
     for expr in &ast.exprs {
-        match rts.visit_expr(source_id, expr, &mut typed_ast, types_arena) {
+        match rts.visit_expr(source_id, expr) {
             Ok(t_expr) => typed_ast.nodes.push(t_expr),
             Err(report) => compiler_ctx.report_ctx.push(report.into_report()),
         }
@@ -208,27 +213,22 @@ pub fn check_types(
     compiler_ctx.t_asts.insert(source_id, typed_ast);
 }
 
-struct RecursiveTypechecker
+struct RecursiveTypechecker<'infos>
 {
-    scopes: Scopes<RefersTo>,
+    pub scopes: Scopes<RefersTo>,
+    pub t_ast: &'infos mut TypedAst,
+    pub types_arena: &'infos mut TypesArena,
 }
 
-impl RecursiveTypechecker
+impl<'a> RecursiveTypechecker<'a>
 {
-    fn new() -> Self
-    {
-        Self {
-            scopes: Scopes::new(),
-        }
-    }
-
     fn unify(
-        types_arena: &mut TypesArena,
+        &mut self,
         a: TypeKey,
         b: TypeKey,
     ) -> Result<(), ()>
     {
-        match (types_arena[a].clone(), types_arena[b].clone()) {
+        match (self.types_arena[a].clone(), self.types_arena[b].clone()) {
             (Type::Object(left), Type::Object(right)) if left == right => Ok(()),
 
             (Type::Function(left_fn_type), Type::Function(right_fn_type)) => {
@@ -236,7 +236,7 @@ impl RecursiveTypechecker
                     left_fn_type.arguments.values().copied(),
                     right_fn_type.arguments.values().copied(),
                 )
-                .try_for_each(|(left, right)| Self::unify(types_arena, left, right))?;
+                .try_for_each(|(left, right)| self.unify(left, right))?;
 
                 Ok(())
             }
@@ -257,32 +257,23 @@ impl RecursiveTypechecker
         &mut self,
         source_id: SourceId,
         expr: &Expr,
-        t_ast: &mut TypedAst,
-        types_arena: &mut TypesArena,
     ) -> Result<TypeKey, TypecheckError>
     {
         match expr {
-            Expr::Int(_) => Ok(types_arena.insert(Type::Int)),
-            Expr::Float(_) => Ok(types_arena.insert(Type::Float)),
-            Expr::String(_) => Ok(types_arena.insert(Type::String)),
-            Expr::Bool(_) => Ok(types_arena.insert(Type::Bool)),
-            Expr::Ident(Spanned(span, name)) => {
-                self.infer_ident(t_ast, types_arena, source_id, name, span.clone())
+            Expr::Int(_) => Ok(self.types_arena.insert(Type::Int)),
+            Expr::Float(_) => Ok(self.types_arena.insert(Type::Float)),
+            Expr::String(_) => Ok(self.types_arena.insert(Type::String)),
+            Expr::Bool(_) => Ok(self.types_arena.insert(Type::Bool)),
+            Expr::ImportDirective(_) => Ok(self.types_arena.insert(Type::Unit)),
+            Expr::Ident(Spanned(span, name)) => self.infer_ident(source_id, name, span.clone()),
+            Expr::BinaryOperation { lhs, operator, rhs } => {
+                self.infer_binary_op(source_id, lhs, operator, rhs, expr.span())
             }
-            Expr::BinaryOperation { lhs, operator, rhs } => self.infer_binary_op(
-                t_ast,
-                types_arena,
-                source_id,
-                lhs,
-                operator,
-                rhs,
-                expr.span(),
-            ),
             Expr::Assign {
                 lhs: _,
                 eq_token: _,
                 value: _,
-            } => Ok(types_arena.insert(Type::Unit)),
+            } => Ok(self.types_arena.insert(Type::Unit)),
             Expr::Function {
                 fn_token: _,
                 name,
@@ -294,8 +285,6 @@ impl RecursiveTypechecker
                 equals: _,
                 body: _,
             } => self.infer_function(
-                t_ast,
-                types_arena,
                 source_id,
                 name.as_ref().map(|spanned| spanned.as_deref()),
                 arguments,
@@ -317,12 +306,12 @@ impl RecursiveTypechecker
                         ));
                     };
 
-                    let type_key = referred_to.into_type(t_ast);
+                    let type_key = referred_to.into_type(&self.t_ast);
 
                     if let Type::Function(FunctionType {
                         arguments: _,
                         return_type,
-                    }) = &types_arena[type_key]
+                    }) = &self.types_arena[type_key]
                     {
                         Ok(*return_type)
                     } else {
@@ -336,8 +325,8 @@ impl RecursiveTypechecker
                 _ => Err(TypecheckError::CannotCallNonIdent(source_id, callee.span())),
             },
 
-            Expr::Block { .. } => Ok(types_arena.insert(Type::Unit)),
-            Expr::Return(..) => Ok(types_arena.insert(Type::Unit)),
+            Expr::Block { .. } => Ok(self.types_arena.insert(Type::Unit)),
+            Expr::Return(..) => Ok(self.types_arena.insert(Type::Unit)),
 
             Expr::Poisoned => unreachable!(),
         }
@@ -345,8 +334,6 @@ impl RecursiveTypechecker
 
     fn infer_ident(
         &mut self,
-        t_ast: &TypedAst,
-        _types_arena: &mut TypesArena,
         source_id: SourceId,
         name: &str,
         span: Range<usize>,
@@ -360,15 +347,13 @@ impl RecursiveTypechecker
         };
 
         match referred_to {
-            RefersTo::Local(local_key) => Ok(t_ast.locals[local_key]),
+            RefersTo::Local(local_key) => Ok(self.t_ast.locals[local_key]),
             RefersTo::Type(type_key) => Ok(type_key),
         }
     }
 
     fn infer_binary_op(
         &mut self,
-        t_ast: &mut TypedAst,
-        types_arena: &mut TypesArena,
         source_id: SourceId,
         lhs: &Expr,
         operator: &Operator,
@@ -377,18 +362,21 @@ impl RecursiveTypechecker
     ) -> Result<TypeKey, TypecheckError>
     {
         let (lhs_type_key, rhs_type_key) = (
-            self.infer_type(source_id, lhs, t_ast, types_arena)?,
-            self.infer_type(source_id, rhs, t_ast, types_arena)?,
+            self.infer_type(source_id, lhs)?,
+            self.infer_type(source_id, rhs)?,
         );
 
         match (
             operator.kind,
-            (&types_arena[lhs_type_key], &types_arena[rhs_type_key]),
+            (
+                &self.types_arena[lhs_type_key],
+                &self.types_arena[rhs_type_key],
+            ),
         ) {
             (
                 BinaryOperatorKind::Add | BinaryOperatorKind::Sub | BinaryOperatorKind::Mul,
                 (Type::Int, Type::Int),
-            ) => Ok(types_arena.insert(Type::Int)),
+            ) => Ok(self.types_arena.insert(Type::Int)),
 
             (
                 BinaryOperatorKind::Add
@@ -396,17 +384,17 @@ impl RecursiveTypechecker
                 | BinaryOperatorKind::Mul
                 | BinaryOperatorKind::Div,
                 (Type::Float, Type::Float) | (Type::Float, Type::Int) | (Type::Int, Type::Float),
-            ) => Ok(types_arena.insert(Type::Float)),
+            ) => Ok(self.types_arena.insert(Type::Float)),
 
             (BinaryOperatorKind::Equal, (..)) => {
-                if Self::unify(types_arena, lhs_type_key, rhs_type_key).is_ok() {
-                    Ok(types_arena.insert(Type::Bool))
+                if self.unify(lhs_type_key, rhs_type_key).is_ok() {
+                    Ok(self.types_arena.insert(Type::Bool))
                 } else {
                     Err(TypecheckError::TypeMismatch {
                         source_id,
                         span,
-                        expected: display_type(lhs_type_key, types_arena),
-                        found: display_type(rhs_type_key, types_arena),
+                        expected: display_type(lhs_type_key, &mut self.types_arena),
+                        found: display_type(rhs_type_key, &mut self.types_arena),
                     })
                 }
             }
@@ -414,16 +402,14 @@ impl RecursiveTypechecker
             _ => Err(TypecheckError::IncompatibleOperands {
                 source_id,
                 span,
-                left: display_type(lhs_type_key, types_arena),
-                right: display_type(rhs_type_key, types_arena),
+                left: display_type(lhs_type_key, &mut self.types_arena),
+                right: display_type(rhs_type_key, &mut self.types_arena),
             }),
         }
     }
 
     fn infer_function(
         &mut self,
-        _t_ast: &mut TypedAst,
-        types_arena: &mut TypesArena,
         _source_id: SourceId,
         _name: Option<Spanned<&str>>,
         arguments: &[Argument],
@@ -440,12 +426,12 @@ impl RecursiveTypechecker
                      }| {
                         (
                             name.clone(),
-                            types_arena.insert(type_annotation.clone().into()),
+                            self.types_arena.insert(type_annotation.clone().into()),
                         )
                     },
                 )
                 .collect(),
-            return_type: types_arena.insert(
+            return_type: self.types_arena.insert(
                 return_type_annotation
                     .map(|Spanned(_, ty)| ty)
                     .cloned()
@@ -454,15 +440,13 @@ impl RecursiveTypechecker
             ),
         });
 
-        Ok(types_arena.insert(fn_type))
+        Ok(self.types_arena.insert(fn_type))
     }
 
     fn visit_expr(
         &mut self,
         source_id: SourceId,
         expr: &Expr,
-        t_ast: &mut TypedAst,
-        types_arena: &mut TypesArena,
     ) -> Result<TypedExpression, TypecheckError>
     {
         let old_len = self.scopes.len();
@@ -474,21 +458,18 @@ impl RecursiveTypechecker
             Expr::String(value) => Ok(TypedExpressionKind::String(
                 value.as_ref().map(Clone::clone),
             )),
-            Expr::Ident(Spanned(span, ident)) => self.visit_ident(t_ast, source_id, span, ident),
-            Expr::BinaryOperation { lhs, operator, rhs } => self.visit_binary_op(
-                t_ast,
-                types_arena,
-                source_id,
-                expr,
-                lhs,
-                operator.clone(),
-                rhs,
-            ),
+            Expr::ImportDirective(import_directive) => {
+                self.visit_import_directive(import_directive.as_ref())
+            }
+            Expr::Ident(Spanned(span, ident)) => self.visit_ident(source_id, span, ident),
+            Expr::BinaryOperation { lhs, operator, rhs } => {
+                self.visit_binary_op(source_id, expr, lhs, operator.clone(), rhs)
+            }
             Expr::Assign {
                 lhs,
                 eq_token: _,
                 value,
-            } => self.visit_assign(t_ast, types_arena, source_id, lhs, value),
+            } => self.visit_assign(source_id, lhs, value),
             Expr::Function {
                 fn_token,
                 name,
@@ -500,8 +481,6 @@ impl RecursiveTypechecker
                 equals: _,
                 body,
             } => self.visit_function(
-                t_ast,
-                types_arena,
                 source_id,
                 expr,
                 fn_token,
@@ -515,35 +494,15 @@ impl RecursiveTypechecker
                 left_paren,
                 arguments,
                 right_paren,
-            } => self.visit_call(
-                t_ast,
-                types_arena,
-                source_id,
-                expr,
-                callee,
-                left_paren,
-                arguments,
-                right_paren,
-            ),
-            Expr::Return(return_token, ret_expr) => self.visit_return(
-                t_ast,
-                types_arena,
-                source_id,
-                return_token.clone(),
-                ret_expr.as_deref(),
-            ),
+            } => self.visit_call(source_id, expr, callee, left_paren, arguments, right_paren),
+            Expr::Return(return_token, ret_expr) => {
+                self.visit_return(source_id, return_token.clone(), ret_expr.as_deref())
+            }
             Expr::Block {
                 left_brace,
                 expressions,
                 right_brace,
-            } => self.visit_block(
-                t_ast,
-                types_arena,
-                source_id,
-                left_brace,
-                expressions,
-                right_brace,
-            ),
+            } => self.visit_block(source_id, left_brace, expressions, right_brace),
 
             Expr::Poisoned => unreachable!(),
         };
@@ -553,7 +512,7 @@ impl RecursiveTypechecker
         let typed_expression_kind = typed_expression_kind?;
 
         Ok(TypedExpression {
-            type_key: self.infer_type(source_id, expr, t_ast, types_arena)?,
+            type_key: self.infer_type(source_id, expr)?,
             typed_expression_kind,
         })
     }
@@ -565,23 +524,17 @@ impl RecursiveTypechecker
         &mut self,
         source_id: SourceId,
         function: &TypedFunction,
-        types_arena: &mut TypesArena,
     ) -> Result<(), TypecheckError>
     {
         self.check_fn_body_branches(source_id, &function.body)?;
-        Self::typecheck_fn_body_returns(
-            source_id,
-            types_arena,
-            function.return_type,
-            &function.body,
-        )?;
+        self.typecheck_fn_body_returns(source_id, function.return_type, &function.body)?;
 
         Ok(())
     }
 
     fn typecheck_fn_body_returns(
+        &mut self,
         source_id: SourceId,
-        types_arena: &mut TypesArena,
         expected_type: TypeKey,
         expr: &TypedExpression,
     ) -> Result<(), TypecheckError>
@@ -590,7 +543,7 @@ impl RecursiveTypechecker
 
         match &expr.typed_expression_kind {
             Return(return_type_index, return_token, value) => {
-                match Self::unify(types_arena, *return_type_index, expected_type) {
+                match self.unify(*return_type_index, expected_type) {
                     Ok(_) => Ok(()),
                     Err(_) => Err(TypecheckError::TypeMismatch {
                         source_id,
@@ -598,14 +551,14 @@ impl RecursiveTypechecker
                             .as_ref()
                             .map(|expr| expr.typed_expression_kind.span())
                             .unwrap_or(return_token.span()),
-                        expected: display_type(expected_type, types_arena),
-                        found: display_type(*return_type_index, types_arena),
+                        expected: display_type(expected_type, &mut self.types_arena),
+                        found: display_type(*return_type_index, &mut self.types_arena),
                     }),
                 }
             }
 
             Block { expressions, .. } => expressions.iter().try_for_each(|expr| {
-                Self::typecheck_fn_body_returns(source_id, types_arena, expected_type, expr)
+                self.typecheck_fn_body_returns(source_id, expected_type, expr)
             }),
 
             _ => Ok(()),
@@ -656,9 +609,28 @@ impl RecursiveTypechecker
         }
     }
 
+    fn visit_import_directive(
+        &mut self,
+        import_directive: Spanned<&frostbite_parser::ast::ImportDirectiveKind>,
+    ) -> Result<TypedExpressionKind, TypecheckError>
+    {
+        let Spanned(span, import_directive) = import_directive;
+
+        let imp_dir = match import_directive.clone() {
+            frostbite_parser::ast::ImportDirectiveKind::FromModuleImportSymbol {
+                module,
+                symbol,
+            } => ImportDirectiveKind::FromModuleImportSymbol { module, symbol },
+            frostbite_parser::ast::ImportDirectiveKind::ImportModule { module } => {
+                ImportDirectiveKind::ImportModule { module }
+            }
+        };
+
+        Ok(TypedExpressionKind::ImportDirective(Spanned(span, imp_dir)))
+    }
+
     fn visit_ident(
         &mut self,
-        t_ast: &TypedAst,
         source_id: SourceId,
         span: &Range<usize>,
         ident: &str,
@@ -671,7 +643,7 @@ impl RecursiveTypechecker
             ));
         };
 
-        let _type_key = refers_to.into_type(t_ast);
+        let _type_key = refers_to.into_type(&self.t_ast);
 
         Ok(TypedExpressionKind::Ident {
             refers_to,
@@ -681,8 +653,6 @@ impl RecursiveTypechecker
 
     fn visit_binary_op(
         &mut self,
-        t_ast: &mut TypedAst,
-        types_arena: &mut TypesArena,
         source_id: SourceId,
         expr: &Expr,
         lhs: &Expr,
@@ -690,11 +660,11 @@ impl RecursiveTypechecker
         rhs: &Expr,
     ) -> Result<TypedExpressionKind, TypecheckError>
     {
-        self.infer_type(source_id, expr, t_ast, types_arena)?;
+        self.infer_type(source_id, expr)?;
 
         let (t_ast_lhs, t_ast_rhs) = (
-            self.visit_expr(source_id, lhs, t_ast, types_arena)?,
-            self.visit_expr(source_id, rhs, t_ast, types_arena)?,
+            self.visit_expr(source_id, lhs)?,
+            self.visit_expr(source_id, rhs)?,
         );
 
         Ok(TypedExpressionKind::BinaryOperation {
@@ -706,14 +676,12 @@ impl RecursiveTypechecker
 
     fn visit_assign(
         &mut self,
-        t_ast: &mut TypedAst,
-        types_arena: &mut TypesArena,
         source_id: SourceId,
         lhs: &Expr,
         value: &Expr,
     ) -> Result<TypedExpressionKind, TypecheckError>
     {
-        let value = self.visit_expr(source_id, value, t_ast, types_arena)?;
+        let value = self.visit_expr(source_id, value)?;
 
         match lhs {
             Expr::Ident(spanned_str) => match self.scopes.local(spanned_str.value()).copied() {
@@ -722,7 +690,7 @@ impl RecursiveTypechecker
                     return Err(TypecheckError::CannotAssignTo(source_id, lhs.span()));
                 }
                 None => {
-                    let local_index = t_ast.locals.insert(value.type_key);
+                    let local_index = self.t_ast.locals.insert(value.type_key);
 
                     self.scopes
                         .insert_local(spanned_str.value(), RefersTo::Local(local_index));
@@ -732,7 +700,7 @@ impl RecursiveTypechecker
             _ => return Err(TypecheckError::CannotAssignTo(source_id, lhs.span())),
         }
 
-        let lhs = self.visit_expr(source_id, lhs, t_ast, types_arena)?;
+        let lhs = self.visit_expr(source_id, lhs)?;
 
         let assignable = Assignable::try_from(lhs).unwrap();
 
@@ -744,8 +712,6 @@ impl RecursiveTypechecker
 
     fn visit_function(
         &mut self,
-        t_ast: &mut TypedAst,
-        types_arena: &mut TypesArena,
         source_id: SourceId,
         expr: &Expr,
         fn_token: &FunctionToken,
@@ -755,7 +721,7 @@ impl RecursiveTypechecker
         body: &Expr,
     ) -> Result<TypedExpressionKind, TypecheckError>
     {
-        let type_key = self.infer_type(source_id, expr, t_ast, types_arena)?;
+        let type_key = self.infer_type(source_id, expr)?;
 
         if let Some(name) = name.as_ref() {
             self.scopes
@@ -772,7 +738,7 @@ impl RecursiveTypechecker
                     (arg_name.into(), Type::from(type_annotation.value().clone()))
                 },
             )
-            .map(|(name, ty)| (name, types_arena.insert(ty)))
+            .map(|(name, ty)| (name, self.types_arena.insert(ty)))
             .collect::<BTreeMap<_, _>>();
 
         let return_type = Type::from(
@@ -783,17 +749,17 @@ impl RecursiveTypechecker
                 .unwrap_or(TypeAnnotation::Unit),
         );
 
-        let return_type = types_arena.insert(return_type);
+        let return_type = self.types_arena.insert(return_type);
 
         self.scopes.enter_scope();
 
         for (k, v) in arguments.iter() {
-            let local_index = t_ast.locals.insert(*v);
+            let local_index = self.t_ast.locals.insert(*v);
 
             self.scopes.insert_local(k, RefersTo::Local(local_index));
         }
 
-        let t_ast_body = self.visit_expr(source_id, body, t_ast, types_arena)?;
+        let t_ast_body = self.visit_expr(source_id, body)?;
 
         self.scopes.leave_scope();
 
@@ -805,13 +771,13 @@ impl RecursiveTypechecker
             body: Box::new(t_ast_body),
         };
 
-        if !matches!(&types_arena[function.return_type], Type::Unit)
+        if !matches!(&self.types_arena[function.return_type], Type::Unit)
             && matches!(
                 &function.body.typed_expression_kind,
                 TypedExpressionKind::Block { .. }
             )
         {
-            self.typecheck_function_body_returns(source_id, &function, types_arena)?;
+            self.typecheck_function_body_returns(source_id, &function)?;
         }
 
         Ok(TypedExpressionKind::Function(function))
@@ -819,8 +785,6 @@ impl RecursiveTypechecker
 
     fn visit_call(
         &mut self,
-        t_ast: &mut TypedAst,
-        types_arena: &mut TypesArena,
         source_id: SourceId,
         expr: &Expr,
         callee: &Expr,
@@ -840,9 +804,9 @@ impl RecursiveTypechecker
                     ));
                 };
 
-                let type_key = refers_to.into_type(t_ast);
+                let type_key = refers_to.into_type(&self.t_ast);
 
-                let Type::Function(function) = &types_arena[type_key].clone() else {
+                let Type::Function(function) = &self.types_arena[type_key].clone() else {
                     return Err(TypecheckError::CannotCallNonFunction(
                         source_id,
                         callee.span(),
@@ -876,21 +840,21 @@ impl RecursiveTypechecker
                     call_arguments
                         .iter()
                         .map(|expr| {
-                            self.infer_type(source_id, expr, t_ast, types_arena)
+                            self.infer_type(source_id, expr)
                                 .map(|inferred| (expr.span(), inferred))
                         })
                         .collect::<Result<Vec<_>, _>>()?
                         .into_iter(),
                     function.arguments.values().copied(),
                 ) {
-                    match Self::unify(types_arena, call_arg, func_arg) {
+                    match self.unify(call_arg, func_arg) {
                         Ok(_) => {}
                         Err(_) => {
                             return Err(TypecheckError::TypeMismatch {
                                 source_id,
                                 span: call_arg_span,
-                                expected: display_type(func_arg, types_arena),
-                                found: display_type(call_arg, types_arena),
+                                expected: display_type(func_arg, &mut self.types_arena),
+                                found: display_type(call_arg, &mut self.types_arena),
                             })
                         }
                     }
@@ -899,7 +863,7 @@ impl RecursiveTypechecker
                 let mut arguments = vec![];
 
                 for call_arg in call_arguments.iter() {
-                    let node = self.visit_expr(source_id, call_arg, t_ast, types_arena)?;
+                    let node = self.visit_expr(source_id, call_arg)?;
 
                     arguments.push(node);
                 }
@@ -919,23 +883,21 @@ impl RecursiveTypechecker
 
     fn visit_return(
         &mut self,
-        t_ast: &mut TypedAst,
-        types_arena: &mut TypesArena,
         source_id: SourceId,
         return_token: ReturnToken,
         ret_expr: Option<&Expr>,
     ) -> Result<TypedExpressionKind, TypecheckError>
     {
         let return_value_type = if let Some(ret_expr) = ret_expr {
-            self.infer_type(source_id, ret_expr, t_ast, types_arena)?
+            self.infer_type(source_id, ret_expr)?
         } else {
-            types_arena.insert(Type::Unit)
+            self.types_arena.insert(Type::Unit)
         };
 
         let mut value = None;
 
         if let Some(ret_expr) = ret_expr {
-            let temp_val = self.visit_expr(source_id, ret_expr, t_ast, types_arena)?;
+            let temp_val = self.visit_expr(source_id, ret_expr)?;
 
             value = Some(temp_val);
         }
@@ -949,8 +911,6 @@ impl RecursiveTypechecker
 
     fn visit_block(
         &mut self,
-        t_ast: &mut TypedAst,
-        types_arena: &mut TypesArena,
         source_id: SourceId,
         left_brace: &LeftBraceToken,
         expressions: &[Expr],
@@ -961,7 +921,7 @@ impl RecursiveTypechecker
             left_brace: left_brace.clone(),
             expressions: expressions
                 .iter()
-                .map(|expr| self.visit_expr(source_id, expr, t_ast, types_arena))
+                .map(|expr| self.visit_expr(source_id, expr))
                 .collect::<Result<_, TypecheckError>>()?,
             right_brace: right_brace.clone(),
         })

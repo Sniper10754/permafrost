@@ -1,14 +1,17 @@
-use alloc::{vec, vec::Vec};
+use alloc::{string::ToString, vec, vec::Vec};
 use frostbite_bytecode::{
     ConstantValue, Function, FunctionKey, Globals, Instruction, Manifest, Module,
 };
 use frostbite_parser::ast::{tokens::BinaryOperatorKind, Spanned};
-use frostbite_reports::ReportContext;
+use frostbite_reports::sourcemap::SourceId;
 use slotmap::SecondaryMap;
 
-use crate::tir::{
-    self, FunctionType, Type, TypedAst, TypedExpression, TypedExpressionKind, TypedFunction,
-    TypesArena,
+use crate::{
+    context::CompilerContext,
+    tir::{
+        self, FunctionType, ImportDirectiveKind, Type, TypedAst, TypedExpression,
+        TypedExpressionKind, TypedFunction, TypesArena,
+    },
 };
 
 use super::CodegenBackend;
@@ -51,6 +54,10 @@ impl BytecodeCodegenBackend
             | TypedExpressionKind::Bool(..)
             | TypedExpressionKind::String(..) => {
                 self.compile_constant(instructions, globals, t_expr)
+            }
+
+            TypedExpressionKind::ImportDirective(Spanned(_, import_directive)) => {
+                self.compile_import_directive(instructions, import_directive)
             }
 
             TypedExpressionKind::Ident {
@@ -132,6 +139,27 @@ impl BytecodeCodegenBackend
             });
 
         instructions.push(Instruction::LoadConstant(constant_index));
+    }
+
+    fn compile_import_directive(
+        &mut self,
+        instructions: &mut Vec<Instruction>,
+        import_directive: &ImportDirectiveKind,
+    )
+    {
+        match import_directive {
+            ImportDirectiveKind::FromModuleImportSymbol { module, symbol } => {
+                instructions.push(Instruction::ImportFromModule {
+                    module: module.to_string(),
+                    symbol: symbol.clone(),
+                })
+            }
+            ImportDirectiveKind::ImportModule { module } => {
+                instructions.push(Instruction::Import {
+                    module: module.to_string(),
+                })
+            }
+        }
     }
 
     fn compile_binary_operation(
@@ -304,11 +332,27 @@ impl CodegenBackend for BytecodeCodegenBackend
 
     fn codegen(
         mut self,
-        _report_ctx: &mut ReportContext,
-        t_ast: &TypedAst,
-        types_arena: &TypesArena,
+        source_id: SourceId,
+        compiler_ctx: &mut CompilerContext,
     ) -> Self::Output
     {
+        compiler_ctx
+            .intrinsic_ctx
+            .symbols
+            .iter()
+            .for_each(
+                |(name, type_key)| match &compiler_ctx.types_arena[*type_key] {
+                    Type::Int => (),
+                    Type::Float => (),
+                    Type::String => (),
+                    Type::Bool => (),
+                    Type::Function(_) => todo!(),
+                    Type::Unit => (),
+                    Type::Object(_) => (),
+                    Type::Any => (),
+                },
+            );
+
         let mut module = Module {
             manifest: Manifest {
                 bytecode_version: option_env!("PROJECT_VERSION")
@@ -319,7 +363,9 @@ impl CodegenBackend for BytecodeCodegenBackend
             body: Vec::new(),
         };
 
-        self.compile_program(t_ast, types_arena, &mut module);
+        let t_ast = &compiler_ctx.t_asts[source_id];
+
+        self.compile_program(t_ast, &compiler_ctx.types_arena, &mut module);
 
         module
     }

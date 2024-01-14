@@ -1,4 +1,5 @@
 use alloc::string::String;
+use frostbite_bytecode::Module;
 use frostbite_parser::ast::Program;
 use frostbite_reports::{
     sourcemap::{SourceId, SourceMap},
@@ -8,6 +9,7 @@ use slotmap::{SecondaryMap, SlotMap};
 
 use crate::{
     intrinsic::IntrinsicContext,
+    modules::ModuleKey,
     tir::{Type, TypeKey, TypedAst, TypesArena},
 };
 
@@ -21,6 +23,8 @@ pub struct CompilerContext
     pub asts: SecondaryMap<SourceId, Program>,
     pub t_asts: SecondaryMap<SourceId, TypedAst>,
     pub types_arena: SlotMap<TypeKey, Type>,
+    pub modules: SlotMap<ModuleKey, Module>,
+    pub modules_to_srcs: SecondaryMap<SourceId, ModuleKey>,
 }
 
 impl CompilerContext
@@ -38,6 +42,8 @@ impl CompilerContext
             asts: SecondaryMap::new(),
             t_asts: SecondaryMap::new(),
             types_arena: SlotMap::default(),
+            modules: SlotMap::default(),
+            modules_to_srcs: SecondaryMap::default(),
         }
     }
 
@@ -63,7 +69,10 @@ impl CompilerContext
         E: Default,
     {
         // Equivalent of
-        // if self.has_errors() { Err(E::default()) } else { Ok(()) }
-        self.has_errors().then_some(()).ok_or(E::default())
+        if self.has_errors() {
+            Err(E::default())
+        } else {
+            Ok(())
+        }
     }
 }

@@ -1,10 +1,9 @@
-use frostbite_reports::ReportContext;
-
 mod bytecode;
 
 pub use bytecode::BytecodeCodegenBackend;
+use frostbite_reports::sourcemap::SourceId;
 
-use crate::tir::{TypedAst, TypesArena};
+use crate::context::CompilerContext;
 
 pub trait CodegenBackend
 {
@@ -12,9 +11,8 @@ pub trait CodegenBackend
 
     fn codegen(
         self,
-        reports: &mut ReportContext,
-        tree: &TypedAst,
-        types_arena: &TypesArena,
+        source_id: SourceId,
+        compiler_ctx: &mut CompilerContext,
     ) -> Self::Output;
 }
 

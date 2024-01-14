@@ -5,7 +5,7 @@ use std::fmt;
 use self::utils::SourceMapCache;
 
 use crate::{
-    diagnostic_printer, diagnostic_printer::PrintBackend, sourcemap::SourceMap, Diagnostic, Level,
+    printer, printer::PrintBackend, sourcemap::SourceMap, Level, Report,
 };
 
 pub struct AriadnePrintBackend;
@@ -99,10 +99,10 @@ impl PrintBackend for AriadnePrintBackend
     fn write_report_to<'id, W: fmt::Write + ?Sized>(
         destination: &mut W,
         source_map: &SourceMap,
-        diagnostic: &Diagnostic,
-    ) -> Result<(), diagnostic_printer::PrintingError>
+        report: &Report,
+    ) -> Result<(), printer::PrintingError>
     {
-        let Diagnostic {
+        let Report {
             level,
             span,
             source_id,
@@ -110,7 +110,7 @@ impl PrintBackend for AriadnePrintBackend
             description,
             infos,
             helps,
-        } = diagnostic;
+        } = report;
 
         let report_source_id = *source_id;
 

@@ -34,6 +34,18 @@ pub struct Manifest
 #[repr(u8)]
 pub enum Instruction
 {
+    /// Import a module at runtime,
+    Import
+    {
+        module: String
+    },
+
+    /// Import a symbol from a module at runtime,
+    ImportFromModule
+    {
+        module: String, symbol: String
+    },
+
     /// Loads a constant element into the stack from the constants pool
     LoadConstant(ConstantKey),
 

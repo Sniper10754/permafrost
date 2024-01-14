@@ -14,13 +14,16 @@ use ast::{
         ArrowToken, Eq, LeftBraceToken, LeftParenthesisToken, Operator, ReturnToken,
         RightBraceToken, RightParenthesisToken, TypeAnnotation,
     },
-    Argument, Expr, Program, Spanned,
+    Argument, Expr, ModulePath, Program, Spanned,
 };
 use error::ErrorKind;
 use frostbite_reports::{sourcemap::SourceId, ReportContext};
 use lexer::{Token, TokenStream};
 
-use crate::{ast::tokens::FunctionToken, error::Error};
+use crate::{
+    ast::{tokens::FunctionToken, Spannable},
+    error::Error,
+};
 
 mod utils
 {
@@ -229,6 +232,11 @@ impl<'report_context> Parser<'report_context>
             Some(Spanned(span, Token::True)) => Some(Expr::Bool(Spanned(span, true))),
             Some(Spanned(span, Token::False)) => Some(Expr::Bool(Spanned(span, false))),
 
+            // Some(Spanned(span, Token::Import)) => {
+            //     let span_start = span.start;
+
+            //     // let
+            // }
             Some(Spanned(_, Token::LParen)) => {
                 let expr = self.parse_expr()?;
 
@@ -480,6 +488,72 @@ impl<'report_context> Parser<'report_context>
                 None
             }
         }
+    }
+
+    fn parse_module_path(&mut self) -> Option<ModulePath>
+    {
+        let mut parents = Vec::new();
+
+        match self.token_stream.next() {
+            Some(Spanned(span, Token::Ident(identifier))) => {
+                parents.push(identifier);
+
+                loop {
+                    match self.token_stream.peek() {
+                        Some(Spanned(_, Token::DoubleColon)) => {
+                            consume_token!(
+                                parser: self,
+                                token: Token::DoubleColon,
+                                description: "Double colon"
+                            )
+                            .unwrap();
+
+                            let Spanned(_, Token::Ident(name)) = consume_token!(
+                                parser: self,
+                                token: Token::Ident(..),
+                                description: "Identifier"
+                            )
+                            .unwrap() else {
+                                unreachable!()
+                            };
+
+                            parents.push(name)
+                        }
+
+                        Some(_) => break,
+
+                        None => self.report_ctx.push(report!(
+                            parser: self,
+                            ErrorKind::UnrecognizedEof { expected: &["()"], previous_element_span: self.token_stream.previous().unwrap().span() }
+                        )),
+                    }
+                }
+            }
+            Some(Spanned(span, _)) => {
+                self.report_ctx.push(report!(
+                    parser: self,
+                    ErrorKind::UnrecognizedToken { span, expected: "An identifier" }
+                ));
+
+                return None;
+            }
+            None => {
+                self.report_ctx.push(report!(
+                    parser: self,
+                    ErrorKind::UnrecognizedEof { expected: &["An identifier"], previous_element_span: self.token_stream.previous().unwrap().span() }
+                ));
+
+                return None;
+            }
+        }
+
+        let tail = parents
+            .pop()
+            .expect("There's at least one parent inside the parents vec");
+
+        let module_path = ModulePath { parents, tail };
+
+        Some(module_path)
     }
 }
 

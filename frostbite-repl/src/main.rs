@@ -2,10 +2,7 @@ use frostbite_bytecode::text_repr::print_bytecode;
 use frostbite_compiler::{
     codegen::CodegenBackends, context::CompilerContext, CompilationResults, Compiler,
 };
-use frostbite_reports::{
-    diagnostic_printer::{DefaultPrintBackend, DiagnosticPrinter},
-    Report,
-};
+use frostbite_reports::printer::{DefaultPrintBackend, ReportPrinter};
 use reedline::{DefaultPrompt, DefaultPromptSegment, Reedline, Signal};
 use std::error::Error;
 
@@ -36,20 +33,11 @@ fn main() -> Result<(), Box<dyn Error>>
                         print_bytecode(&mut code_buffer, &module)?;
                     }
                     Err(compiler_ctx) => {
-                        compiler_ctx
-                            .report_ctx
-                            .iter()
-                            .for_each(|report| match report {
-                                Report::Diagnostic(diagnostic) => {
-                                    DiagnosticPrinter::new(&mut code_buffer)
-                                        .print::<DefaultPrintBackend>(
-                                            &compiler_ctx.src_map,
-                                            diagnostic,
-                                        )
-                                        .unwrap();
-                                }
-                                Report::Backtrace(_) => unreachable!(),
-                            });
+                        compiler_ctx.report_ctx.iter().for_each(|report| {
+                            ReportPrinter::new(&mut code_buffer)
+                                .print::<DefaultPrintBackend>(&compiler_ctx.src_map, report)
+                                .unwrap()
+                        });
                     }
                 }
 

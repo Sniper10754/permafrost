@@ -2,4 +2,4 @@ compare = function(a: any, b: any) -> bool = a == b;
 
 x = compare(1, compare(2, 3));
 
-print(x);
+print();

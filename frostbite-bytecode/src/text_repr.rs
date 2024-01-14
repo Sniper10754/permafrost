@@ -98,6 +98,14 @@ where
             index.cyan(),
             module.globals.constants_pool[*index]
         )?,
+        Instruction::Import { module } => {
+            write!(w, "{module}")?;
+        }
+        Instruction::ImportFromModule { module, symbol } => {
+            write!(w, "{module}")?;
+
+            write!(w, "{symbol}")?;
+        }
         Instruction::LoadFunction(index) => {
             write!(w, "{}", index.cyan())?;
         }

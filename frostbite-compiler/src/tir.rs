@@ -4,7 +4,7 @@ use frostbite_parser::ast::{
         FunctionToken, LeftBraceToken, LeftParenthesisToken, Operator, ReturnToken,
         RightBraceToken, RightParenthesisToken, TypeAnnotation,
     },
-    Spannable, Spanned,
+    ModulePath, Spannable, Spanned,
 };
 use slotmap::{new_key_type, SlotMap};
 
@@ -26,7 +26,9 @@ pub mod display
     use frostbite_parser::ast::Spanned;
 
     use super::{FunctionType, TypeKey, TypedAst, TypedExpression, TypesArena};
-    use crate::tir::{Assignable, Callable, Type::*, TypedExpressionKind, TypedFunction};
+    use crate::tir::{
+        Assignable, Callable, ImportDirectiveKind, Type::*, TypedExpressionKind, TypedFunction,
+    };
 
     fn join_map_into_string<K, V>(mut map: impl Iterator<Item = (K, V)>) -> String
     where
@@ -113,6 +115,15 @@ pub mod display
             Float(Spanned(_, value)) => write!(buf, "{value}"),
             Bool(Spanned(_, value)) => write!(buf, "{value}"),
             String(Spanned(_, value)) => write!(buf, "{value}"),
+            ImportDirective(Spanned(
+                _,
+                ImportDirectiveKind::FromModuleImportSymbol { module, symbol },
+            )) => {
+                write!(buf, "from {module} import {symbol}")
+            }
+            ImportDirective(Spanned(_, ImportDirectiveKind::ImportModule { module })) => {
+                write!(buf, "import {module}")
+            }
             Ident {
                 refers_to,
                 str_value: Spanned(_, name),
@@ -297,6 +308,8 @@ pub enum TypedExpressionKind
     Bool(Spanned<bool>),
     String(Spanned<String>),
 
+    ImportDirective(Spanned<ImportDirectiveKind>),
+
     Ident
     {
         refers_to: RefersTo,
@@ -344,10 +357,12 @@ impl Spannable for TypedExpressionKind
         use TypedExpressionKind::*;
 
         match self {
-            Int(Spanned(span, _)) => span.clone(),
-            Float(Spanned(span, _)) => span.clone(),
-            Bool(Spanned(span, _)) => span.clone(),
-            String(Spanned(span, _)) => span.clone(),
+            Int(Spanned(span, _))
+            | Float(Spanned(span, _))
+            | Bool(Spanned(span, _))
+            | String(Spanned(span, _))
+            | ImportDirective(Spanned(span, _)) => span.clone(),
+
             Ident {
                 refers_to: _,
                 str_value: Spanned(span, _),
@@ -383,6 +398,19 @@ impl Spannable for TypedExpressionKind
             } => (left_brace.span().start)..(right_brace.span().end),
         }
     }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum ImportDirectiveKind
+{
+    FromModuleImportSymbol
+    {
+        module: ModulePath, symbol: String
+    },
+    ImportModule
+    {
+        module: ModulePath
+    },
 }
 
 #[derive(Debug, Clone)]

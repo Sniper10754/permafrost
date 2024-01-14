@@ -152,8 +152,14 @@ pub enum Token
     #[token("function")]
     Fn,
 
+    #[token("from")]
+    From,
+
     #[token("import")]
     Import,
+
+    #[token("::")]
+    DoubleColon,
 
     #[token("return")]
     Return,

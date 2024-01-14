@@ -1,4 +1,5 @@
 use alloc::{collections::BTreeMap, string::String};
+use frostbite_bytecode::Module;
 
 use crate::tir::TypeKey;
 
@@ -6,4 +7,5 @@ use crate::tir::TypeKey;
 pub struct IntrinsicContext
 {
     pub symbols: BTreeMap<String, TypeKey>,
+    pub modules: BTreeMap<String, Module>,
 }

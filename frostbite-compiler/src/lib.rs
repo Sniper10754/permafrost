@@ -15,6 +15,7 @@ use semantic::run_semantic_checks;
 pub mod codegen;
 pub mod context;
 pub mod intrinsic;
+pub mod modules;
 pub mod semantic;
 pub mod tir;
 pub mod utils;
@@ -131,13 +132,7 @@ impl Compiler
         codegen: C,
     ) -> Result<C::Output, CompilerError>
     {
-        let t_ast = &compiler_ctx.t_asts[main_source_id];
-
-        let output = codegen.codegen(
-            &mut compiler_ctx.report_ctx,
-            t_ast,
-            &compiler_ctx.types_arena,
-        );
+        let output = codegen.codegen(main_source_id, compiler_ctx);
 
         compiler_ctx.errors_as_result()?;
 

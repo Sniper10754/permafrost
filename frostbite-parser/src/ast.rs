@@ -1,5 +1,8 @@
 use alloc::{boxed::Box, string::String, vec::Vec};
-use core::ops::{Deref, DerefMut, Range};
+use core::{
+    fmt::Display,
+    ops::{Deref, DerefMut, Range},
+};
 
 use derive_more::From;
 
@@ -238,9 +241,9 @@ impl Spannable for Expr
             Expr::Int(Spanned(span, _))
             | Expr::Float(Spanned(span, _))
             | Expr::Ident(Spanned(span, _))
-            | Expr::String(Spanned(span, _)) => span.clone(),
-
-            Expr::Bool(Spanned(span, _)) => span.clone(),
+            | Expr::String(Spanned(span, _))
+            | Expr::Bool(Spanned(span, _))
+            | Expr::ImportDirective(Spanned(span, _)) => span.clone(),
 
             Expr::BinaryOperation {
                 lhs,
@@ -288,6 +291,8 @@ pub enum Expr
     Ident(Spanned<String>),
     Bool(Spanned<bool>),
     String(Spanned<String>),
+
+    ImportDirective(Spanned<ImportDirectiveKind>),
 
     BinaryOperation
     {
@@ -341,4 +346,65 @@ pub struct Argument
 {
     pub name: Spanned<String>,
     pub type_annotation: Spanned<TypeAnnotation>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum ImportDirectiveKind
+{
+    FromModuleImportSymbol
+    {
+        module: ModulePath, symbol: String
+    },
+    ImportModule
+    {
+        module: ModulePath
+    },
+}
+
+#[derive(Debug, Clone, PartialEq, Default)]
+pub struct ModulePath
+{
+    pub parents: Vec<String>,
+    pub tail: String,
+}
+
+impl Display for ModulePath
+{
+    fn fmt(
+        &self,
+        f: &mut core::fmt::Formatter<'_>,
+    ) -> core::fmt::Result
+    {
+        let mut iter = self.parents.iter();
+
+        if let Some(parent) = iter.next() {
+            write!(f, "{parent}")?;
+
+            for parent in iter {
+                write!(f, "::{parent}")?;
+            }
+        }
+
+        write!(f, "{}", self.tail)?;
+
+        Ok(())
+    }
+}
+
+impl DerefMut for ModulePath
+{
+    fn deref_mut(&mut self) -> &mut Self::Target
+    {
+        &mut self.parents
+    }
+}
+
+impl Deref for ModulePath
+{
+    type Target = Vec<String>;
+
+    fn deref(&self) -> &Self::Target
+    {
+        &self.parents
+    }
 }

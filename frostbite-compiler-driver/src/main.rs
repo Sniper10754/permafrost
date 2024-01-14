@@ -8,10 +8,7 @@ use frostbite_compiler::{
     tir::{FunctionType, Type},
     CompilationResults, Compiler,
 };
-use frostbite_reports::{
-    diagnostic_printer::{DefaultPrintBackend, DiagnosticPrinter},
-    Report,
-};
+use frostbite_reports::printer::{DefaultPrintBackend, ReportPrinter};
 
 mod compile;
 
@@ -100,17 +97,9 @@ fn main() -> eyre::Result<()>
                     let mut buf = String::new();
 
                     for report in compiler.ctx().report_ctx.iter() {
-                        match report {
-                            Report::Diagnostic(diagnostic) => {
-                                DiagnosticPrinter::new(&mut buf)
-                                    .print::<DefaultPrintBackend>(
-                                        &compiler.ctx().src_map,
-                                        diagnostic,
-                                    )
-                                    .unwrap();
-                            }
-                            Report::Backtrace(_) => unreachable!(),
-                        }
+                        ReportPrinter::new(&mut buf)
+                            .print::<DefaultPrintBackend>(&compiler.ctx().src_map, report)
+                            .unwrap();
                     }
 
                     println!("{buf}");
