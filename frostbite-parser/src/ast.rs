@@ -3,6 +3,7 @@ use core::{
     fmt::Display,
     ops::{Deref, DerefMut, Range},
 };
+use dbg_pls::DebugPls;
 
 use derive_more::From;
 
@@ -23,7 +24,7 @@ pub mod tokens
 
     macro_rules! token {
         ($name:ident) => {
-            #[derive(Debug, Clone, PartialEq, Hash)]
+            #[derive(Debug, Clone, PartialEq, Hash, dbg_pls::DebugPls)]
             pub struct $name(pub crate::ast::Span);
 
             impl Spannable for $name
@@ -44,7 +45,7 @@ pub mod tokens
         };
     }
 
-    #[derive(Debug, Clone, Hash, PartialEq, Display)]
+    #[derive(Debug, Clone, Hash, PartialEq, Display, dbg_pls::DebugPls)]
     #[display(fmt = "{kind}")]
     pub struct Operator
     {
@@ -60,7 +61,7 @@ pub mod tokens
         }
     }
 
-    #[derive(Debug, Clone, Copy, PartialEq, Hash, Display)]
+    #[derive(Debug, Clone, Copy, PartialEq, Hash, Display, dbg_pls::DebugPls)]
     pub enum BinaryOperatorKind
     {
         #[display(fmt = "+")]
@@ -75,7 +76,7 @@ pub mod tokens
         Equal,
     }
 
-    #[derive(Debug, Clone, PartialEq, Display)]
+    #[derive(Debug, Clone, PartialEq, Display, dbg_pls::DebugPls)]
     pub enum TypeAnnotation
     {
         #[display(fmt = "int")]
@@ -112,7 +113,7 @@ pub trait Spannable
     fn span(&self) -> Span;
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash, From)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, From, DebugPls)]
 pub struct Spanned<T>(pub Span, pub T);
 
 impl<T> Spanned<T>
@@ -283,7 +284,7 @@ impl Spannable for Expr
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, DebugPls)]
 pub enum Expr
 {
     Int(Spanned<i32>),
@@ -341,14 +342,14 @@ pub enum Expr
     Poisoned,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, DebugPls)]
 pub struct Argument
 {
     pub name: Spanned<String>,
     pub type_annotation: Spanned<TypeAnnotation>,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, DebugPls)]
 pub enum ImportDirectiveKind
 {
     FromModuleImportSymbol
@@ -361,7 +362,7 @@ pub enum ImportDirectiveKind
     },
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, DebugPls)]
 pub struct ModulePath
 {
     pub parents: Vec<Spanned<String>>,

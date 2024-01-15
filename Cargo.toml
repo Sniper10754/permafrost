@@ -24,6 +24,10 @@ derive_more = "0"
 cfg-if = "1"
 owo-colors = "4"
 
+[workspace.dependencies.dbg-pls]
+version = "0.4"
+features = ["colors", "derive", "pretty"]
+
 [workspace.dependencies.log]
 version = "0.4"
 default-features = false

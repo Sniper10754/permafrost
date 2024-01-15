@@ -1,4 +1,5 @@
 use alloc::{boxed::Box, collections::BTreeMap, string::String, vec::Vec};
+use dbg_pls::DebugPls;
 use frostbite_parser::ast::{
     tokens::{
         FunctionToken, LeftBraceToken, LeftParenthesisToken, Operator, ReturnToken,
@@ -19,16 +20,39 @@ new_key_type! {
     pub struct TypeKey;
 }
 
+impl DebugPls for TypeKey
+{
+    fn fmt(
+        &self,
+        f: dbg_pls::Formatter<'_>,
+    )
+    {
+        f.debug_tuple_struct("TypeKey")
+            .field(&(self.0.as_ffi() as u32))
+            .finish()
+    }
+}
+
+impl DebugPls for LocalKey
+{
+    fn fmt(
+        &self,
+        f: dbg_pls::Formatter<'_>,
+    )
+    {
+        f.debug_tuple_struct("LocalKey")
+            .field(&(self.0.as_ffi() as u32))
+            .finish()
+    }
+}
+
 pub mod display
 {
     use alloc::{borrow::Cow, format, string::String};
-    use core::fmt::{self, Display, Write as _};
-    use frostbite_parser::ast::Spanned;
+    use core::fmt::{Display, Write as _};
 
-    use super::{FunctionType, TypeKey, TypedAst, TypedExpression, TypesArena};
-    use crate::tir::{
-        Assignable, Callable, ImportDirectiveKind, Type::*, TypedExpressionKind, TypedFunction,
-    };
+    use super::{FunctionType, TypeKey, TypesArena};
+    use crate::tir::Type::*;
 
     fn join_map_into_string<K, V>(mut map: impl Iterator<Item = (K, V)>) -> String
     where
@@ -78,187 +102,6 @@ pub mod display
 
         format!("{type_description} [{type_key}]").into()
     }
-
-    pub fn display_tree(
-        t_ast: &TypedAst,
-        types_arena: &TypesArena,
-    ) -> String
-    {
-        let mut buf = String::new();
-
-        t_ast
-            .nodes
-            .iter()
-            .try_for_each::<_, fmt::Result>(|node| {
-                display_node(&mut buf, t_ast, types_arena, node)?;
-
-                writeln!(buf)?;
-
-                Ok(())
-            })
-            .expect("infallible");
-
-        buf
-    }
-
-    pub fn display_node(
-        buf: &mut String,
-        t_ast: &TypedAst,
-        types_arena: &TypesArena,
-        node: &TypedExpression,
-    ) -> fmt::Result
-    {
-        use TypedExpressionKind::*;
-
-        match &node.typed_expression_kind {
-            Int(Spanned(_, value)) => write!(buf, "{value}"),
-            Float(Spanned(_, value)) => write!(buf, "{value}"),
-            Bool(Spanned(_, value)) => write!(buf, "{value}"),
-            String(Spanned(_, value)) => write!(buf, "{value}"),
-            ImportDirective(Spanned(
-                _,
-                ImportDirectiveKind::FromModuleImportSymbol { module, symbol },
-            )) => {
-                write!(buf, "from {module} import {symbol}")
-            }
-            ImportDirective(Spanned(_, ImportDirectiveKind::ImportModule { module })) => {
-                write!(buf, "import {module}")
-            }
-            Ident {
-                refers_to,
-                str_value: Spanned(_, name),
-            } => {
-                write!(buf, "{name} (")?;
-
-                write!(
-                    buf,
-                    "{}",
-                    display_type(refers_to.into_type(t_ast), types_arena)
-                )?;
-
-                write!(buf, ") ")?;
-
-                Ok(())
-            }
-            BinaryOperation { lhs, operator, rhs } => {
-                display_node(buf, t_ast, types_arena, lhs)?;
-
-                write!(buf, "{} ", operator.kind)?;
-
-                display_node(buf, t_ast, types_arena, rhs)?;
-
-                Ok(())
-            }
-            Assign { lhs, value } => {
-                match lhs {
-                    Assignable::Ident(type_key, Spanned(_, name)) => {
-                        write!(buf, "{name} [{type_key}]")?;
-                    }
-                }
-
-                write!(buf, " = ")?;
-
-                display_node(buf, t_ast, types_arena, value)?;
-
-                Ok(())
-            }
-            Function(TypedFunction {
-                fn_token: _,
-                name,
-                arguments,
-                return_type,
-                body,
-            }) => {
-                write!(buf, "function ")?;
-
-                if let Some(Spanned(_, name)) = name {
-                    write!(buf, "{name}")?;
-                }
-
-                write!(buf, "(")?;
-
-                {
-                    let mut arguments_iter = arguments.iter();
-
-                    if let Some((name, type_key)) = arguments_iter.next() {
-                        write!(buf, "{name}: {}", display_type(*type_key, types_arena))?;
-
-                        arguments_iter.try_for_each(|(name, type_key)| {
-                            write!(buf, ", {name}: {}", display_type(*type_key, types_arena))
-                        })?;
-                    }
-                }
-
-                write!(buf, ") ")?;
-                write!(buf, "-> {}", display_type(*return_type, types_arena))?;
-                writeln!(buf)?;
-                write!(buf, "\t= ")?;
-
-                display_node(buf, t_ast, types_arena, body)?;
-
-                Ok(())
-            }
-            Call {
-                callee,
-                right_parent: _,
-                arguments,
-                left_parent: _,
-                return_type,
-            } => {
-                match callee {
-                    Callable::Function(refers_to, Spanned(_, name)) => {
-                        write!(
-                            buf,
-                            "{name} (which has type {})",
-                            display_type(refers_to.into_type(t_ast), types_arena)
-                        )?;
-                    }
-                }
-
-                write!(buf, "(")?;
-                {
-                    let mut arguments_iter = arguments.iter();
-
-                    if let Some(argument) = arguments_iter.next() {
-                        display_node(buf, t_ast, types_arena, argument)?;
-
-                        arguments_iter.try_for_each(|argument| {
-                            write!(buf, ", ")?;
-
-                            display_node(buf, t_ast, types_arena, argument)?;
-
-                            Ok(())
-                        })?;
-                    }
-                }
-                write!(buf, ")")?;
-
-                write!(
-                    buf,
-                    " # (returns {})",
-                    display_type(*return_type, types_arena)
-                )?;
-
-                Ok(())
-            }
-            Return(..) => todo!(),
-            Block {
-                left_brace: _,
-                expressions,
-                right_brace: _,
-            } => {
-                writeln!(buf, "{{")?;
-
-                expressions
-                    .iter()
-                    .try_for_each(|expr| display_node(buf, t_ast, types_arena, expr))?;
-
-                writeln!(buf, "}}")?;
-
-                Ok(())
-            }
-        }
-    }
 }
 
 #[derive(Debug, derive_more::From, derive_more::Into)]
@@ -272,7 +115,34 @@ pub struct TypedAst
     pub locals: SlotMap<LocalKey, TypeKey>,
 }
 
-#[derive(Debug, Clone)]
+impl DebugPls for TypedAst
+{
+    fn fmt(
+        &self,
+        f: dbg_pls::Formatter<'_>,
+    )
+    {
+        struct LocalsDebugPls<'a>(&'a SlotMap<LocalKey, TypeKey>);
+
+        impl<'a> DebugPls for LocalsDebugPls<'a>
+        {
+            fn fmt(
+                &self,
+                f: dbg_pls::Formatter<'_>,
+            )
+            {
+                f.debug_map().entries(self.0.iter()).finish()
+            }
+        }
+
+        f.debug_struct("TypedAst")
+            .field("nodes", &self.nodes)
+            .field("locals", &LocalsDebugPls(&self.locals))
+            .finish()
+    }
+}
+
+#[derive(Debug, Clone, DebugPls)]
 pub struct TypedFunction
 {
     pub fn_token: FunctionToken,
@@ -282,25 +152,22 @@ pub struct TypedFunction
     pub body: Box<TypedExpression>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, DebugPls)]
 pub struct TypedExpression
 {
     pub type_key: TypeKey,
-    pub typed_expression_kind: TypedExpressionKind,
+    pub kind: TypedExpressionKind,
 }
 
 impl TypedFunction
 {
     pub fn is_body_block(&self) -> bool
     {
-        matches!(
-            &self.body.typed_expression_kind,
-            TypedExpressionKind::Block { .. }
-        )
+        matches!(&self.body.kind, TypedExpressionKind::Block { .. })
     }
 }
 
-#[derive(Debug, Clone, derive_more::IsVariant)]
+#[derive(Debug, Clone, DebugPls, derive_more::IsVariant)]
 pub enum TypedExpressionKind
 {
     Int(Spanned<i32>),
@@ -371,10 +238,10 @@ impl Spannable for TypedExpressionKind
                 lhs,
                 operator: _,
                 rhs,
-            } => (lhs.typed_expression_kind.span().start)..(rhs.typed_expression_kind.span().end),
-            Assign { lhs, value } => (lhs.span().start)..(value.typed_expression_kind.span().end),
+            } => (lhs.kind.span().start)..(rhs.kind.span().end),
+            Assign { lhs, value } => (lhs.span().start)..(value.kind.span().end),
             Function(TypedFunction { fn_token, body, .. }) => {
-                (fn_token.span().start)..(body.typed_expression_kind.span().end)
+                (fn_token.span().start)..(body.kind.span().end)
             }
             Call {
                 callee: _,
@@ -387,7 +254,7 @@ impl Spannable for TypedExpressionKind
                 (ret_token.0.start)
                     ..(value
                         .as_ref()
-                        .map(|value| value.typed_expression_kind.span())
+                        .map(|value| value.kind.span())
                         .map(|span| span.start)
                         .unwrap_or(ret_token.span().end))
             }
@@ -400,7 +267,7 @@ impl Spannable for TypedExpressionKind
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, DebugPls)]
 pub enum ImportDirectiveKind
 {
     FromModuleImportSymbol
@@ -413,7 +280,7 @@ pub enum ImportDirectiveKind
     },
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, DebugPls)]
 pub enum Callable
 {
     Function(RefersTo, Spanned<String>),
@@ -429,7 +296,7 @@ impl Spannable for Callable
     }
 }
 
-#[derive(Debug, Clone, Copy, derive_more::From)]
+#[derive(Debug, Clone, Copy, DebugPls, derive_more::From)]
 pub enum RefersTo
 {
     Local(LocalKey),
@@ -451,7 +318,7 @@ impl RefersTo
 }
 
 #[non_exhaustive]
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, DebugPls)]
 pub enum Assignable
 {
     Ident(TypeKey, Spanned<String>),
@@ -475,7 +342,7 @@ impl TryFrom<TypedExpression> for Assignable
     {
         use TypedExpressionKind::*;
 
-        match value.typed_expression_kind {
+        match value.kind {
             Ident {
                 refers_to: _,
                 str_value: ident,

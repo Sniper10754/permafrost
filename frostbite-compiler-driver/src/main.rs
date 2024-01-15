@@ -1,4 +1,9 @@
-use std::{env, fs, io::Write, path::PathBuf, process};
+use std::{
+    env, fs,
+    io::Write,
+    path::PathBuf,
+    process,
+};
 
 use clap::Parser;
 use color_eyre::eyre;

@@ -184,15 +184,16 @@ pub fn check_types(
     source_id: SourceId,
 )
 {
-    let t_ast = &mut compiler_ctx.t_asts[source_id];
+    compiler_ctx.t_asts.insert(source_id, TypedAst::default());
+
+    let typed_ast = &mut compiler_ctx.t_asts[source_id];
     let types_arena = &mut compiler_ctx.types_arena;
 
     let mut rts = RecursiveTypechecker {
         scopes: Scopes::new(),
-        t_ast,
+        typed_ast,
         types_arena,
     };
-    let mut typed_ast = TypedAst::default();
 
     compiler_ctx
         .intrinsic_ctx
@@ -205,18 +206,16 @@ pub fn check_types(
 
     for expr in &ast.exprs {
         match rts.visit_expr(source_id, expr) {
-            Ok(t_expr) => typed_ast.nodes.push(t_expr),
+            Ok(t_expr) => rts.typed_ast.nodes.push(t_expr),
             Err(report) => compiler_ctx.report_ctx.push(report.into_report()),
         }
     }
-
-    compiler_ctx.t_asts.insert(source_id, typed_ast);
 }
 
 struct RecursiveTypechecker<'infos>
 {
     pub scopes: Scopes<RefersTo>,
-    pub t_ast: &'infos mut TypedAst,
+    pub typed_ast: &'infos mut TypedAst,
     pub types_arena: &'infos mut TypesArena,
 }
 
@@ -306,7 +305,7 @@ impl<'a> RecursiveTypechecker<'a>
                         ));
                     };
 
-                    let type_key = referred_to.into_type(self.t_ast);
+                    let type_key = referred_to.into_type(self.typed_ast);
 
                     if let Type::Function(FunctionType {
                         arguments: _,
@@ -347,7 +346,7 @@ impl<'a> RecursiveTypechecker<'a>
         };
 
         match referred_to {
-            RefersTo::Local(local_key) => Ok(self.t_ast.locals[local_key]),
+            RefersTo::Local(local_key) => Ok(self.typed_ast.locals[local_key]),
             RefersTo::Type(type_key) => Ok(type_key),
         }
     }
@@ -416,8 +415,16 @@ impl<'a> RecursiveTypechecker<'a>
         return_type_annotation: Option<Spanned<&TypeAnnotation>>,
     ) -> Result<TypeKey, TypecheckError>
     {
-        let fn_type = Type::Function(FunctionType {
-            arguments: arguments
+        let fn_type = {
+            let return_type = self.types_arena.insert(
+                return_type_annotation
+                    .map(|Spanned(_, ty)| ty)
+                    .cloned()
+                    .unwrap_or(TypeAnnotation::Unit)
+                    .into(),
+            );
+
+            let arguments = arguments
                 .iter()
                 .map(
                     |Argument {
@@ -430,15 +437,13 @@ impl<'a> RecursiveTypechecker<'a>
                         )
                     },
                 )
-                .collect(),
-            return_type: self.types_arena.insert(
-                return_type_annotation
-                    .map(|Spanned(_, ty)| ty)
-                    .cloned()
-                    .unwrap_or(TypeAnnotation::Unit)
-                    .into(),
-            ),
-        });
+                .collect();
+
+            Type::Function(FunctionType {
+                arguments,
+                return_type,
+            })
+        };
 
         Ok(self.types_arena.insert(fn_type))
     }
@@ -451,13 +456,23 @@ impl<'a> RecursiveTypechecker<'a>
     {
         let old_len = self.scopes.len();
 
-        let typed_expression_kind = match expr {
-            Expr::Int(value) => Ok(TypedExpressionKind::Int(value.clone())),
-            Expr::Float(value) => Ok(TypedExpressionKind::Float(value.clone())),
-            Expr::Bool(value) => Ok(TypedExpressionKind::Bool(value.clone())),
-            Expr::String(value) => Ok(TypedExpressionKind::String(
-                value.as_ref().map(Clone::clone),
-            )),
+        let typed_expression = match expr {
+            Expr::Int(value) => Ok(TypedExpression {
+                type_key: self.infer_type(source_id, expr)?,
+                kind: TypedExpressionKind::Int(value.clone()),
+            }),
+            Expr::Float(value) => Ok(TypedExpression {
+                type_key: self.infer_type(source_id, expr)?,
+                kind: TypedExpressionKind::Float(value.clone()),
+            }),
+            Expr::Bool(value) => Ok(TypedExpression {
+                type_key: self.infer_type(source_id, expr)?,
+                kind: TypedExpressionKind::Bool(value.clone()),
+            }),
+            Expr::String(value) => Ok(TypedExpression {
+                type_key: self.infer_type(source_id, expr)?,
+                kind: TypedExpressionKind::String(value.as_ref().map(Clone::clone)),
+            }),
             Expr::ImportDirective(import_directive) => {
                 self.visit_import_directive(import_directive.as_ref())
             }
@@ -509,11 +524,195 @@ impl<'a> RecursiveTypechecker<'a>
 
         self.scopes.truncate(old_len);
 
-        let typed_expression_kind = typed_expression_kind?;
+        let typed_expression = typed_expression?;
+
+        Ok(typed_expression)
+    }
+
+    fn visit_import_directive(
+        &mut self,
+        import_directive: Spanned<&frostbite_parser::ast::ImportDirectiveKind>,
+    ) -> Result<TypedExpression, TypecheckError>
+    {
+        let Spanned(span, import_directive) = import_directive;
+
+        let imp_dir = match import_directive.clone() {
+            frostbite_parser::ast::ImportDirectiveKind::FromModuleImportSymbol {
+                module,
+                symbol,
+            } => ImportDirectiveKind::FromModuleImportSymbol { module, symbol },
+            frostbite_parser::ast::ImportDirectiveKind::ImportModule { module } => {
+                ImportDirectiveKind::ImportModule { module }
+            }
+        };
+
+        let type_key = self.types_arena.insert(Type::Unit);
 
         Ok(TypedExpression {
-            type_key: self.infer_type(source_id, expr)?,
-            typed_expression_kind,
+            type_key,
+            kind: TypedExpressionKind::ImportDirective(Spanned(span, imp_dir)),
+        })
+    }
+
+    fn visit_ident(
+        &mut self,
+        source_id: SourceId,
+        span: &Range<usize>,
+        ident: &str,
+    ) -> Result<TypedExpression, TypecheckError>
+    {
+        let Some(refers_to) = self.scopes.local(ident).copied() else {
+            return Err(TypecheckError::SymbolNotFound(
+                source_id,
+                Spanned(span.clone(), ident.into()),
+            ));
+        };
+
+        let type_key = refers_to.into_type(self.typed_ast);
+
+        Ok(TypedExpression {
+            type_key,
+            kind: TypedExpressionKind::Ident {
+                refers_to,
+                str_value: Spanned(span.clone(), ident.into()),
+            },
+        })
+    }
+
+    fn visit_binary_op(
+        &mut self,
+        source_id: SourceId,
+        expr: &Expr,
+        lhs: &Expr,
+        operator: Operator,
+        rhs: &Expr,
+    ) -> Result<TypedExpression, TypecheckError>
+    {
+        let type_key = self.infer_type(source_id, expr)?;
+
+        let (t_ast_lhs, t_ast_rhs) = (
+            self.visit_expr(source_id, lhs)?,
+            self.visit_expr(source_id, rhs)?,
+        );
+
+        Ok(TypedExpression {
+            type_key,
+            kind: TypedExpressionKind::BinaryOperation {
+                lhs: Box::new(t_ast_lhs),
+                operator: operator.clone(),
+                rhs: Box::new(t_ast_rhs),
+            },
+        })
+    }
+
+    fn visit_assign(
+        &mut self,
+        source_id: SourceId,
+        lhs: &Expr,
+        value: &Expr,
+    ) -> Result<TypedExpression, TypecheckError>
+    {
+        let value = self.visit_expr(source_id, value)?;
+
+        match lhs {
+            Expr::Ident(spanned_str) => match self.scopes.local(spanned_str.value()) {
+                Some(RefersTo::Local(_)) => {}
+                Some(RefersTo::Type(_)) => {
+                    return Err(TypecheckError::CannotAssignTo(source_id, lhs.span()));
+                }
+                None => {
+                    let local_index = self.typed_ast.locals.insert(value.type_key);
+
+                    self.scopes
+                        .insert_local(spanned_str.value(), RefersTo::Local(local_index));
+                }
+            },
+
+            _ => return Err(TypecheckError::CannotAssignTo(source_id, lhs.span())),
+        }
+
+        let lhs = self.visit_expr(source_id, lhs)?;
+
+        let assignable = Assignable::try_from(lhs).unwrap();
+
+        let type_key = self.types_arena.insert(Type::Unit);
+
+        Ok(TypedExpression {
+            type_key,
+            kind: TypedExpressionKind::Assign {
+                lhs: assignable,
+                value: Box::new(value),
+            },
+        })
+    }
+
+    fn visit_function(
+        &mut self,
+        source_id: SourceId,
+        expr: &Expr,
+        fn_token: &FunctionToken,
+        name: Option<Spanned<String>>,
+        arguments: &[Argument],
+        return_type_annotation: Option<Spanned<TypeAnnotation>>,
+        body: &Expr,
+    ) -> Result<TypedExpression, TypecheckError>
+    {
+        let type_key = self.infer_type(source_id, expr)?;
+
+        if let Some(name) = name.as_ref() {
+            self.scopes
+                .insert_local(name.value(), RefersTo::Type(type_key));
+        }
+
+        let arguments = arguments
+            .iter()
+            .map(
+                |Argument {
+                     name: Spanned(_, arg_name),
+                     type_annotation,
+                 }| {
+                    (arg_name.into(), Type::from(type_annotation.value().clone()))
+                },
+            )
+            .map(|(name, ty)| (name, self.types_arena.insert(ty)))
+            .collect::<BTreeMap<_, _>>();
+
+        let return_type = self.types_arena.insert(
+            return_type_annotation
+                .as_ref()
+                .cloned()
+                .map(|Spanned(_, ret)| ret)
+                .unwrap_or(TypeAnnotation::Unit)
+                .into(),
+        );
+
+        self.scopes.enter_scope();
+
+        arguments.iter().for_each(|(k, v)| {
+            let local_index = self.typed_ast.locals.insert(*v);
+
+            self.scopes.insert_local(k, RefersTo::Local(local_index));
+        });
+
+        let t_ast_body = self.visit_expr(source_id, body)?;
+
+        self.scopes.leave_scope();
+
+        let function = TypedFunction {
+            fn_token: fn_token.clone(),
+            name,
+            arguments,
+            return_type,
+            body: Box::new(t_ast_body),
+        };
+
+        if matches!(function.body.kind, TypedExpressionKind::Block { .. }) {
+            self.typecheck_function_body_returns(source_id, &function)?;
+        }
+
+        Ok(TypedExpression {
+            type_key,
+            kind: TypedExpressionKind::Function(function),
         })
     }
 
@@ -541,7 +740,7 @@ impl<'a> RecursiveTypechecker<'a>
     {
         use TypedExpressionKind::*;
 
-        match &expr.typed_expression_kind {
+        match &expr.kind {
             Return(return_type_index, return_token, value) => {
                 match self.unify(*return_type_index, expected_type) {
                     Ok(_) => Ok(()),
@@ -549,7 +748,7 @@ impl<'a> RecursiveTypechecker<'a>
                         source_id,
                         span: value
                             .as_ref()
-                            .map(|expr| expr.typed_expression_kind.span())
+                            .map(|expr| expr.kind.span())
                             .unwrap_or(return_token.span()),
                         expected: display_type(expected_type, self.types_arena),
                         found: display_type(*return_type_index, self.types_arena),
@@ -571,10 +770,10 @@ impl<'a> RecursiveTypechecker<'a>
         expr: &TypedExpression,
     ) -> Result<(), TypecheckError>
     {
-        if let Err(span) = Self::check_branches_for_return(&expr.typed_expression_kind) {
+        if let Err(faulty_branch_position) = Self::check_branches_for_return(&expr.kind) {
             Err(TypecheckError::FunctionDoesntReturn {
                 source_id,
-                faulty_branch_position: span,
+                faulty_branch_position,
             })
         } else {
             Ok(())
@@ -591,12 +790,12 @@ impl<'a> RecursiveTypechecker<'a>
             Block { expressions, .. } => {
                 let scope_has_return = expressions
                     .iter()
-                    .any(|expr| matches!(&expr.typed_expression_kind, Return(..)));
+                    .any(|expr| matches!(expr.kind, Return(..)));
 
                 if scope_has_return {
                     expressions
                         .iter()
-                        .map(|t_ast| Self::check_branches_for_return(&t_ast.typed_expression_kind))
+                        .map(|t_ast| Self::check_branches_for_return(&t_ast.kind))
                         .collect::<Result<Vec<_>, _>>()?;
 
                     Ok(())
@@ -609,180 +808,6 @@ impl<'a> RecursiveTypechecker<'a>
         }
     }
 
-    fn visit_import_directive(
-        &mut self,
-        import_directive: Spanned<&frostbite_parser::ast::ImportDirectiveKind>,
-    ) -> Result<TypedExpressionKind, TypecheckError>
-    {
-        let Spanned(span, import_directive) = import_directive;
-
-        let imp_dir = match import_directive.clone() {
-            frostbite_parser::ast::ImportDirectiveKind::FromModuleImportSymbol {
-                module,
-                symbol,
-            } => ImportDirectiveKind::FromModuleImportSymbol { module, symbol },
-            frostbite_parser::ast::ImportDirectiveKind::ImportModule { module } => {
-                ImportDirectiveKind::ImportModule { module }
-            }
-        };
-
-        Ok(TypedExpressionKind::ImportDirective(Spanned(span, imp_dir)))
-    }
-
-    fn visit_ident(
-        &mut self,
-        source_id: SourceId,
-        span: &Range<usize>,
-        ident: &str,
-    ) -> Result<TypedExpressionKind, TypecheckError>
-    {
-        let Some(refers_to) = self.scopes.local(ident).copied() else {
-            return Err(TypecheckError::SymbolNotFound(
-                source_id,
-                Spanned(span.clone(), ident.into()),
-            ));
-        };
-
-        let _type_key = refers_to.into_type(self.t_ast);
-
-        Ok(TypedExpressionKind::Ident {
-            refers_to,
-            str_value: Spanned(span.clone(), ident.into()),
-        })
-    }
-
-    fn visit_binary_op(
-        &mut self,
-        source_id: SourceId,
-        expr: &Expr,
-        lhs: &Expr,
-        operator: Operator,
-        rhs: &Expr,
-    ) -> Result<TypedExpressionKind, TypecheckError>
-    {
-        self.infer_type(source_id, expr)?;
-
-        let (t_ast_lhs, t_ast_rhs) = (
-            self.visit_expr(source_id, lhs)?,
-            self.visit_expr(source_id, rhs)?,
-        );
-
-        Ok(TypedExpressionKind::BinaryOperation {
-            lhs: Box::new(t_ast_lhs),
-            operator: operator.clone(),
-            rhs: Box::new(t_ast_rhs),
-        })
-    }
-
-    fn visit_assign(
-        &mut self,
-        source_id: SourceId,
-        lhs: &Expr,
-        value: &Expr,
-    ) -> Result<TypedExpressionKind, TypecheckError>
-    {
-        let value = self.visit_expr(source_id, value)?;
-
-        match lhs {
-            Expr::Ident(spanned_str) => match self.scopes.local(spanned_str.value()).copied() {
-                Some(RefersTo::Local(_)) => {}
-                Some(RefersTo::Type(_)) => {
-                    return Err(TypecheckError::CannotAssignTo(source_id, lhs.span()));
-                }
-                None => {
-                    let local_index = self.t_ast.locals.insert(value.type_key);
-
-                    self.scopes
-                        .insert_local(spanned_str.value(), RefersTo::Local(local_index));
-                }
-            },
-
-            _ => return Err(TypecheckError::CannotAssignTo(source_id, lhs.span())),
-        }
-
-        let lhs = self.visit_expr(source_id, lhs)?;
-
-        let assignable = Assignable::try_from(lhs).unwrap();
-
-        Ok(TypedExpressionKind::Assign {
-            lhs: assignable,
-            value: Box::new(value),
-        })
-    }
-
-    fn visit_function(
-        &mut self,
-        source_id: SourceId,
-        expr: &Expr,
-        fn_token: &FunctionToken,
-        name: Option<Spanned<String>>,
-        arguments: &[Argument],
-        return_type_annotation: Option<Spanned<TypeAnnotation>>,
-        body: &Expr,
-    ) -> Result<TypedExpressionKind, TypecheckError>
-    {
-        let type_key = self.infer_type(source_id, expr)?;
-
-        if let Some(name) = name.as_ref() {
-            self.scopes
-                .insert_local(name.value(), RefersTo::Type(type_key));
-        }
-
-        let arguments = arguments
-            .iter()
-            .map(
-                |Argument {
-                     name: Spanned(_, arg_name),
-                     type_annotation,
-                 }| {
-                    (arg_name.into(), Type::from(type_annotation.value().clone()))
-                },
-            )
-            .map(|(name, ty)| (name, self.types_arena.insert(ty)))
-            .collect::<BTreeMap<_, _>>();
-
-        let return_type = Type::from(
-            return_type_annotation
-                .as_ref()
-                .cloned()
-                .map(|Spanned(_, ret)| ret)
-                .unwrap_or(TypeAnnotation::Unit),
-        );
-
-        let return_type = self.types_arena.insert(return_type);
-
-        self.scopes.enter_scope();
-
-        for (k, v) in arguments.iter() {
-            let local_index = self.t_ast.locals.insert(*v);
-
-            self.scopes.insert_local(k, RefersTo::Local(local_index));
-        }
-
-        let t_ast_body = self.visit_expr(source_id, body)?;
-
-        self.scopes.leave_scope();
-
-        let function = TypedFunction {
-            fn_token: fn_token.clone(),
-            name,
-            arguments,
-            return_type,
-            body: Box::new(t_ast_body),
-        };
-
-        if !matches!(self.types_arena[function.return_type], Type::Unit)
-            && matches!(
-                &function.body.typed_expression_kind,
-                TypedExpressionKind::Block { .. }
-            )
-        {
-            self.typecheck_function_body_returns(source_id, &function)?;
-        }
-
-        Ok(TypedExpressionKind::Function(function))
-    }
-
     fn visit_call(
         &mut self,
         source_id: SourceId,
@@ -791,7 +816,7 @@ impl<'a> RecursiveTypechecker<'a>
         left_paren: &LeftParenthesisToken,
         arguments: &[Expr],
         right_paren: &RightParenthesisToken,
-    ) -> Result<TypedExpressionKind, TypecheckError>
+    ) -> Result<TypedExpression, TypecheckError>
     {
         let call_arguments = arguments;
 
@@ -804,7 +829,7 @@ impl<'a> RecursiveTypechecker<'a>
                     ));
                 };
 
-                let type_key = refers_to.into_type(self.t_ast);
+                let type_key = refers_to.into_type(self.typed_ast);
 
                 let Type::Function(function) = self.types_arena[type_key].clone() else {
                     return Err(TypecheckError::CannotCallNonFunction(
@@ -868,12 +893,15 @@ impl<'a> RecursiveTypechecker<'a>
                     arguments.push(node);
                 }
 
-                Ok(TypedExpressionKind::Call {
-                    callee: Callable::Function(refers_to, Spanned(span.clone(), name.into())),
-                    left_parent: left_paren.clone(),
-                    arguments,
-                    right_parent: right_paren.clone(),
-                    return_type: function.return_type,
+                Ok(TypedExpression {
+                    type_key,
+                    kind: TypedExpressionKind::Call {
+                        callee: Callable::Function(refers_to, Spanned(span.clone(), name.into())),
+                        left_parent: left_paren.clone(),
+                        arguments,
+                        right_parent: right_paren.clone(),
+                        return_type: function.return_type,
+                    },
                 })
             }
 
@@ -886,7 +914,7 @@ impl<'a> RecursiveTypechecker<'a>
         source_id: SourceId,
         return_token: ReturnToken,
         ret_expr: Option<&Expr>,
-    ) -> Result<TypedExpressionKind, TypecheckError>
+    ) -> Result<TypedExpression, TypecheckError>
     {
         let return_value_type = if let Some(ret_expr) = ret_expr {
             self.infer_type(source_id, ret_expr)?
@@ -902,11 +930,16 @@ impl<'a> RecursiveTypechecker<'a>
             value = Some(temp_val);
         }
 
-        Ok(TypedExpressionKind::Return(
-            return_value_type,
-            return_token.clone(),
-            value.map(Box::new),
-        ))
+        let type_key = self.types_arena.insert(Type::Unit);
+
+        Ok(TypedExpression {
+            type_key,
+            kind: TypedExpressionKind::Return(
+                return_value_type,
+                return_token.clone(),
+                value.map(Box::new),
+            ),
+        })
     }
 
     fn visit_block(
@@ -915,15 +948,20 @@ impl<'a> RecursiveTypechecker<'a>
         left_brace: &LeftBraceToken,
         expressions: &[Expr],
         right_brace: &RightBraceToken,
-    ) -> Result<TypedExpressionKind, TypecheckError>
+    ) -> Result<TypedExpression, TypecheckError>
     {
-        Ok(TypedExpressionKind::Block {
-            left_brace: left_brace.clone(),
-            expressions: expressions
-                .iter()
-                .map(|expr| self.visit_expr(source_id, expr))
-                .collect::<Result<_, TypecheckError>>()?,
-            right_brace: right_brace.clone(),
+        let type_key = self.types_arena.insert(Type::Unit);
+
+        Ok(TypedExpression {
+            type_key,
+            kind: TypedExpressionKind::Block {
+                left_brace: left_brace.clone(),
+                expressions: expressions
+                    .iter()
+                    .map(|expr| self.visit_expr(source_id, expr))
+                    .collect::<Result<_, TypecheckError>>()?,
+                right_brace: right_brace.clone(),
+            },
         })
     }
 }

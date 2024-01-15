@@ -1,4 +1,9 @@
-use alloc::{string::ToString, vec, vec::Vec};
+use alloc::{
+    collections::BTreeMap,
+    string::{String, ToString},
+    vec,
+    vec::Vec,
+};
 use frostbite_bytecode::{
     ConstantValue, Function, FunctionKey, Globals, Instruction, Manifest, Module,
 };
@@ -9,8 +14,8 @@ use slotmap::SecondaryMap;
 use crate::{
     context::CompilerContext,
     tir::{
-        self, FunctionType, ImportDirectiveKind, Type, TypedAst, TypedExpression,
-        TypedExpressionKind, TypedFunction, TypesArena,
+        Assignable, Callable, FunctionType, ImportDirectiveKind, Type, TypeKey, TypedAst,
+        TypedExpression, TypedExpressionKind, TypedFunction, TypesArena,
     },
 };
 
@@ -19,7 +24,9 @@ use super::CodegenBackend;
 #[derive(Debug, Default)]
 pub struct BytecodeCodegenBackend
 {
-    functions: SecondaryMap<tir::TypeKey, FunctionKey>,
+    /// Instrinsics are just provided by the interpreter
+    intrinsics: BTreeMap<String, Vec<Instruction>>,
+    functions: SecondaryMap<TypeKey, FunctionKey>,
 }
 
 impl BytecodeCodegenBackend
@@ -48,7 +55,7 @@ impl BytecodeCodegenBackend
         t_expr: &TypedExpression,
     )
     {
-        match &t_expr.typed_expression_kind {
+        match &t_expr.kind {
             TypedExpressionKind::Int(..)
             | TypedExpressionKind::Float(..)
             | TypedExpressionKind::Bool(..)
@@ -127,16 +134,14 @@ impl BytecodeCodegenBackend
         node: &TypedExpression,
     )
     {
-        let constant_index = globals
-            .constants_pool
-            .insert(match &node.typed_expression_kind {
-                TypedExpressionKind::Int(Spanned(_, constant)) => (*constant).into(),
-                TypedExpressionKind::Float(Spanned(_, constant)) => (*constant).into(),
-                TypedExpressionKind::Bool(Spanned(_, bool)) => (*bool).into(),
-                TypedExpressionKind::String(Spanned(_, constant)) => constant.clone().into(),
+        let constant_index = globals.constants_pool.insert(match &node.kind {
+            TypedExpressionKind::Int(Spanned(_, constant)) => (*constant).into(),
+            TypedExpressionKind::Float(Spanned(_, constant)) => (*constant).into(),
+            TypedExpressionKind::Bool(Spanned(_, bool)) => (*bool).into(),
+            TypedExpressionKind::String(Spanned(_, constant)) => constant.clone().into(),
 
-                _ => unreachable!(),
-            });
+            _ => unreachable!(),
+        });
 
         instructions.push(Instruction::LoadConstant(constant_index));
     }
@@ -220,14 +225,14 @@ impl BytecodeCodegenBackend
         types_arena: &TypesArena,
         globals: &mut Globals,
         instructions: &mut Vec<Instruction>,
-        lhs: &tir::Assignable,
+        lhs: &Assignable,
         value: &TypedExpression,
     )
     {
         self.compile_node(t_ast, types_arena, instructions, globals, value);
 
         match lhs {
-            tir::Assignable::Ident(_, Spanned(_, name)) => {
+            Assignable::Ident(_, Spanned(_, name)) => {
                 instructions.push(Instruction::StoreName(name.into()));
             }
         };
@@ -239,7 +244,7 @@ impl BytecodeCodegenBackend
         types_arena: &TypesArena,
         globals: &mut Globals,
         instructions: &mut Vec<Instruction>,
-        type_key: tir::TypeKey,
+        type_key: TypeKey,
         function: &TypedFunction,
     )
     {
@@ -292,12 +297,12 @@ impl BytecodeCodegenBackend
         types_arena: &TypesArena,
         globals: &mut Globals,
         instructions: &mut Vec<Instruction>,
-        callee: &tir::Callable,
+        callee: &Callable,
         arguments_exprs: &[TypedExpression],
     )
     {
         match callee {
-            tir::Callable::Function(refers_to, _) => {
+            Callable::Function(refers_to, _) => {
                 let function_type_key = refers_to.into_type(t_ast);
 
                 let Type::Function(FunctionType {
@@ -336,22 +341,7 @@ impl CodegenBackend for BytecodeCodegenBackend
         compiler_ctx: &mut CompilerContext,
     ) -> Self::Output
     {
-        compiler_ctx
-            .intrinsic_ctx
-            .symbols
-            .iter()
-            .for_each(
-                |(_name, type_key)| match &compiler_ctx.types_arena[*type_key] {
-                    Type::Int => (),
-                    Type::Float => (),
-                    Type::String => (),
-                    Type::Bool => (),
-                    Type::Function(_) => todo!(),
-                    Type::Unit => (),
-                    Type::Object(_) => (),
-                    Type::Any => (),
-                },
-            );
+        self.translate_intrinsics(compiler_ctx);
 
         let mut module = Module {
             manifest: Manifest {
@@ -368,5 +358,31 @@ impl CodegenBackend for BytecodeCodegenBackend
         self.compile_program(t_ast, &compiler_ctx.types_arena, &mut module);
 
         module
+    }
+}
+
+impl BytecodeCodegenBackend
+{
+    fn translate_intrinsics(
+        &mut self,
+        compiler_ctx: &mut CompilerContext,
+    )
+    {
+        compiler_ctx
+            .intrinsic_ctx
+            .symbols
+            .iter()
+            .for_each(
+                |(_name, type_key)| match &compiler_ctx.types_arena[*type_key] {
+                    Type::Int => (),
+                    Type::Float => (),
+                    Type::String => (),
+                    Type::Bool => (),
+                    Type::Function(_) => todo!(),
+                    Type::Unit => (),
+                    Type::Object(_) => (),
+                    Type::Any => (),
+                },
+            );
     }
 }
