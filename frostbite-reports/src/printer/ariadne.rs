@@ -4,9 +4,7 @@ use std::fmt;
 
 use self::utils::SourceMapCache;
 
-use crate::{
-    printer, printer::PrintBackend, sourcemap::SourceMap, Level, Report,
-};
+use crate::{printer, printer::PrintBackend, sourcemap::SourceMap, Level, Report};
 
 pub struct AriadnePrintBackend;
 

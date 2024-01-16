@@ -2,6 +2,7 @@
 
 extern crate alloc;
 
+use crate::semantic::typecheck;
 use alloc::string::String;
 use codegen::CodegenBackend;
 use context::CompilerContext;
@@ -10,11 +11,9 @@ use frostbite_parser::{
     Parser,
 };
 use frostbite_reports::sourcemap::{SourceDescription, SourceId, SourceUrl};
-use semantic::run_semantic_checks;
 
 pub mod codegen;
 pub mod context;
-pub mod intrinsic;
 pub mod modules;
 pub mod semantic;
 pub mod tir;
@@ -69,14 +68,8 @@ impl Compiler
 
         // TAST is stored in the compiler context
         log::trace!("Running semantic checks...");
-        run_semantic_checks(&mut self.ctx, source_id);
 
-        log::debug!(
-            "Typed Internal representation:\n{}",
-            dbg_pls::color(&self.ctx.t_asts[source_id]),
-        );
-
-        self.ctx.errors_as_result()?;
+        self.run_semantic_checks(source_id)?;
 
         log::trace!("Codegenning...");
         let codegen_output = Self::codegen(&mut self.ctx, source_id, codegen)?;
@@ -85,6 +78,23 @@ impl Compiler
 
         log::trace!("Done...");
         Ok(compilation_results)
+    }
+
+    pub fn run_semantic_checks(
+        &mut self,
+        source_id: SourceId,
+    ) -> Result<(), CompilerError>
+    {
+        typecheck::check_types(self, source_id);
+
+        self.ctx.errors_as_result()?;
+
+        log::debug!(
+            "Typed Internal representation:\n{}",
+            dbg_pls::color(&self.ctx.type_ctx.t_asts[source_id]),
+        );
+
+        Ok(())
     }
 
     fn lex(

@@ -1,9 +1,4 @@
-use alloc::{
-    collections::BTreeMap,
-    string::{String, ToString},
-    vec,
-    vec::Vec,
-};
+use alloc::{string::ToString, vec, vec::Vec};
 use frostbite_bytecode::{
     ConstantValue, Function, FunctionKey, Globals, Instruction, Manifest, Module,
 };
@@ -25,7 +20,6 @@ use super::CodegenBackend;
 pub struct BytecodeCodegenBackend
 {
     /// Instrinsics are just provided by the interpreter
-    intrinsics: BTreeMap<String, Vec<Instruction>>,
     functions: SecondaryMap<TypeKey, FunctionKey>,
 }
 
@@ -341,8 +335,6 @@ impl CodegenBackend for BytecodeCodegenBackend
         compiler_ctx: &mut CompilerContext,
     ) -> Self::Output
     {
-        self.translate_intrinsics(compiler_ctx);
-
         let mut module = Module {
             manifest: Manifest {
                 bytecode_version: option_env!("PROJECT_VERSION")
@@ -353,9 +345,11 @@ impl CodegenBackend for BytecodeCodegenBackend
             body: Vec::new(),
         };
 
-        let t_ast = &compiler_ctx.t_asts[source_id];
+        // self.translate_intrinsics(compiler_ctx, &mut module);
 
-        self.compile_program(t_ast, &compiler_ctx.types_arena, &mut module);
+        let t_ast = &compiler_ctx.type_ctx.t_asts[source_id];
+
+        self.compile_program(t_ast, &compiler_ctx.type_ctx.types_arena, &mut module);
 
         module
     }
@@ -363,26 +357,11 @@ impl CodegenBackend for BytecodeCodegenBackend
 
 impl BytecodeCodegenBackend
 {
-    fn translate_intrinsics(
-        &mut self,
-        compiler_ctx: &mut CompilerContext,
-    )
-    {
-        compiler_ctx
-            .intrinsic_ctx
-            .symbols
-            .iter()
-            .for_each(
-                |(_name, type_key)| match &compiler_ctx.types_arena[*type_key] {
-                    Type::Int => (),
-                    Type::Float => (),
-                    Type::String => (),
-                    Type::Bool => (),
-                    Type::Function(_) => todo!(),
-                    Type::Unit => (),
-                    Type::Object(_) => (),
-                    Type::Any => (),
-                },
-            );
-    }
+    // fn translate_intrinsics(
+    //     &mut self,
+    //     compiler_ctx: &mut CompilerContext,
+    //     module: &mut Module,
+    // )
+    // {
+    // }
 }

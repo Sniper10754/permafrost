@@ -3,6 +3,8 @@ mod scopes_abstraction
 
     use alloc::{collections::BTreeMap, string::String, vec::Vec};
 
+    pub struct 
+
     #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
     pub struct Scope<V>
     {
@@ -67,13 +69,26 @@ mod scopes_abstraction
             }
         }
 
-        pub fn insert_local(
+        #[deprecated = "Use Scopes::<V>::try_insert"]
+        pub fn insert(
             &mut self,
             local: impl Into<String>,
             v: V,
         )
         {
             self.scopes.last_mut().unwrap().insert_local(local, v)
+        }
+
+        #[must_use = "Scope result must not be ignored"]
+        pub fn try_insert(
+            &mut self,
+            local: impl Into<String>,
+            v: V,
+        ) -> Result<(), ()>
+        {
+            let local = local.into();
+
+            Ok(())
         }
 
         pub fn local(

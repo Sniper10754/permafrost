@@ -17,15 +17,23 @@ use frostbite_parser::ast::{
     Argument, Expr, Spannable, Spanned,
 };
 use frostbite_reports::{sourcemap::SourceId, IntoReport, Label, Level, Report};
+use slotmap::SecondaryMap;
 
 use crate::{
-    context::CompilerContext,
     tir::{
         display::display_type, Assignable, Callable, FunctionType, ImportDirectiveKind, RefersTo,
         Type, TypeKey, TypedAst, TypedExpression, TypedExpressionKind, TypedFunction, TypesArena,
     },
     utils::Scopes,
+    Compiler,
 };
+
+#[derive(Debug, Default)]
+pub struct TypeContext
+{
+    pub t_asts: SecondaryMap<SourceId, TypedAst>,
+    pub types_arena: TypesArena,
+}
 
 #[derive(Debug)]
 pub enum TypecheckError
@@ -180,43 +188,46 @@ impl IntoReport for TypecheckError
 }
 
 pub fn check_types(
-    compiler_ctx: &mut CompilerContext,
+    compiler: &mut Compiler,
     source_id: SourceId,
 )
 {
-    compiler_ctx.t_asts.insert(source_id, TypedAst::default());
+    compiler
+        .ctx
+        .type_ctx
+        .t_asts
+        .insert(source_id, TypedAst::default());
 
-    let typed_ast = &mut compiler_ctx.t_asts[source_id];
-    let types_arena = &mut compiler_ctx.types_arena;
+    // compiler.ctx
+    //     .intrinsic_ctx
+    //     .symbols
+    //     .iter()
+    //     .map(|(name, ty)| (name, *ty))
+    //     .for_each(|(name, type_key)| rts.scopes.insert_local(name, RefersTo::Type(type_key)));
 
     let mut rts = RecursiveTypechecker {
         scopes: Scopes::new(),
-        typed_ast,
-        types_arena,
+        compiler,
     };
 
-    compiler_ctx
-        .intrinsic_ctx
-        .symbols
-        .iter()
-        .map(|(name, ty)| (name, *ty))
-        .for_each(|(name, type_key)| rts.scopes.insert_local(name, RefersTo::Type(type_key)));
+    let ast = rts.compiler.ctx.asts[source_id].exprs.clone().into_iter();
 
-    let ast = &compiler_ctx.asts[source_id];
+    for expr in ast {
+        let result = rts.visit_expr(source_id, &expr);
 
-    for expr in &ast.exprs {
-        match rts.visit_expr(source_id, expr) {
-            Ok(t_expr) => rts.typed_ast.nodes.push(t_expr),
-            Err(report) => compiler_ctx.report_ctx.push(report.into_report()),
+        match result {
+            Ok(t_expr) => rts.compiler.ctx.type_ctx.t_asts[source_id]
+                .nodes
+                .push(t_expr),
+            Err(report) => rts.compiler.ctx.report_ctx.push(report.into_report()),
         }
     }
 }
 
-struct RecursiveTypechecker<'infos>
+struct RecursiveTypechecker<'compiler>
 {
     pub scopes: Scopes<RefersTo>,
-    pub typed_ast: &'infos mut TypedAst,
-    pub types_arena: &'infos mut TypesArena,
+    pub compiler: &'compiler mut Compiler,
 }
 
 impl<'a> RecursiveTypechecker<'a>
@@ -227,7 +238,10 @@ impl<'a> RecursiveTypechecker<'a>
         b: TypeKey,
     ) -> Result<(), ()>
     {
-        match (self.types_arena[a].clone(), self.types_arena[b].clone()) {
+        match (
+            self.compiler.ctx.type_ctx.types_arena[a].clone(),
+            self.compiler.ctx.type_ctx.types_arena[b].clone(),
+        ) {
             (Type::Object(left), Type::Object(right)) if left == right => Ok(()),
 
             (Type::Function(left_fn_type), Type::Function(right_fn_type)) => {
@@ -259,11 +273,13 @@ impl<'a> RecursiveTypechecker<'a>
     ) -> Result<TypeKey, TypecheckError>
     {
         match expr {
-            Expr::Int(_) => Ok(self.types_arena.insert(Type::Int)),
-            Expr::Float(_) => Ok(self.types_arena.insert(Type::Float)),
-            Expr::String(_) => Ok(self.types_arena.insert(Type::String)),
-            Expr::Bool(_) => Ok(self.types_arena.insert(Type::Bool)),
-            Expr::ImportDirective(_) => Ok(self.types_arena.insert(Type::Unit)),
+            Expr::Int(_) => Ok(self.compiler.ctx.type_ctx.types_arena.insert(Type::Int)),
+            Expr::Float(_) => Ok(self.compiler.ctx.type_ctx.types_arena.insert(Type::Float)),
+            Expr::String(_) => Ok(self.compiler.ctx.type_ctx.types_arena.insert(Type::String)),
+            Expr::Bool(_) => Ok(self.compiler.ctx.type_ctx.types_arena.insert(Type::Bool)),
+            Expr::ImportDirective(_) => {
+                Ok(self.compiler.ctx.type_ctx.types_arena.insert(Type::Unit))
+            }
             Expr::Ident(Spanned(span, name)) => self.infer_ident(source_id, name, span.clone()),
             Expr::BinaryOperation { lhs, operator, rhs } => {
                 self.infer_binary_op(source_id, lhs, operator, rhs, expr.span())
@@ -272,7 +288,7 @@ impl<'a> RecursiveTypechecker<'a>
                 lhs: _,
                 eq_token: _,
                 value: _,
-            } => Ok(self.types_arena.insert(Type::Unit)),
+            } => Ok(self.compiler.ctx.type_ctx.types_arena.insert(Type::Unit)),
             Expr::Function {
                 fn_token: _,
                 name,
@@ -305,12 +321,13 @@ impl<'a> RecursiveTypechecker<'a>
                         ));
                     };
 
-                    let type_key = referred_to.into_type(self.typed_ast);
+                    let type_key =
+                        referred_to.into_type(&self.compiler.ctx.type_ctx.t_asts[source_id]);
 
                     if let Type::Function(FunctionType {
                         arguments: _,
                         return_type,
-                    }) = &self.types_arena[type_key]
+                    }) = &self.compiler.ctx.type_ctx.types_arena[type_key]
                     {
                         Ok(*return_type)
                     } else {
@@ -324,8 +341,8 @@ impl<'a> RecursiveTypechecker<'a>
                 _ => Err(TypecheckError::CannotCallNonIdent(source_id, callee.span())),
             },
 
-            Expr::Block { .. } => Ok(self.types_arena.insert(Type::Unit)),
-            Expr::Return(..) => Ok(self.types_arena.insert(Type::Unit)),
+            Expr::Block { .. } => Ok(self.compiler.ctx.type_ctx.types_arena.insert(Type::Unit)),
+            Expr::Return(..) => Ok(self.compiler.ctx.type_ctx.types_arena.insert(Type::Unit)),
 
             Expr::Poisoned => unreachable!(),
         }
@@ -346,7 +363,9 @@ impl<'a> RecursiveTypechecker<'a>
         };
 
         match referred_to {
-            RefersTo::Local(local_key) => Ok(self.typed_ast.locals[local_key]),
+            RefersTo::Local(local_key) => {
+                Ok(self.compiler.ctx.type_ctx.t_asts[source_id].locals[local_key])
+            }
             RefersTo::Type(type_key) => Ok(type_key),
         }
     }
@@ -368,14 +387,14 @@ impl<'a> RecursiveTypechecker<'a>
         match (
             operator.kind,
             (
-                &self.types_arena[lhs_type_key],
-                &self.types_arena[rhs_type_key],
+                &self.compiler.ctx.type_ctx.types_arena[lhs_type_key],
+                &self.compiler.ctx.type_ctx.types_arena[rhs_type_key],
             ),
         ) {
             (
                 BinaryOperatorKind::Add | BinaryOperatorKind::Sub | BinaryOperatorKind::Mul,
                 (Type::Int, Type::Int),
-            ) => Ok(self.types_arena.insert(Type::Int)),
+            ) => Ok(self.compiler.ctx.type_ctx.types_arena.insert(Type::Int)),
 
             (
                 BinaryOperatorKind::Add
@@ -383,17 +402,20 @@ impl<'a> RecursiveTypechecker<'a>
                 | BinaryOperatorKind::Mul
                 | BinaryOperatorKind::Div,
                 (Type::Float, Type::Float) | (Type::Float, Type::Int) | (Type::Int, Type::Float),
-            ) => Ok(self.types_arena.insert(Type::Float)),
+            ) => Ok(self.compiler.ctx.type_ctx.types_arena.insert(Type::Float)),
 
             (BinaryOperatorKind::Equal, (..)) => {
                 if self.unify(lhs_type_key, rhs_type_key).is_ok() {
-                    Ok(self.types_arena.insert(Type::Bool))
+                    Ok(self.compiler.ctx.type_ctx.types_arena.insert(Type::Bool))
                 } else {
                     Err(TypecheckError::TypeMismatch {
                         source_id,
                         span,
-                        expected: display_type(lhs_type_key, self.types_arena),
-                        found: display_type(rhs_type_key, self.types_arena),
+                        expected: display_type(
+                            lhs_type_key,
+                            &self.compiler.ctx.type_ctx.types_arena,
+                        ),
+                        found: display_type(rhs_type_key, &self.compiler.ctx.type_ctx.types_arena),
                     })
                 }
             }
@@ -401,8 +423,8 @@ impl<'a> RecursiveTypechecker<'a>
             _ => Err(TypecheckError::IncompatibleOperands {
                 source_id,
                 span,
-                left: display_type(lhs_type_key, self.types_arena),
-                right: display_type(rhs_type_key, self.types_arena),
+                left: display_type(lhs_type_key, &self.compiler.ctx.type_ctx.types_arena),
+                right: display_type(rhs_type_key, &self.compiler.ctx.type_ctx.types_arena),
             }),
         }
     }
@@ -416,7 +438,7 @@ impl<'a> RecursiveTypechecker<'a>
     ) -> Result<TypeKey, TypecheckError>
     {
         let fn_type = {
-            let return_type = self.types_arena.insert(
+            let return_type = self.compiler.ctx.type_ctx.types_arena.insert(
                 return_type_annotation
                     .map(|Spanned(_, ty)| ty)
                     .cloned()
@@ -433,7 +455,11 @@ impl<'a> RecursiveTypechecker<'a>
                      }| {
                         (
                             name.clone(),
-                            self.types_arena.insert(type_annotation.clone().into()),
+                            self.compiler
+                                .ctx
+                                .type_ctx
+                                .types_arena
+                                .insert(type_annotation.clone().into()),
                         )
                     },
                 )
@@ -445,7 +471,7 @@ impl<'a> RecursiveTypechecker<'a>
             })
         };
 
-        Ok(self.types_arena.insert(fn_type))
+        Ok(self.compiler.ctx.type_ctx.types_arena.insert(fn_type))
     }
 
     fn visit_expr(
@@ -546,7 +572,7 @@ impl<'a> RecursiveTypechecker<'a>
             }
         };
 
-        let type_key = self.types_arena.insert(Type::Unit);
+        let type_key = self.compiler.ctx.type_ctx.types_arena.insert(Type::Unit);
 
         Ok(TypedExpression {
             type_key,
@@ -568,7 +594,7 @@ impl<'a> RecursiveTypechecker<'a>
             ));
         };
 
-        let type_key = refers_to.into_type(self.typed_ast);
+        let type_key = refers_to.into_type(&self.compiler.ctx.type_ctx.t_asts[source_id]);
 
         Ok(TypedExpression {
             type_key,
@@ -621,10 +647,12 @@ impl<'a> RecursiveTypechecker<'a>
                     return Err(TypecheckError::CannotAssignTo(source_id, lhs.span()));
                 }
                 None => {
-                    let local_index = self.typed_ast.locals.insert(value.type_key);
+                    let local_index = self.compiler.ctx.type_ctx.t_asts[source_id]
+                        .locals
+                        .insert(value.type_key);
 
                     self.scopes
-                        .insert_local(spanned_str.value(), RefersTo::Local(local_index));
+                        .insert(spanned_str.value(), RefersTo::Local(local_index));
                 }
             },
 
@@ -635,7 +663,7 @@ impl<'a> RecursiveTypechecker<'a>
 
         let assignable = Assignable::try_from(lhs).unwrap();
 
-        let type_key = self.types_arena.insert(Type::Unit);
+        let type_key = self.compiler.ctx.type_ctx.types_arena.insert(Type::Unit);
 
         Ok(TypedExpression {
             type_key,
@@ -660,8 +688,7 @@ impl<'a> RecursiveTypechecker<'a>
         let type_key = self.infer_type(source_id, expr)?;
 
         if let Some(name) = name.as_ref() {
-            self.scopes
-                .insert_local(name.value(), RefersTo::Type(type_key));
+            self.scopes.insert(name.value(), RefersTo::Type(type_key));
         }
 
         let arguments = arguments
@@ -674,10 +701,10 @@ impl<'a> RecursiveTypechecker<'a>
                     (arg_name.into(), Type::from(type_annotation.value().clone()))
                 },
             )
-            .map(|(name, ty)| (name, self.types_arena.insert(ty)))
+            .map(|(name, ty)| (name, self.compiler.ctx.type_ctx.types_arena.insert(ty)))
             .collect::<BTreeMap<_, _>>();
 
-        let return_type = self.types_arena.insert(
+        let return_type = self.compiler.ctx.type_ctx.types_arena.insert(
             return_type_annotation
                 .as_ref()
                 .cloned()
@@ -689,9 +716,11 @@ impl<'a> RecursiveTypechecker<'a>
         self.scopes.enter_scope();
 
         arguments.iter().for_each(|(k, v)| {
-            let local_index = self.typed_ast.locals.insert(*v);
+            let local_index = self.compiler.ctx.type_ctx.t_asts[source_id]
+                .locals
+                .insert(*v);
 
-            self.scopes.insert_local(k, RefersTo::Local(local_index));
+            self.scopes.insert(k, RefersTo::Local(local_index));
         });
 
         let t_ast_body = self.visit_expr(source_id, body)?;
@@ -750,8 +779,14 @@ impl<'a> RecursiveTypechecker<'a>
                             .as_ref()
                             .map(|expr| expr.kind.span())
                             .unwrap_or(return_token.span()),
-                        expected: display_type(expected_type, self.types_arena),
-                        found: display_type(*return_type_index, self.types_arena),
+                        expected: display_type(
+                            expected_type,
+                            &self.compiler.ctx.type_ctx.types_arena,
+                        ),
+                        found: display_type(
+                            *return_type_index,
+                            &self.compiler.ctx.type_ctx.types_arena,
+                        ),
                     }),
                 }
             }
@@ -829,9 +864,11 @@ impl<'a> RecursiveTypechecker<'a>
                     ));
                 };
 
-                let type_key = refers_to.into_type(self.typed_ast);
+                let type_key = refers_to.into_type(&self.compiler.ctx.type_ctx.t_asts[source_id]);
 
-                let Type::Function(function) = self.types_arena[type_key].clone() else {
+                let Type::Function(function) =
+                    self.compiler.ctx.type_ctx.types_arena[type_key].clone()
+                else {
                     return Err(TypecheckError::CannotCallNonFunction(
                         source_id,
                         callee.span(),
@@ -878,8 +915,14 @@ impl<'a> RecursiveTypechecker<'a>
                             return Err(TypecheckError::TypeMismatch {
                                 source_id,
                                 span: call_arg_span,
-                                expected: display_type(func_arg, self.types_arena),
-                                found: display_type(call_arg, self.types_arena),
+                                expected: display_type(
+                                    func_arg,
+                                    &self.compiler.ctx.type_ctx.types_arena,
+                                ),
+                                found: display_type(
+                                    call_arg,
+                                    &self.compiler.ctx.type_ctx.types_arena,
+                                ),
                             })
                         }
                     }
@@ -919,7 +962,7 @@ impl<'a> RecursiveTypechecker<'a>
         let return_value_type = if let Some(ret_expr) = ret_expr {
             self.infer_type(source_id, ret_expr)?
         } else {
-            self.types_arena.insert(Type::Unit)
+            self.compiler.ctx.type_ctx.types_arena.insert(Type::Unit)
         };
 
         let mut value = None;
@@ -930,7 +973,7 @@ impl<'a> RecursiveTypechecker<'a>
             value = Some(temp_val);
         }
 
-        let type_key = self.types_arena.insert(Type::Unit);
+        let type_key = self.compiler.ctx.type_ctx.types_arena.insert(Type::Unit);
 
         Ok(TypedExpression {
             type_key,
@@ -950,7 +993,7 @@ impl<'a> RecursiveTypechecker<'a>
         right_brace: &RightBraceToken,
     ) -> Result<TypedExpression, TypecheckError>
     {
-        let type_key = self.types_arena.insert(Type::Unit);
+        let type_key = self.compiler.ctx.type_ctx.types_arena.insert(Type::Unit);
 
         Ok(TypedExpression {
             type_key,

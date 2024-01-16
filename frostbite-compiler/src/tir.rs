@@ -280,6 +280,17 @@ pub enum ImportDirectiveKind
     },
 }
 
+impl ImportDirectiveKind
+{
+    pub fn module_path(&self) -> &ModulePath
+    {
+        match self {
+            ImportDirectiveKind::FromModuleImportSymbol { module, symbol: _ } => module,
+            ImportDirectiveKind::ImportModule { module } => module,
+        }
+    }
+}
+
 #[derive(Debug, Clone, DebugPls)]
 pub enum Callable
 {

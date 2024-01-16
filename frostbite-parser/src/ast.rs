@@ -369,6 +369,22 @@ pub struct ModulePath
     pub tail: Spanned<String>,
 }
 
+impl ModulePath
+{
+    pub fn head(&self) -> &str
+    {
+        self.parents
+            .first()
+            .map(|spanned_str| spanned_str.value() as &str)
+            .unwrap_or(self.tail())
+    }
+
+    pub fn tail(&self) -> &str
+    {
+        self.tail.value()
+    }
+}
+
 impl Display for ModulePath
 {
     fn fmt(
