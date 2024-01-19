@@ -10,10 +10,24 @@ pub trait CodegenBackend
     type Output;
 
     fn codegen(
-        self,
+        &mut self,
         source_id: SourceId,
         compiler_ctx: &mut CompilerContext,
     ) -> Self::Output;
+}
+
+impl<T: CodegenBackend> CodegenBackend for &mut T
+{
+    type Output = T::Output;
+
+    fn codegen(
+        &mut self,
+        source_id: SourceId,
+        compiler_ctx: &mut CompilerContext,
+    ) -> Self::Output
+    {
+        T::codegen(self, source_id, compiler_ctx)
+    }
 }
 
 pub struct CodegenBackends;

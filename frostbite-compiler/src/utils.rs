@@ -3,8 +3,6 @@ mod scopes_abstraction
 
     use alloc::{collections::BTreeMap, string::String, vec::Vec};
 
-    pub struct 
-
     #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
     pub struct Scope<V>
     {

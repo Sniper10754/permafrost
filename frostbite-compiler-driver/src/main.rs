@@ -75,18 +75,20 @@ fn main() -> eyre::Result<()>
 
             let src_id = compiler.add_source(file.display().to_string(), src);
 
-            let output = compiler.compile_source_code(src_id, CodegenBackends::bytecode_backend());
+            let output = compiler.compile_module(src_id, CodegenBackends::bytecode_backend());
 
             let CompilationResults { codegen_output } = match output {
                 Ok(output) => output,
                 Err(_) => {
                     let mut buf = String::new();
 
-                    for report in compiler.ctx().report_ctx.iter() {
-                        ReportPrinter::new(&mut buf)
+                    let report_printer = ReportPrinter::new(&mut buf);
+
+                    compiler.ctx().report_ctx.iter().for_each(|report| {
+                        report_printer
                             .print::<DefaultPrintBackend>(&compiler.ctx().src_map, report)
                             .unwrap();
-                    }
+                    });
 
                     println!("{buf}");
 

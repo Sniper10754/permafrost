@@ -2,7 +2,7 @@
 
 extern crate alloc;
 
-use crate::semantic::typecheck;
+use crate::{modules::Module, semantic::typecheck};
 use alloc::string::String;
 use codegen::CodegenBackend;
 use context::CompilerContext;
@@ -11,6 +11,7 @@ use frostbite_parser::{
     Parser,
 };
 use frostbite_reports::sourcemap::{SourceDescription, SourceId, SourceUrl};
+use modules::ModuleKey;
 
 pub mod codegen;
 pub mod context;
@@ -53,31 +54,45 @@ impl Compiler
         })
     }
 
-    pub fn compile_source_code<C: CodegenBackend>(
+    pub fn compile_module(
         &mut self,
-        source_id: SourceId,
-        codegen: C,
-    ) -> Result<CompilationResults<C>, CompilerError>
+        src_id: SourceId,
+        module_name: &str,
+    ) -> Result<ModuleKey, CompilerError>
     {
         log::trace!("Lexing...");
-        let token_stream = Self::lex(&mut self.ctx, source_id)?;
+        let token_stream = Self::lex(&mut self.ctx, src_id)?;
 
         log::trace!("Parsing...");
         // AST is stored in the compiler context
-        Self::parse(&mut self.ctx, token_stream, source_id)?;
+        Self::parse(&mut self.ctx, token_stream, src_id)?;
 
         // TAST is stored in the compiler context
         log::trace!("Running semantic checks...");
 
-        self.run_semantic_checks(source_id)?;
-
-        log::trace!("Codegenning...");
-        let codegen_output = Self::codegen(&mut self.ctx, source_id, codegen)?;
-
-        let compilation_results = CompilationResults { codegen_output };
+        self.run_semantic_checks(src_id)?;
 
         log::trace!("Done...");
-        Ok(compilation_results)
+
+        let module_key = self.ctx.module_ctx.modules.insert(Module {
+            name: module_name.into(),
+            src_id,
+        });
+
+        Ok(module_key)
+    }
+
+    pub fn codegen_module<C: CodegenBackend>(
+        &mut self,
+        module_key: ModuleKey,
+        codegen: &mut C,
+    ) -> Result<CompilationResults<C>, CompilerError>
+    {
+        let module = &self.ctx.module_ctx.modules[module_key];
+
+        let codegen_output = Self::codegen(&mut self.ctx, module.src_id, codegen)?;
+
+        Ok(CompilationResults { codegen_output })
     }
 
     pub fn run_semantic_checks(
@@ -130,7 +145,7 @@ impl Compiler
     fn codegen<C: CodegenBackend>(
         compiler_ctx: &mut CompilerContext,
         main_source_id: SourceId,
-        codegen: C,
+        codegen: &mut C,
     ) -> Result<C::Output, CompilerError>
     {
         let output = codegen.codegen(main_source_id, compiler_ctx);

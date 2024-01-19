@@ -330,7 +330,7 @@ impl CodegenBackend for BytecodeCodegenBackend
     type Output = Module;
 
     fn codegen(
-        mut self,
+        &mut self,
         source_id: SourceId,
         compiler_ctx: &mut CompilerContext,
     ) -> Self::Output
