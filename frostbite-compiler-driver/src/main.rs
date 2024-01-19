@@ -3,7 +3,9 @@ use std::{env, fs, io::Write, path::PathBuf, process};
 use clap::Parser;
 use color_eyre::eyre;
 
-use frostbite_compiler::{codegen::CodegenBackends, CompilationResults, Compiler};
+use frostbite_compiler::{
+    codegen::CodegenBackends, context::CompilerContext, CompilationResults, Compiler,
+};
 use frostbite_reports::printer::{DefaultPrintBackend, ReportPrinter};
 
 mod compile;
@@ -75,25 +77,19 @@ fn main() -> eyre::Result<()>
 
             let src_id = compiler.add_source(file.display().to_string(), src);
 
-            let output = compiler.compile_module(src_id, CodegenBackends::bytecode_backend());
+            let Ok(module_key) = compiler.compile_module(src_id) else {
+                bail_on_compiler_err(compiler.ctx());
 
-            let CompilationResults { codegen_output } = match output {
-                Ok(output) => output,
-                Err(_) => {
-                    let mut buf = String::new();
+                unreachable!();
+            };
 
-                    let report_printer = ReportPrinter::new(&mut buf);
+            let output =
+                compiler.codegen_module(module_key, &mut CodegenBackends::bytecode_backend());
 
-                    compiler.ctx().report_ctx.iter().for_each(|report| {
-                        report_printer
-                            .print::<DefaultPrintBackend>(&compiler.ctx().src_map, report)
-                            .unwrap();
-                    });
+            let Ok(CompilationResults { codegen_output }) = output else {
+                bail_on_compiler_err(compiler.ctx());
 
-                    println!("{buf}");
-
-                    process::exit(1);
-                }
+                unreachable!();
             };
 
             let mut buf = vec![];
@@ -115,4 +111,28 @@ fn main() -> eyre::Result<()>
     }
 
     Ok(())
+}
+
+fn bail_on_compiler_err(ctx: &CompilerContext)
+{
+    if ctx.report_ctx.has_errors() {
+        print_reports(ctx);
+
+        process::exit(1);
+    }
+}
+
+fn print_reports(ctx: &CompilerContext)
+{
+    let mut buf = String::new();
+
+    let mut report_printer = ReportPrinter::new(&mut buf);
+
+    ctx.report_ctx.iter().for_each(|report| {
+        report_printer
+            .print::<DefaultPrintBackend>(&ctx.src_map, report)
+            .unwrap();
+    });
+
+    println!("{buf}");
 }

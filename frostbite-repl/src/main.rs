@@ -62,8 +62,16 @@ fn compile_code(code: &str) -> Result<frostbite_bytecode::Module, CompilerContex
 
     let src_id = compiler.add_source("REPL".to_string(), code);
 
-    compiler
-        .compile_module(src_id, CodegenBackends::bytecode_backend())
-        .map(|CompilationResults { codegen_output }| codegen_output)
-        .map_err(|_| (compiler.move_ctx()))
+    let module_key = match compiler.compile_module(src_id) {
+        Ok(module_key) => module_key,
+        Err(_) => {
+            return Err(compiler.move_ctx());
+        }
+    };
+
+    let CompilationResults { codegen_output } = compiler
+        .codegen_module(module_key, &mut CodegenBackends::bytecode_backend())
+        .map_err(|_| compiler.move_ctx())?;
+
+    Ok(codegen_output)
 }

@@ -1,9 +1,7 @@
 use frostbite_reports::sourcemap::SourceId;
-use slotmap::{new_key_type, SecondaryMap, SlotMap};
+use slotmap::{new_key_type, SlotMap};
 
 use alloc::string::String;
-
-use crate::Compiler;
 
 new_key_type! {
     pub struct ModuleKey;

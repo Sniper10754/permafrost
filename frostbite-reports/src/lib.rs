@@ -1,3 +1,4 @@
+#![feature(path_file_prefix)]
 #![no_std]
 
 extern crate alloc;

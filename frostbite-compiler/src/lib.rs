@@ -3,7 +3,7 @@
 extern crate alloc;
 
 use crate::{modules::Module, semantic::typecheck};
-use alloc::string::String;
+use alloc::string::{String, ToString};
 use codegen::CodegenBackend;
 use context::CompilerContext;
 use frostbite_parser::{
@@ -57,27 +57,23 @@ impl Compiler
     pub fn compile_module(
         &mut self,
         src_id: SourceId,
-        module_name: &str,
     ) -> Result<ModuleKey, CompilerError>
     {
         log::trace!("Lexing...");
         let token_stream = Self::lex(&mut self.ctx, src_id)?;
 
         log::trace!("Parsing...");
-        // AST is stored in the compiler context
         Self::parse(&mut self.ctx, token_stream, src_id)?;
 
-        // TAST is stored in the compiler context
         log::trace!("Running semantic checks...");
 
         self.run_semantic_checks(src_id)?;
 
         log::trace!("Done...");
 
-        let module_key = self.ctx.module_ctx.modules.insert(Module {
-            name: module_name.into(),
-            src_id,
-        });
+        let name = self.ctx.src_map[src_id].url.to_string();
+
+        let module_key = self.ctx.module_ctx.modules.insert(Module { name, src_id });
 
         Ok(module_key)
     }
@@ -89,8 +85,9 @@ impl Compiler
     ) -> Result<CompilationResults<C>, CompilerError>
     {
         let module = &self.ctx.module_ctx.modules[module_key];
+        let main_source_id = module.src_id;
 
-        let codegen_output = Self::codegen(&mut self.ctx, module.src_id, codegen)?;
+        let codegen_output = Self::codegen(&mut self.ctx, main_source_id, codegen)?;
 
         Ok(CompilationResults { codegen_output })
     }

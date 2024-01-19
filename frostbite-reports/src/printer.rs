@@ -33,7 +33,7 @@ impl<'output, O: fmt::Write> ReportPrinter<'output, O>
     /// # Errors
     /// May return error if the backend fails writing the report
     pub fn print<B: PrintBackend>(
-        self,
+        &mut self,
         source_map: &SourceMap,
         report: &Report,
     ) -> Result<(), PrintingError>
