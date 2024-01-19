@@ -6,7 +6,13 @@ use core::{
 };
 
 use alloc::{
-    borrow::Cow, boxed::Box, collections::BTreeMap, format, string::String, vec, vec::Vec,
+    borrow::Cow,
+    boxed::Box,
+    collections::BTreeMap,
+    format,
+    string::{String, ToString},
+    vec,
+    vec::Vec,
 };
 
 use frostbite_parser::ast::{
@@ -14,12 +20,13 @@ use frostbite_parser::ast::{
         BinaryOperatorKind, FunctionToken, LeftBraceToken, LeftParenthesisToken, Operator,
         ReturnToken, RightBraceToken, RightParenthesisToken, TypeAnnotation,
     },
-    Argument, Expr, Spannable, Spanned,
+    Argument, Expr, ModulePath, Spannable, Spanned,
 };
 use frostbite_reports::{sourcemap::SourceId, IntoReport, Label, Level, Report};
 use slotmap::SecondaryMap;
 
 use crate::{
+    modules::ModuleKey,
     tir::{
         display::display_type, Assignable, Callable, FunctionType, ImportDirectiveKind, RefersTo,
         Type, TypeKey, TypedAst, TypedExpression, TypedExpressionKind, TypedFunction, TypesArena,
@@ -36,7 +43,7 @@ pub struct TypeContext
 }
 
 #[derive(Debug)]
-pub enum TypecheckError
+enum TypecheckError
 {
     TypeMismatch
     {
@@ -55,7 +62,13 @@ pub enum TypecheckError
         left: Cow<'static, str>,
         right: Cow<'static, str>,
     },
-    CannotAssignTo(SourceId, Range<usize>),
+    CannotAssignTo
+    {
+        src_id: SourceId,
+        span: Range<usize>,
+
+        reason: CannotAssignToReason,
+    },
     CannotCallNonIdent(SourceId, Range<usize>),
     CannotCallNonFunction(SourceId, Range<usize>),
     TooManyArguments
@@ -79,6 +92,13 @@ pub enum TypecheckError
         source_id: SourceId,
         faulty_branch_position: Range<usize>,
     },
+}
+
+#[derive(Debug, derive_more::Display)]
+enum CannotAssignToReason
+{
+    SymbolAlreadyExists,
+    SymbolIsConstant,
 }
 
 impl IntoReport for TypecheckError
@@ -123,12 +143,12 @@ impl IntoReport for TypecheckError
                 ],
                 [],
             ),
-            TypecheckError::CannotAssignTo(source_id, span) => Report::new_diagnostic(
+            TypecheckError::CannotAssignTo { src_id, span, reason } => Report::new_diagnostic(
                 Level::Error,
                 span,
-                source_id,
+                src_id,
                 "Cannot assign to",
-                Some("Only identifiers may be assigned to"),
+                Some(reason.to_string()),
                 [],
                 [],
             ),
@@ -562,7 +582,7 @@ impl<'a> RecursiveTypechecker<'a>
     {
         let Spanned(span, import_directive) = import_directive;
 
-        let imp_dir = match import_directive.clone() {
+        let import_directive = match import_directive.clone() {
             frostbite_parser::ast::ImportDirectiveKind::FromModuleImportSymbol {
                 module,
                 symbol,
@@ -572,12 +592,29 @@ impl<'a> RecursiveTypechecker<'a>
             }
         };
 
+        let module_path = import_directive.module_path();
+
+        match import_directive {
+            ImportDirectiveKind::FromModuleImportSymbol {
+                ref module,
+                ref symbol,
+            } => {}
+            ImportDirectiveKind::ImportModule { ref module } => {}
+        }
+
         let type_key = self.compiler.ctx.type_ctx.types_arena.insert(Type::Unit);
 
         Ok(TypedExpression {
             type_key,
-            kind: TypedExpressionKind::ImportDirective(Spanned(span, imp_dir)),
+            kind: TypedExpressionKind::ImportDirective(Spanned(span, import_directive)),
         })
+    }
+
+    fn resolve_module_path(
+        &mut self,
+        module_path: &ModulePath,
+    ) -> ModuleKey
+    {
     }
 
     fn visit_ident(
@@ -644,7 +681,11 @@ impl<'a> RecursiveTypechecker<'a>
             Expr::Ident(spanned_str) => match self.scopes.local(spanned_str.value()) {
                 Some(RefersTo::Local(_)) => {}
                 Some(RefersTo::Type(_)) => {
-                    return Err(TypecheckError::CannotAssignTo(source_id, lhs.span()));
+                    return Err(TypecheckError::CannotAssignTo {
+                        src_id: source_id,
+                        span: lhs.span(),
+                        reason: CannotAssignToReason::SymbolAlreadyExists,
+                    });
                 }
                 None => {
                     let local_index = self.compiler.ctx.type_ctx.t_asts[source_id]
@@ -652,11 +693,17 @@ impl<'a> RecursiveTypechecker<'a>
                         .insert(value.type_key);
 
                     self.scopes
-                        .insert(spanned_str.value(), RefersTo::Local(local_index));
+                        .insert_forced(spanned_str.value(), RefersTo::Local(local_index));
                 }
             },
 
-            _ => return Err(TypecheckError::CannotAssignTo(source_id, lhs.span())),
+            _ => {
+                return Err(TypecheckError::CannotAssignTo {
+                    src_id: source_id,
+                    span: lhs.span(),
+                    reason: CannotAssignToReason::SymbolIsConstant,
+                })
+            }
         }
 
         let lhs = self.visit_expr(source_id, lhs)?;
@@ -688,7 +735,13 @@ impl<'a> RecursiveTypechecker<'a>
         let type_key = self.infer_type(source_id, expr)?;
 
         if let Some(name) = name.as_ref() {
-            self.scopes.insert(name.value(), RefersTo::Type(type_key));
+            self.scopes
+                .try_insert(name.value(), RefersTo::Type(type_key))
+                .map_err(|_| TypecheckError::CannotAssignTo {
+                    src_id: source_id,
+                    span: name.span(),
+                    reason: CannotAssignToReason::SymbolAlreadyExists,
+                })?;
         }
 
         let arguments = arguments
@@ -720,7 +773,7 @@ impl<'a> RecursiveTypechecker<'a>
                 .locals
                 .insert(*v);
 
-            self.scopes.insert(k, RefersTo::Local(local_index));
+            self.scopes.insert_forced(k, RefersTo::Local(local_index));
         });
 
         let t_ast_body = self.visit_expr(source_id, body)?;

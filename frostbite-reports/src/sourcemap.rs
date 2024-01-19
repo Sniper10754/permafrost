@@ -3,7 +3,7 @@ extern crate std;
 
 use core::ops::Index;
 
-use alloc::string::String;
+use alloc::string::{String, ToString};
 use slotmap::{new_key_type, SlotMap};
 
 new_key_type! {
@@ -89,4 +89,12 @@ pub enum SourceUrl
     String(String),
 
     Unknown,
+}
+
+impl<'a> From<&'a str> for SourceUrl
+{
+    fn from(value: &'a str) -> Self
+    {
+        Self::from(value.to_string())
+    }
 }

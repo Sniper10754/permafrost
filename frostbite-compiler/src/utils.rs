@@ -3,6 +3,9 @@ mod scopes_abstraction
 
     use alloc::{collections::BTreeMap, string::String, vec::Vec};
 
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+    pub struct SymbolAlreadyExists;
+
     #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
     pub struct Scope<V>
     {
@@ -67,8 +70,7 @@ mod scopes_abstraction
             }
         }
 
-        #[deprecated = "Use Scopes::<V>::try_insert"]
-        pub fn insert(
+        pub fn insert_forced(
             &mut self,
             local: impl Into<String>,
             v: V,
@@ -82,9 +84,15 @@ mod scopes_abstraction
             &mut self,
             local: impl Into<String>,
             v: V,
-        ) -> Result<(), ()>
+        ) -> Result<(), SymbolAlreadyExists>
         {
-            let local = local.into();
+            let local_name = local.into();
+
+            if self.local(&local_name).is_some() {
+                return Err(SymbolAlreadyExists);
+            } else {
+                self.insert_forced(local_name, v)
+            }
 
             Ok(())
         }

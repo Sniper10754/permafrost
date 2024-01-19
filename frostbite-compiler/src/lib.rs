@@ -98,7 +98,6 @@ impl Compiler
     ) -> Result<(), CompilerError>
     {
         typecheck::check_types(self, source_id);
-
         self.ctx.errors_as_result()?;
 
         log::debug!(
@@ -107,20 +106,6 @@ impl Compiler
         );
 
         Ok(())
-    }
-
-    fn lex(
-        compiler_ctx: &mut CompilerContext,
-        source_id: SourceId,
-    ) -> Result<TokenStream, CompilerError>
-    {
-        let source = compiler_ctx.src_map[source_id].source_code.as_str();
-
-        let token_stream = tokenize(&mut compiler_ctx.report_ctx, source_id, source);
-
-        compiler_ctx.errors_as_result()?;
-
-        Ok(token_stream)
     }
 
     fn parse(
@@ -137,6 +122,20 @@ impl Compiler
         compiler_ctx.errors_as_result()?;
 
         Ok(())
+    }
+
+    fn lex(
+        compiler_ctx: &mut CompilerContext,
+        source_id: SourceId,
+    ) -> Result<TokenStream, CompilerError>
+    {
+        let source = compiler_ctx.src_map[source_id].source_code.as_str();
+
+        let token_stream = tokenize(&mut compiler_ctx.report_ctx, source_id, source);
+
+        compiler_ctx.errors_as_result()?;
+
+        Ok(token_stream)
     }
 
     fn codegen<C: CodegenBackend>(

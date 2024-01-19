@@ -9,6 +9,8 @@ use frostbite_parser::ast::{
 };
 use slotmap::{new_key_type, SlotMap};
 
+use crate::modules::ModuleKey;
+
 pub type TypesArena = SlotMap<TypeKey, Type>;
 
 new_key_type! {
@@ -312,18 +314,21 @@ pub enum RefersTo
 {
     Local(LocalKey),
     Type(TypeKey),
+    Module(ModuleKey),
 }
 
 impl RefersTo
 {
-    pub fn into_type(
+    pub fn try_into_type(
         self,
         t_ast: &TypedAst,
-    ) -> TypeKey
+    ) -> Option<TypeKey>
     {
         match self {
-            RefersTo::Local(local_index) => t_ast.locals[local_index],
-            RefersTo::Type(type_index) => type_index,
+            RefersTo::Local(local_index) => Some(t_ast.locals[local_index]),
+            RefersTo::Type(type_index) => Some(type_index),
+
+            _ => None,
         }
     }
 }

@@ -60,7 +60,7 @@ fn compile_code(code: &str) -> Result<frostbite_bytecode::Module, CompilerContex
 {
     let mut compiler = Compiler::new();
 
-    let src_id = compiler.add_source("REPL".to_string(), code);
+    let src_id = compiler.add_source("REPL", code);
 
     let module_key = match compiler.compile_module(src_id) {
         Ok(module_key) => module_key,
