@@ -17,7 +17,8 @@ pub mod codegen;
 pub mod context;
 pub mod modules;
 pub mod semantic;
-pub mod tir;
+pub mod ir;
+pub mod types;
 pub mod utils;
 
 #[derive(Debug, Clone, Copy, Default, Hash, PartialEq, Eq, PartialOrd, Ord)]
@@ -74,6 +75,11 @@ impl Compiler
         let name = self.ctx.src_map[src_id].url.to_string();
 
         let module_key = self.ctx.module_ctx.modules.insert(Module { name, src_id });
+
+        self.ctx
+            .module_ctx
+            .modules_to_srcs
+            .insert(module_key, src_id);
 
         Ok(module_key)
     }

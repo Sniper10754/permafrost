@@ -8,7 +8,7 @@ use slotmap::SecondaryMap;
 
 use crate::{
     context::CompilerContext,
-    tir::{
+    ir::typed::{
         Assignable, Callable, FunctionType, ImportDirectiveKind, Type, TypeKey, TypedAst,
         TypedExpression, TypedExpressionKind, TypedFunction, TypesArena,
     },
@@ -150,7 +150,7 @@ impl BytecodeCodegenBackend
             ImportDirectiveKind::FromModuleImportSymbol { module, symbol } => {
                 instructions.push(Instruction::ImportFromModule {
                     module: module.to_string(),
-                    symbol: symbol.clone(),
+                    symbol: symbol.value().clone(),
                 })
             }
             ImportDirectiveKind::ImportModule { module } => {

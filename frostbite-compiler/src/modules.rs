@@ -1,8 +1,7 @@
+use alloc::string::String;
 use dbg_pls::DebugPls;
 use frostbite_reports::sourcemap::SourceId;
-use slotmap::{new_key_type, SlotMap};
-
-use alloc::string::String;
+use slotmap::{new_key_type, SecondaryMap, SlotMap};
 
 new_key_type! {
     #[derive(derive_more::Display)]
@@ -30,6 +29,7 @@ pub struct ModuleImportError;
 pub struct ModuleContext
 {
     pub modules: SlotMap<ModuleKey, Module>,
+    pub modules_to_srcs: SecondaryMap<ModuleKey, SourceId>,
 }
 
 #[derive(Debug, Clone, Default)]

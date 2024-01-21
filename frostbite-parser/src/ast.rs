@@ -354,7 +354,8 @@ pub enum ImportDirectiveKind
 {
     FromModuleImportSymbol
     {
-        module: ModulePath, symbol: String
+        module: ModulePath,
+        symbol: Spanned<String>,
     },
     ImportModule
     {
@@ -362,66 +363,8 @@ pub enum ImportDirectiveKind
     },
 }
 
-#[derive(Debug, Clone, PartialEq, DebugPls)]
+#[derive(Debug, Clone, PartialEq, DebugPls, derive_more::Display, derive_more::From)]
 pub struct ModulePath
 {
-    pub parents: Vec<Spanned<String>>,
-    pub tail: Spanned<String>,
-}
-
-impl ModulePath
-{
-    pub fn head(&self) -> &str
-    {
-        self.parents
-            .first()
-            .map(|spanned_str| spanned_str.value() as &str)
-            .unwrap_or(self.tail())
-    }
-
-    pub fn tail(&self) -> &str
-    {
-        self.tail.value()
-    }
-}
-
-impl Display for ModulePath
-{
-    fn fmt(
-        &self,
-        f: &mut core::fmt::Formatter<'_>,
-    ) -> core::fmt::Result
-    {
-        let mut iter = self.parents.iter();
-
-        if let Some(Spanned(_, parent)) = iter.next() {
-            write!(f, "{parent}")?;
-
-            for Spanned(_, parent) in iter {
-                write!(f, "::{parent}")?;
-            }
-        }
-
-        write!(f, "{}", self.tail.value())?;
-
-        Ok(())
-    }
-}
-
-impl DerefMut for ModulePath
-{
-    fn deref_mut(&mut self) -> &mut Self::Target
-    {
-        &mut self.parents
-    }
-}
-
-impl Deref for ModulePath
-{
-    type Target = Vec<Spanned<String>>;
-
-    fn deref(&self) -> &Self::Target
-    {
-        &self.parents
-    }
+    name: String,
 }

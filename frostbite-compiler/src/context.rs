@@ -5,7 +5,7 @@ use frostbite_reports::{
 };
 use slotmap::SecondaryMap;
 
-use crate::{modules::ModuleContext, semantic::typecheck::TypeContext};
+use crate::{modules::ModuleContext, types::TypeContext};
 
 #[derive(Debug, Default)]
 pub struct CompilerContext

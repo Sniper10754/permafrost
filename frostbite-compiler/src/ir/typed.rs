@@ -9,7 +9,7 @@ use frostbite_parser::ast::{
 };
 use slotmap::{new_key_type, SlotMap};
 
-use crate::modules::ModuleKey;
+use crate::utils::Scope;
 
 pub type TypesArena = SlotMap<TypeKey, Type>;
 
@@ -54,7 +54,7 @@ pub mod display
     use core::fmt::{Display, Write as _};
 
     use super::{FunctionType, TypeKey, TypesArena};
-    use crate::tir::Type::*;
+    use crate::ir::typed::Type::*;
 
     fn join_map_into_string<K, V>(mut map: impl Iterator<Item = (K, V)>) -> String
     where
@@ -115,6 +115,7 @@ pub struct TypedAst
 {
     pub nodes: Vec<TypedExpression>,
     pub locals: SlotMap<LocalKey, TypeKey>,
+    pub global_scope: Scope<RefersTo>,
 }
 
 impl DebugPls for TypedAst
@@ -274,7 +275,8 @@ pub enum ImportDirectiveKind
 {
     FromModuleImportSymbol
     {
-        module: ModulePath, symbol: String
+        module: ModulePath,
+        symbol: Spanned<String>,
     },
     ImportModule
     {
@@ -314,21 +316,18 @@ pub enum RefersTo
 {
     Local(LocalKey),
     Type(TypeKey),
-    Module(ModuleKey),
 }
 
 impl RefersTo
 {
-    pub fn try_into_type(
+    pub fn into_type(
         self,
         t_ast: &TypedAst,
-    ) -> Option<TypeKey>
+    ) -> TypeKey
     {
         match self {
-            RefersTo::Local(local_index) => Some(t_ast.locals[local_index]),
-            RefersTo::Type(type_index) => Some(type_index),
-
-            _ => None,
+            RefersTo::Local(local_index) => t_ast.locals[local_index],
+            RefersTo::Type(type_index) => type_index,
         }
     }
 }

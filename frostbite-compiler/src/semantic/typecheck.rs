@@ -23,24 +23,16 @@ use frostbite_parser::ast::{
     Argument, Expr, ModulePath, Spannable, Spanned,
 };
 use frostbite_reports::{sourcemap::SourceId, IntoReport, Label, Level, Report};
-use slotmap::SecondaryMap;
 
 use crate::{
-    modules::ModuleKey,
-    tir::{
+    ir::typed::{
         display::display_type, Assignable, Callable, FunctionType, ImportDirectiveKind, RefersTo,
-        Type, TypeKey, TypedAst, TypedExpression, TypedExpressionKind, TypedFunction, TypesArena,
+        Type, TypeKey, TypedAst, TypedExpression, TypedExpressionKind, TypedFunction,
     },
+    modules::ModuleKey,
     utils::Scopes,
     Compiler,
 };
-
-#[derive(Debug, Default)]
-pub struct TypeContext
-{
-    pub t_asts: SecondaryMap<SourceId, TypedAst>,
-    pub types_arena: TypesArena,
-}
 
 #[derive(Debug)]
 enum TypecheckError
@@ -519,9 +511,6 @@ impl<'a> RecursiveTypechecker<'a>
                 type_key: self.infer_type(source_id, expr)?,
                 kind: TypedExpressionKind::String(value.as_ref().map(Clone::clone)),
             }),
-            Expr::ImportDirective(import_directive) => {
-                self.visit_import_directive(import_directive.as_ref())
-            }
             Expr::Ident(Spanned(span, ident)) => self.visit_ident(source_id, span, ident),
             Expr::BinaryOperation { lhs, operator, rhs } => {
                 self.visit_binary_op(source_id, expr, lhs, operator.clone(), rhs)
@@ -573,48 +562,6 @@ impl<'a> RecursiveTypechecker<'a>
         let typed_expression = typed_expression?;
 
         Ok(typed_expression)
-    }
-
-    fn visit_import_directive(
-        &mut self,
-        import_directive: Spanned<&frostbite_parser::ast::ImportDirectiveKind>,
-    ) -> Result<TypedExpression, TypecheckError>
-    {
-        let Spanned(span, import_directive) = import_directive;
-
-        let import_directive = match import_directive.clone() {
-            frostbite_parser::ast::ImportDirectiveKind::FromModuleImportSymbol {
-                module,
-                symbol,
-            } => ImportDirectiveKind::FromModuleImportSymbol { module, symbol },
-            frostbite_parser::ast::ImportDirectiveKind::ImportModule { module } => {
-                ImportDirectiveKind::ImportModule { module }
-            }
-        };
-
-        let module_path = import_directive.module_path();
-
-        match import_directive {
-            ImportDirectiveKind::FromModuleImportSymbol {
-                ref module,
-                ref symbol,
-            } => {}
-            ImportDirectiveKind::ImportModule { ref module } => {}
-        }
-
-        let type_key = self.compiler.ctx.type_ctx.types_arena.insert(Type::Unit);
-
-        Ok(TypedExpression {
-            type_key,
-            kind: TypedExpressionKind::ImportDirective(Spanned(span, import_directive)),
-        })
-    }
-
-    fn resolve_module_path(
-        &mut self,
-        module_path: &ModulePath,
-    ) -> ModuleKey
-    {
     }
 
     fn visit_ident(

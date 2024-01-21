@@ -249,7 +249,7 @@ impl<'report_context> Parser<'report_context>
                     description: "import"
                 )?;
 
-                let Spanned(_, Token::Ident(symbol)) = consume_token!(
+                let Spanned(span, Token::Ident(symbol)) = consume_token!(
                     parser: self,
                     token: Token::Ident(..),
                     description: "A name"
@@ -260,7 +260,10 @@ impl<'report_context> Parser<'report_context>
 
                 Some(Expr::ImportDirective(Spanned(
                     start..end,
-                    ImportDirectiveKind::FromModuleImportSymbol { module, symbol },
+                    ImportDirectiveKind::FromModuleImportSymbol {
+                        module,
+                        symbol: Spanned(span, symbol),
+                    },
                 )))
             }
 
@@ -522,73 +525,22 @@ impl<'report_context> Parser<'report_context>
 
     fn parse_module_path(&mut self) -> Option<Spanned<ModulePath>>
     {
-        let mut parents = Vec::new();
-        let span_start;
+        let Spanned(
+            Range {
+                start: span_start,
+                end: span_end,
+            },
+            Token::Ident(name),
+        ) = consume_token!(
+            parser: self,
+            token: Token::Ident(..),
+            description: "Module name"
+        )?
+        else {
+            unreachable!()
+        };
 
-        match self.token_stream.next() {
-            Some(Spanned(Range { start, end }, Token::Ident(identifier))) => {
-                span_start = start;
-
-                parents.push(Spanned(start..end, identifier));
-
-                loop {
-                    match self.token_stream.peek() {
-                        Some(Spanned(_, Token::DoubleColon)) => {
-                            consume_token!(
-                                parser: self,
-                                token: Token::DoubleColon,
-                                description: "Double colon"
-                            )
-                            .unwrap();
-
-                            let Spanned(span, Token::Ident(name)) = consume_token!(
-                                parser: self,
-                                token: Token::Ident(..),
-                                description: "Identifier"
-                            )
-                            .unwrap() else {
-                                unreachable!()
-                            };
-
-                            parents.push(Spanned(span, name))
-                        }
-
-                        Some(_) => break,
-
-                        None => self.report_ctx.push(report!(
-                            parser: self,
-                            ErrorKind::UnrecognizedEof { expected: &["()"], previous_element_span: self.token_stream.previous().unwrap().span() }
-                        )),
-                    }
-                }
-            }
-            Some(Spanned(span, _)) => {
-                self.report_ctx.push(report!(
-                    parser: self,
-                    ErrorKind::UnrecognizedToken { span, expected: "An identifier" }
-                ));
-
-                return None;
-            }
-            None => {
-                self.report_ctx.push(report!(
-                    parser: self,
-                    ErrorKind::UnrecognizedEof { expected: &["An identifier"], previous_element_span: self.token_stream.previous().unwrap().span() }
-                ));
-
-                return None;
-            }
-        }
-
-        let tail = parents
-            .pop()
-            .expect("There's at least one parent inside the parents vec");
-
-        let span_end = tail.span().end;
-
-        let module_path = ModulePath { parents, tail };
-
-        Some(Spanned(span_start..span_end, module_path))
+        Some(Spanned(span_start..span_end, name.into()))
     }
 }
 
