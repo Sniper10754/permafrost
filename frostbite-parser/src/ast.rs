@@ -1,8 +1,5 @@
 use alloc::{boxed::Box, string::String, vec::Vec};
-use core::{
-    fmt::Display,
-    ops::{Deref, DerefMut, Range},
-};
+use core::ops::{Deref, DerefMut, Range};
 use dbg_pls::DebugPls;
 
 use derive_more::From;
@@ -228,6 +225,24 @@ impl<T> From<(&Span, T)> for Spanned<T>
     }
 }
 
+impl<T> Deref for Spanned<T>
+{
+    type Target = T;
+
+    fn deref(&self) -> &Self::Target
+    {
+        &self.1
+    }
+}
+
+impl<T> AsRef<T> for Spanned<T>
+{
+    fn as_ref(&self) -> &T
+    {
+        self
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct Program
 {
@@ -342,7 +357,7 @@ pub enum Expr
     Poisoned,
 }
 
-#[derive(Debug, Clone, PartialEq, DebugPls)]
+#[derive(Debug, Clone, PartialEq, DebugPls, derive_more::From)]
 pub struct Argument
 {
     pub name: Spanned<String>,

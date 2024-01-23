@@ -7,16 +7,13 @@ use frostbite_parser::ast::{
     },
     Spannable, Spanned,
 };
-use slotmap::{new_key_type, SlotMap};
+use slotmap::{new_key_type, SecondaryMap, SlotMap};
 
-use crate::utils::Scope;
+use super::named::LocalKey;
 
 pub type TypesArena = SlotMap<TypeKey, Type>;
 
 new_key_type! {
-    #[derive(derive_more::Display)]
-    #[display(fmt = "{}", "self.0.as_ffi() as u32")]
-    pub struct LocalKey;
     #[derive(derive_more::Display)]
     #[display(fmt = "{}", "self.0.as_ffi() as u32")]
     pub struct TypeKey;
@@ -30,19 +27,6 @@ impl DebugPls for TypeKey
     )
     {
         f.debug_tuple_struct("TypeKey")
-            .field(&(self.0.as_ffi() as u32))
-            .finish()
-    }
-}
-
-impl DebugPls for LocalKey
-{
-    fn fmt(
-        &self,
-        f: dbg_pls::Formatter<'_>,
-    )
-    {
-        f.debug_tuple_struct("LocalKey")
             .field(&(self.0.as_ffi() as u32))
             .finish()
     }
@@ -114,8 +98,7 @@ pub struct Typed<T>(TypeKey, T);
 pub struct TypedAst
 {
     pub nodes: Vec<TypedExpression>,
-    pub locals: SlotMap<LocalKey, TypeKey>,
-    pub global_scope: Scope<RefersTo>,
+    pub locals: SecondaryMap<LocalKey, TypeKey>,
 }
 
 impl DebugPls for TypedAst
@@ -125,7 +108,7 @@ impl DebugPls for TypedAst
         f: dbg_pls::Formatter<'_>,
     )
     {
-        struct LocalsDebugPls<'a>(&'a SlotMap<LocalKey, TypeKey>);
+        struct LocalsDebugPls<'a>(&'a SecondaryMap<LocalKey, TypeKey>);
 
         impl<'a> DebugPls for LocalsDebugPls<'a>
         {
@@ -180,7 +163,6 @@ pub enum TypedExpressionKind
 
     Ident
     {
-        refers_to: RefersTo,
         str_value: Spanned<String>,
     },
 
@@ -231,7 +213,6 @@ impl Spannable for TypedExpressionKind
             | String(Spanned(span, _)) => span.clone(),
 
             Ident {
-                refers_to: _,
                 str_value: Spanned(span, _),
             } => span.clone(),
             BinaryOperation {
@@ -270,7 +251,7 @@ impl Spannable for TypedExpressionKind
 #[derive(Debug, Clone, DebugPls)]
 pub enum Callable
 {
-    Function(RefersTo, Spanned<String>),
+    Function(TypeKey, Spanned<String>),
 }
 
 impl Spannable for Callable
@@ -279,27 +260,6 @@ impl Spannable for Callable
     {
         match self {
             Callable::Function(_, Spanned(span, _)) => span.clone(),
-        }
-    }
-}
-
-#[derive(Debug, Clone, Copy, DebugPls, derive_more::From)]
-pub enum RefersTo
-{
-    Local(LocalKey),
-    Type(TypeKey),
-}
-
-impl RefersTo
-{
-    pub fn into_type(
-        self,
-        t_ast: &TypedAst,
-    ) -> TypeKey
-    {
-        match self {
-            RefersTo::Local(local_index) => t_ast.locals[local_index],
-            RefersTo::Type(type_index) => type_index,
         }
     }
 }
@@ -330,10 +290,7 @@ impl TryFrom<TypedExpression> for Assignable
         use TypedExpressionKind::*;
 
         match value.kind {
-            Ident {
-                refers_to: _,
-                str_value: ident,
-            } => Ok(Assignable::Ident(value.type_key, ident)),
+            Ident { str_value: ident } => Ok(Assignable::Ident(value.type_key, ident)),
 
             _ => Err(()),
         }

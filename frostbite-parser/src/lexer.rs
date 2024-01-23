@@ -50,7 +50,7 @@ pub type SpannedToken = Spanned<Token>;
 #[derive(Debug, PartialEq, Clone)]
 pub struct LexerError
 {
-    source_id: SourceKey,
+    source_key: SourceKey,
     kind: LexerErrorKind,
 }
 
@@ -75,7 +75,7 @@ impl IntoReport for LexerError
 {
     fn into_report(self) -> frostbite_reports::Report
     {
-        let source_id = self.source_id;
+        let source_key = self.source_key;
 
         let location;
         let title;
@@ -99,10 +99,10 @@ impl IntoReport for LexerError
             LexerErrorKind::GenericLexerError => unreachable!(),
         }
 
-        Report::new_diagnostic(
+        Report::new(
             Level::Error,
             location,
-            source_id,
+            source_key,
             title,
             Some(description),
             [],
@@ -279,7 +279,7 @@ impl TokenStream
 
 pub fn tokenize(
     report_ctx: &mut ReportContext,
-    source_id: SourceKey,
+    source_key: SourceKey,
     input: &str,
 ) -> TokenStream
 {
@@ -297,7 +297,7 @@ pub fn tokenize(
                 };
 
                 let error = LexerError {
-                    source_id,
+                    source_key,
                     kind: error_kind,
                 };
 

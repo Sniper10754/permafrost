@@ -9,7 +9,7 @@ use crate::ast::Span;
 pub struct Error
 {
     pub kind: ErrorKind,
-    pub source_id: SourceKey,
+    pub source_key: SourceKey,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -34,48 +34,48 @@ impl IntoReport for Error
 {
     fn into_report(self) -> frostbite_reports::Report
     {
-        let source_id = self.source_id;
+        let source_key = self.source_key;
 
         match self.kind {
-            ErrorKind::UnrecognizedToken { span, expected } => Report::new_diagnostic(
+            ErrorKind::UnrecognizedToken { span, expected } => Report::new(
                 Level::Error,
                 span,
-                source_id,
+                source_key,
                 "Token in invalid position",
                 None::<&str>,
                 [Label::new(
                     format!("Expected {expected}"),
                     None::<Range<_>>,
-                    source_id,
+                    source_key,
                 )],
                 [],
             ),
             ErrorKind::UnrecognizedEof {
                 expected,
                 previous_element_span,
-            } => Report::new_diagnostic(
+            } => Report::new(
                 Level::Error,
                 previous_element_span,
-                source_id,
+                source_key,
                 "Unexpected EOF",
                 None::<&str>,
                 [],
                 [Label::new(
                     format!("Expected one of: {}", expected.join(", ")),
                     None::<Range<_>>,
-                    source_id,
+                    source_key,
                 )],
             ),
-            ErrorKind::NumberTooBig { span } => Report::new_diagnostic(
+            ErrorKind::NumberTooBig { span } => Report::new(
                 Level::Error,
                 span,
-                source_id,
+                source_key,
                 "Number is too big",
                 Some("Number is too big to lex"),
                 [Label::new(
                     const_format::formatcp!("Maximum limit is {}", i32::MAX),
                     None::<Range<_>>,
-                    source_id,
+                    source_key,
                 )],
                 [],
             ),

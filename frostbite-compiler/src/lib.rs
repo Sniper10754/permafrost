@@ -2,7 +2,10 @@
 
 extern crate alloc;
 
-use crate::{modules::Module, semantic::typecheck};
+use crate::{
+    modules::Module,
+    semantic::{nameresolution, typecheck},
+};
 use alloc::string::{String, ToString};
 use codegen::CodegenBackend;
 use context::CompilerContext;
@@ -91,24 +94,27 @@ impl Compiler
     ) -> Result<CompilationResults<C>, CompilerError>
     {
         let module = &self.ctx.named_ctx.modules[module_key];
-        let main_source_id = module.src_id;
+        let main_source_key = module.src_id;
 
-        let codegen_output = Self::codegen(&mut self.ctx, main_source_id, codegen)?;
+        let codegen_output = Self::codegen(&mut self.ctx, main_source_key, codegen)?;
 
         Ok(CompilationResults { codegen_output })
     }
 
     pub fn run_semantic_checks(
         &mut self,
-        source_id: SourceKey,
+        source_key: SourceKey,
     ) -> Result<(), CompilerError>
     {
-        typecheck::check_types(self, source_id);
+        nameresolution::check_names(self, source_key);
+        self.ctx.errors_as_result()?;
+
+        typecheck::check_types(self, source_key);
         self.ctx.errors_as_result()?;
 
         log::debug!(
             "Typed Internal representation:\n{}",
-            dbg_pls::color(&self.ctx.type_ctx.t_asts[source_id]),
+            dbg_pls::color(&self.ctx.type_ctx.t_asts[source_key]),
         );
 
         Ok(())
@@ -117,13 +123,13 @@ impl Compiler
     fn parse(
         compiler_ctx: &mut CompilerContext,
         token_stream: TokenStream,
-        source_id: SourceKey,
+        source_key: SourceKey,
     ) -> Result<(), CompilerError>
     {
-        let ast =
-            Parser::with_tokenstream(&mut compiler_ctx.report_ctx, token_stream, source_id).parse();
+        let ast = Parser::with_tokenstream(&mut compiler_ctx.report_ctx, token_stream, source_key)
+            .parse();
 
-        compiler_ctx.asts.insert(source_id, ast);
+        compiler_ctx.asts.insert(source_key, ast);
 
         compiler_ctx.errors_as_result()?;
 
@@ -132,12 +138,12 @@ impl Compiler
 
     fn lex(
         compiler_ctx: &mut CompilerContext,
-        source_id: SourceKey,
+        source_key: SourceKey,
     ) -> Result<TokenStream, CompilerError>
     {
-        let source = compiler_ctx.src_map[source_id].source_code.as_str();
+        let source = compiler_ctx.src_map[source_key].source_code.as_str();
 
-        let token_stream = tokenize(&mut compiler_ctx.report_ctx, source_id, source);
+        let token_stream = tokenize(&mut compiler_ctx.report_ctx, source_key, source);
 
         compiler_ctx.errors_as_result()?;
 
@@ -146,11 +152,11 @@ impl Compiler
 
     fn codegen<C: CodegenBackend>(
         compiler_ctx: &mut CompilerContext,
-        main_source_id: SourceKey,
+        main_source_key: SourceKey,
         codegen: &mut C,
     ) -> Result<C::Output, CompilerError>
     {
-        let output = codegen.codegen(main_source_id, compiler_ctx);
+        let output = codegen.codegen(main_source_key, compiler_ctx);
 
         compiler_ctx.errors_as_result()?;
 

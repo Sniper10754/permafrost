@@ -9,11 +9,32 @@ use frostbite_parser::ast::{
     },
     Spannable, Spanned,
 };
+use slotmap::{new_key_type, SlotMap};
 
-#[derive(Debug, Clone, Default, PartialEq)]
+new_key_type! {
+    #[derive(derive_more::Display)]
+    #[display(fmt = "{}", "self.0.as_ffi() as u32")]
+    pub struct LocalKey;
+}
+
+impl DebugPls for LocalKey
+{
+    fn fmt(
+        &self,
+        f: dbg_pls::Formatter<'_>,
+    )
+    {
+        f.debug_tuple_struct("LocalKey")
+            .field(&(self.0.as_ffi() as u32))
+            .finish()
+    }
+}
+
+#[derive(Debug, Clone, Default)]
 pub struct NamedAst
 {
     pub exprs: Vec<NamedExpr>,
+    pub locals: SlotMap<LocalKey, ()>,
 }
 
 impl Spannable for NamedExpr
@@ -23,7 +44,10 @@ impl Spannable for NamedExpr
         match self {
             NamedExpr::Int(Spanned(span, _))
             | NamedExpr::Float(Spanned(span, _))
-            | NamedExpr::Ident(Spanned(span, _))
+            | NamedExpr::Ident {
+                local_key: _,
+                identifier: Spanned(span, _),
+            }
             | NamedExpr::String(Spanned(span, _))
             | NamedExpr::Bool(Spanned(span, _)) => span.clone(),
 
@@ -68,9 +92,13 @@ pub enum NamedExpr
 {
     Int(Spanned<i32>),
     Float(Spanned<f32>),
-    Ident(Spanned<String>),
     Bool(Spanned<bool>),
     String(Spanned<String>),
+    Ident
+    {
+        local_key: LocalKey,
+        identifier: Spanned<String>,
+    },
 
     BinaryOperation
     {
@@ -81,12 +109,14 @@ pub enum NamedExpr
 
     Assign
     {
-        lhs: Box<Self>,
+        lhs: Assignable,
         value: Box<Self>,
     },
 
     Function
     {
+        local_key: Option<LocalKey>,
+
         fn_token: FunctionToken,
         name: Option<Spanned<String>>,
         arguments: Vec<Argument>,
@@ -98,6 +128,7 @@ pub enum NamedExpr
     Call
     {
         callee: Box<Self>,
+
         left_paren: LeftParenthesisToken,
         arguments: Vec<NamedExpr>,
         right_paren: RightParenthesisToken,
@@ -116,8 +147,38 @@ pub enum NamedExpr
 }
 
 #[derive(Debug, Clone, PartialEq, DebugPls)]
+pub enum Assignable
+{
+    Ident(LocalKey, Spanned<String>),
+}
+
+impl From<Assignable> for NamedExpr
+{
+    fn from(value: Assignable) -> Self
+    {
+        match value {
+            Assignable::Ident(local_key, identifier) => NamedExpr::Ident {
+                local_key,
+                identifier,
+            },
+        }
+    }
+}
+
+impl Spannable for Assignable
+{
+    fn span(&self) -> frostbite_parser::ast::Span
+    {
+        match self {
+            Assignable::Ident(_, spanned) => spanned.span(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, DebugPls)]
 pub struct Argument
 {
+    pub local_key: LocalKey,
     pub name: Spanned<String>,
     pub type_annotation: Spanned<TypeAnnotation>,
 }

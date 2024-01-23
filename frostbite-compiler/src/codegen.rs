@@ -11,7 +11,7 @@ pub trait CodegenBackend
 
     fn codegen(
         &mut self,
-        source_id: SourceKey,
+        source_key: SourceKey,
         compiler_ctx: &mut CompilerContext,
     ) -> Self::Output;
 }
@@ -22,11 +22,11 @@ impl<T: CodegenBackend> CodegenBackend for &mut T
 
     fn codegen(
         &mut self,
-        source_id: SourceKey,
+        source_key: SourceKey,
         compiler_ctx: &mut CompilerContext,
     ) -> Self::Output
     {
-        T::codegen(self, source_id, compiler_ctx)
+        T::codegen(self, source_key, compiler_ctx)
     }
 }
 

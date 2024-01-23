@@ -4,7 +4,7 @@ extern crate alloc;
 
 use core::ops::Range;
 
-use alloc::{boxed::Box, vec, vec::Vec};
+use alloc::{boxed::Box, vec};
 
 pub mod ast;
 pub mod error;
@@ -22,10 +22,7 @@ use error::ErrorKind;
 use frostbite_reports::{sourcemap::SourceKey, ReportContext};
 use lexer::{Token, TokenStream};
 
-use crate::{
-    ast::{tokens::FunctionToken, Spannable},
-    error::Error,
-};
+use crate::{ast::tokens::FunctionToken, error::Error};
 
 mod utils
 {
@@ -64,7 +61,7 @@ mod utils
 
             Error {
                 kind: $kind,
-                source_id: $parser.source_id,
+                source_key: $parser.source_key,
             }
             .into_report()
         }};
@@ -77,7 +74,7 @@ pub struct Parser<'report_context>
 {
     token_stream: TokenStream,
     report_ctx: &'report_context mut ReportContext,
-    source_id: SourceKey,
+    source_key: SourceKey,
 }
 
 impl<'report_context> Parser<'report_context>
@@ -86,13 +83,13 @@ impl<'report_context> Parser<'report_context>
     pub fn with_tokenstream(
         report_ctx: &'report_context mut ReportContext,
         token_stream: TokenStream,
-        source_id: SourceKey,
+        source_key: SourceKey,
     ) -> Self
     {
         Self {
             token_stream,
             report_ctx,
-            source_id,
+            source_key,
         }
     }
 

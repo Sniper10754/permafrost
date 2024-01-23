@@ -39,7 +39,7 @@ impl IntoReport for Infallible
 pub struct Location
 {
     span: Range<usize>,
-    source_id: SourceKey,
+    source_key: SourceKey,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -48,7 +48,7 @@ pub struct Report
 {
     level: Level,
     span: Range<usize>,
-    source_id: SourceKey,
+    source_key: SourceKey,
     title: Cow<'static, str>,
     description: Option<Cow<'static, str>>,
     infos: Vec<Label>,
@@ -57,10 +57,10 @@ pub struct Report
 
 impl Report
 {
-    pub fn new_diagnostic(
+    pub fn new(
         level: Level,
         location: Range<usize>,
-        source_id: impl Into<SourceKey>,
+        source_key: impl Into<SourceKey>,
         title: impl Into<Cow<'static, str>>,
         description: Option<impl Into<Cow<'static, str>>>,
         infos: impl IntoIterator<Item = Label>,
@@ -70,7 +70,7 @@ impl Report
         Self {
             level,
             span: location,
-            source_id: source_id.into(),
+            source_key: source_key.into(),
             title: title.into(),
             description: description.map(Into::into),
             infos: infos.into_iter().collect(),

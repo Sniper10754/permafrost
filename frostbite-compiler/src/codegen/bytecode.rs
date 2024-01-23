@@ -60,7 +60,6 @@ impl BytecodeCodegenBackend
             }
 
             TypedExpressionKind::Ident {
-                refers_to: _,
                 str_value: Spanned(_, name),
             } => {
                 instructions.push(Instruction::LoadName(name.into()));
@@ -278,13 +277,11 @@ impl BytecodeCodegenBackend
     )
     {
         match callee {
-            Callable::Function(refers_to, _) => {
-                let function_type_key = refers_to.into_type(t_ast);
-
+            Callable::Function(type_key, _) => {
                 let Type::Function(FunctionType {
                     arguments,
                     return_type: _,
-                }) = &types_arena[function_type_key]
+                }) = &types_arena[*type_key]
                 else {
                     unreachable!()
                 };
@@ -297,7 +294,7 @@ impl BytecodeCodegenBackend
                     },
                 );
 
-                let function_index = self.functions[function_type_key];
+                let function_index = self.functions[*type_key];
 
                 instructions.push(Instruction::LoadFunction(function_index));
 
@@ -313,7 +310,7 @@ impl CodegenBackend for BytecodeCodegenBackend
 
     fn codegen(
         &mut self,
-        source_id: SourceKey,
+        source_key: SourceKey,
         compiler_ctx: &mut CompilerContext,
     ) -> Self::Output
     {
@@ -329,7 +326,7 @@ impl CodegenBackend for BytecodeCodegenBackend
 
         // self.translate_intrinsics(compiler_ctx, &mut module);
 
-        let t_ast = &compiler_ctx.type_ctx.t_asts[source_id];
+        let t_ast = &compiler_ctx.type_ctx.t_asts[source_key];
 
         self.compile_program(t_ast, &compiler_ctx.type_ctx.types_arena, &mut module);
 
