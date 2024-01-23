@@ -16,7 +16,7 @@ mod utils
 
     use ariadne::{Cache, FnCache};
 
-    use crate::sourcemap::{SourceId, SourceMap};
+    use crate::sourcemap::{SourceKey, SourceMap};
 
     pub struct FmtWriteAsIoWrite<'a, W: fmt::Write + ?Sized>
     {
@@ -48,8 +48,10 @@ mod utils
     #[allow(clippy::type_complexity)]
     pub struct SourceMapCache<'src_map>
     {
-        fn_cache:
-            FnCache<SourceId, Box<dyn Fn(&SourceId) -> Result<String, Box<dyn Debug>> + 'src_map>>,
+        fn_cache: FnCache<
+            SourceKey,
+            Box<dyn Fn(&SourceKey) -> Result<String, Box<dyn Debug>> + 'src_map>,
+        >,
         src_map: &'src_map SourceMap,
     }
 
@@ -69,11 +71,11 @@ mod utils
         }
     }
 
-    impl<'src_map> Cache<SourceId> for SourceMapCache<'src_map>
+    impl<'src_map> Cache<SourceKey> for SourceMapCache<'src_map>
     {
         fn fetch(
             &mut self,
-            id: &SourceId,
+            id: &SourceKey,
         ) -> Result<&ariadne::Source, Box<dyn fmt::Debug + '_>>
         {
             self.fn_cache.fetch(id)
@@ -81,7 +83,7 @@ mod utils
 
         fn display<'a>(
             &self,
-            id: &'a SourceId,
+            id: &'a SourceKey,
         ) -> Option<Box<dyn fmt::Display + 'a>>
         {
             self.src_map

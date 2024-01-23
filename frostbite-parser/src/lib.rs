@@ -19,7 +19,7 @@ use ast::{
     Argument, Expr, ImportDirectiveKind, ModulePath, Program, Spanned,
 };
 use error::ErrorKind;
-use frostbite_reports::{sourcemap::SourceId, ReportContext};
+use frostbite_reports::{sourcemap::SourceKey, ReportContext};
 use lexer::{Token, TokenStream};
 
 use crate::{
@@ -77,7 +77,7 @@ pub struct Parser<'report_context>
 {
     token_stream: TokenStream,
     report_ctx: &'report_context mut ReportContext,
-    source_id: SourceId,
+    source_id: SourceKey,
 }
 
 impl<'report_context> Parser<'report_context>
@@ -86,7 +86,7 @@ impl<'report_context> Parser<'report_context>
     pub fn with_tokenstream(
         report_ctx: &'report_context mut ReportContext,
         token_stream: TokenStream,
-        source_id: SourceId,
+        source_id: SourceKey,
     ) -> Self
     {
         Self {

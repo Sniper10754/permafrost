@@ -1,5 +1,6 @@
-use alloc::{boxed::Box, string::String, vec::Vec};
 use core::ops::Range;
+
+use alloc::{boxed::Box, string::String, vec::Vec};
 use dbg_pls::DebugPls;
 use frostbite_parser::ast::{
     tokens::{
@@ -9,18 +10,15 @@ use frostbite_parser::ast::{
     Spannable, Spanned,
 };
 
-pub type Span = Range<usize>;
-
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, Default, PartialEq)]
 pub struct NamedAst
 {
     pub exprs: Vec<NamedExpr>,
-    pub symbols: 
 }
 
 impl Spannable for NamedExpr
 {
-    fn span(&self) -> Span
+    fn span(&self) -> Range<usize>
     {
         match self {
             NamedExpr::Int(Spanned(span, _))

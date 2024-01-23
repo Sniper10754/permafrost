@@ -1,16 +1,18 @@
-use alloc::{string::ToString, vec, vec::Vec};
+#![allow(unsafe_code)]
+
+use alloc::{vec, vec::Vec};
 use frostbite_bytecode::{
     ConstantValue, Function, FunctionKey, Globals, Instruction, Manifest, Module,
 };
 use frostbite_parser::ast::{tokens::BinaryOperatorKind, Spanned};
-use frostbite_reports::sourcemap::SourceId;
+use frostbite_reports::sourcemap::SourceKey;
 use slotmap::SecondaryMap;
 
 use crate::{
     context::CompilerContext,
     ir::typed::{
-        Assignable, Callable, FunctionType, ImportDirectiveKind, Type, TypeKey, TypedAst,
-        TypedExpression, TypedExpressionKind, TypedFunction, TypesArena,
+        Assignable, Callable, FunctionType, Type, TypeKey, TypedAst, TypedExpression,
+        TypedExpressionKind, TypedFunction, TypesArena,
     },
 };
 
@@ -55,10 +57,6 @@ impl BytecodeCodegenBackend
             | TypedExpressionKind::Bool(..)
             | TypedExpressionKind::String(..) => {
                 self.compile_constant(instructions, globals, t_expr)
-            }
-
-            TypedExpressionKind::ImportDirective(Spanned(_, import_directive)) => {
-                self.compile_import_directive(instructions, import_directive)
             }
 
             TypedExpressionKind::Ident {
@@ -140,27 +138,6 @@ impl BytecodeCodegenBackend
         instructions.push(Instruction::LoadConstant(constant_index));
     }
 
-    fn compile_import_directive(
-        &mut self,
-        instructions: &mut Vec<Instruction>,
-        import_directive: &ImportDirectiveKind,
-    )
-    {
-        match import_directive {
-            ImportDirectiveKind::FromModuleImportSymbol { module, symbol } => {
-                instructions.push(Instruction::ImportFromModule {
-                    module: module.to_string(),
-                    symbol: symbol.value().clone(),
-                })
-            }
-            ImportDirectiveKind::ImportModule { module } => {
-                instructions.push(Instruction::Import {
-                    module: module.to_string(),
-                })
-            }
-        }
-    }
-
     fn compile_binary_operation(
         &mut self,
         t_ast: &TypedAst,
@@ -189,9 +166,11 @@ impl BytecodeCodegenBackend
                 {
                     let const_val_idx = globals.constants_pool.insert(ConstantValue::Bool(true));
 
-                    let tmp_fn_idx = globals.functions.insert(Self::compile_function_with_body(
-                        [Instruction::LoadConstant(const_val_idx)].into(),
-                    ));
+                    let tmp_fn_idx = globals.functions.insert(unsafe {
+                        Self::compile_function_with_body(
+                            [Instruction::LoadConstant(const_val_idx)].into(),
+                        )
+                    });
 
                     instructions.push(Instruction::LoadFunction(tmp_fn_idx));
 
@@ -201,9 +180,11 @@ impl BytecodeCodegenBackend
                 {
                     let const_val_idx = globals.constants_pool.insert(ConstantValue::Bool(false));
 
-                    let tmp_fn_idx = globals.functions.insert(Self::compile_function_with_body(
-                        [Instruction::LoadConstant(const_val_idx)].into(),
-                    ));
+                    let tmp_fn_idx = globals.functions.insert(unsafe {
+                        Self::compile_function_with_body(
+                            [Instruction::LoadConstant(const_val_idx)].into(),
+                        )
+                    });
 
                     instructions.push(Instruction::LoadFunction(tmp_fn_idx));
 
@@ -251,7 +232,7 @@ impl BytecodeCodegenBackend
 
         instructions.push(Instruction::LoadFunction(dummy_function_index));
 
-        if let Some(Spanned(_, name)) = &function.name {
+        if let Some(Spanned(_, ref name)) = function.name {
             instructions.push(Instruction::StoreName(name.clone()));
         }
     }
@@ -274,11 +255,12 @@ impl BytecodeCodegenBackend
             function_body,
         );
 
-        BytecodeCodegenBackend::compile_function_with_body(bytecode_function_body)
+        unsafe { BytecodeCodegenBackend::compile_function_with_body(bytecode_function_body) }
     }
 
     /// Caller must guarantee that the return type is on the stack before calling this function
-    fn compile_function_with_body(mut body: Vec<Instruction>) -> frostbite_bytecode::Function
+    unsafe fn compile_function_with_body(mut body: Vec<Instruction>)
+        -> frostbite_bytecode::Function
     {
         body.push(Instruction::Return);
 
@@ -331,7 +313,7 @@ impl CodegenBackend for BytecodeCodegenBackend
 
     fn codegen(
         &mut self,
-        source_id: SourceId,
+        source_id: SourceKey,
         compiler_ctx: &mut CompilerContext,
     ) -> Self::Output
     {

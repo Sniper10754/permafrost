@@ -1,7 +1,7 @@
 use core::ops::Range;
 
 use alloc::format;
-use frostbite_reports::{sourcemap::SourceId, IntoReport, Label, Level, Report};
+use frostbite_reports::{sourcemap::SourceKey, IntoReport, Label, Level, Report};
 
 use crate::ast::Span;
 
@@ -9,7 +9,7 @@ use crate::ast::Span;
 pub struct Error
 {
     pub kind: ErrorKind,
-    pub source_id: SourceId,
+    pub source_id: SourceKey,
 }
 
 #[derive(Debug, Clone, PartialEq)]

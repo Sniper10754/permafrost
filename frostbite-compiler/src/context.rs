@@ -1,21 +1,21 @@
 use frostbite_parser::ast::Program;
 use frostbite_reports::{
-    sourcemap::{SourceId, SourceMap},
+    sourcemap::{SourceKey, SourceMap},
     ReportContext,
 };
 use slotmap::SecondaryMap;
 
-use crate::{modules::ModuleContext, types::TypeContext};
+use crate::{modules::NamedContext, types::TypeContext};
 
 #[derive(Debug, Default)]
 pub struct CompilerContext
 {
     pub src_map: SourceMap,
     pub report_ctx: ReportContext,
-    pub module_ctx: ModuleContext,
+    pub named_ctx: NamedContext,
     pub type_ctx: TypeContext,
 
-    pub asts: SecondaryMap<SourceId, Program>,
+    pub asts: SecondaryMap<SourceKey, Program>,
 }
 
 impl CompilerContext
@@ -28,7 +28,7 @@ impl CompilerContext
         Self {
             src_map,
             report_ctx,
-            module_ctx: ModuleContext::default(),
+            named_ctx: NamedContext::default(),
             type_ctx: TypeContext::default(),
 
             asts: SecondaryMap::new(),

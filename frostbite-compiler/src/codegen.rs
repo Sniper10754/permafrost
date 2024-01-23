@@ -1,7 +1,7 @@
 mod bytecode;
 
 pub use bytecode::BytecodeCodegenBackend;
-use frostbite_reports::sourcemap::SourceId;
+use frostbite_reports::sourcemap::SourceKey;
 
 use crate::context::CompilerContext;
 
@@ -11,7 +11,7 @@ pub trait CodegenBackend
 
     fn codegen(
         &mut self,
-        source_id: SourceId,
+        source_id: SourceKey,
         compiler_ctx: &mut CompilerContext,
     ) -> Self::Output;
 }
@@ -22,7 +22,7 @@ impl<T: CodegenBackend> CodegenBackend for &mut T
 
     fn codegen(
         &mut self,
-        source_id: SourceId,
+        source_id: SourceKey,
         compiler_ctx: &mut CompilerContext,
     ) -> Self::Output
     {

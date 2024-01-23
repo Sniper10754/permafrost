@@ -9,13 +9,13 @@ use slotmap::{new_key_type, SlotMap};
 new_key_type! {
     #[derive(derive_more::Display)]
     #[display(fmt = "{}", "_0.as_ffi() as u32")]
-    pub struct SourceId;
+    pub struct SourceKey;
 }
 
 /// Map representing a list of pairs composed by source identifiers and source codes
 #[derive(Debug)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct SourceMap(SlotMap<SourceId, SourceDescription>);
+pub struct SourceMap(SlotMap<SourceKey, SourceDescription>);
 
 impl Default for SourceMap
 {
@@ -36,7 +36,7 @@ impl SourceMap
     #[must_use]
     pub fn get(
         &self,
-        src_id: SourceId,
+        src_id: SourceKey,
     ) -> Option<&SourceDescription>
     {
         self.0.get(src_id)
@@ -45,24 +45,24 @@ impl SourceMap
     pub fn insert(
         &mut self,
         source_description: SourceDescription,
-    ) -> SourceId
+    ) -> SourceKey
     {
         self.0.insert(source_description)
     }
 
-    pub fn iter(&self) -> impl Iterator<Item = (SourceId, &SourceDescription)>
+    pub fn iter(&self) -> impl Iterator<Item = (SourceKey, &SourceDescription)>
     {
         self.0.iter()
     }
 }
 
-impl Index<SourceId> for SourceMap
+impl Index<SourceKey> for SourceMap
 {
     type Output = SourceDescription;
 
     fn index(
         &self,
-        index: SourceId,
+        index: SourceKey,
     ) -> &Self::Output
     {
         &self.0[index]

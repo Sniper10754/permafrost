@@ -5,7 +5,7 @@ extern crate alloc;
 
 use alloc::{borrow::Cow, vec::Vec};
 use core::{convert::Infallible, ops::Range};
-use sourcemap::SourceId;
+use sourcemap::SourceKey;
 
 cfg_if! {
     if #[cfg(feature = "std")] {
@@ -39,7 +39,7 @@ impl IntoReport for Infallible
 pub struct Location
 {
     span: Range<usize>,
-    source_id: SourceId,
+    source_id: SourceKey,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -48,7 +48,7 @@ pub struct Report
 {
     level: Level,
     span: Range<usize>,
-    source_id: SourceId,
+    source_id: SourceKey,
     title: Cow<'static, str>,
     description: Option<Cow<'static, str>>,
     infos: Vec<Label>,
@@ -60,7 +60,7 @@ impl Report
     pub fn new_diagnostic(
         level: Level,
         location: Range<usize>,
-        source_id: impl Into<SourceId>,
+        source_id: impl Into<SourceKey>,
         title: impl Into<Cow<'static, str>>,
         description: Option<impl Into<Cow<'static, str>>>,
         infos: impl IntoIterator<Item = Label>,
@@ -85,7 +85,7 @@ pub struct Label
 {
     pub info: Cow<'static, str>,
     pub span: Option<Range<usize>>,
-    pub src_id: SourceId,
+    pub src_id: SourceKey,
 }
 
 impl Label
@@ -93,7 +93,7 @@ impl Label
     pub fn new(
         info: impl Into<Cow<'static, str>>,
         location: impl Into<Option<Range<usize>>>,
-        src_id: impl Into<SourceId>,
+        src_id: impl Into<SourceKey>,
     ) -> Self
     {
         Self {

@@ -10,14 +10,14 @@ use frostbite_parser::{
     lexer::{tokenize, TokenStream},
     Parser,
 };
-use frostbite_reports::sourcemap::{SourceDescription, SourceId, SourceUrl};
+use frostbite_reports::sourcemap::{SourceDescription, SourceKey, SourceUrl};
 use modules::ModuleKey;
 
 pub mod codegen;
 pub mod context;
+pub mod ir;
 pub mod modules;
 pub mod semantic;
-pub mod ir;
 pub mod types;
 pub mod utils;
 
@@ -47,7 +47,7 @@ impl Compiler
         &mut self,
         url: impl Into<SourceUrl>,
         source: impl Into<String>,
-    ) -> SourceId
+    ) -> SourceKey
     {
         self.ctx.src_map.insert(SourceDescription {
             url: url.into(),
@@ -57,7 +57,7 @@ impl Compiler
 
     pub fn compile_module(
         &mut self,
-        src_id: SourceId,
+        src_id: SourceKey,
     ) -> Result<ModuleKey, CompilerError>
     {
         log::trace!("Lexing...");
@@ -74,10 +74,10 @@ impl Compiler
 
         let name = self.ctx.src_map[src_id].url.to_string();
 
-        let module_key = self.ctx.module_ctx.modules.insert(Module { name, src_id });
+        let module_key = self.ctx.named_ctx.modules.insert(Module { name, src_id });
 
         self.ctx
-            .module_ctx
+            .named_ctx
             .modules_to_srcs
             .insert(module_key, src_id);
 
@@ -90,7 +90,7 @@ impl Compiler
         codegen: &mut C,
     ) -> Result<CompilationResults<C>, CompilerError>
     {
-        let module = &self.ctx.module_ctx.modules[module_key];
+        let module = &self.ctx.named_ctx.modules[module_key];
         let main_source_id = module.src_id;
 
         let codegen_output = Self::codegen(&mut self.ctx, main_source_id, codegen)?;
@@ -100,7 +100,7 @@ impl Compiler
 
     pub fn run_semantic_checks(
         &mut self,
-        source_id: SourceId,
+        source_id: SourceKey,
     ) -> Result<(), CompilerError>
     {
         typecheck::check_types(self, source_id);
@@ -117,7 +117,7 @@ impl Compiler
     fn parse(
         compiler_ctx: &mut CompilerContext,
         token_stream: TokenStream,
-        source_id: SourceId,
+        source_id: SourceKey,
     ) -> Result<(), CompilerError>
     {
         let ast =
@@ -132,7 +132,7 @@ impl Compiler
 
     fn lex(
         compiler_ctx: &mut CompilerContext,
-        source_id: SourceId,
+        source_id: SourceKey,
     ) -> Result<TokenStream, CompilerError>
     {
         let source = compiler_ctx.src_map[source_id].source_code.as_str();
@@ -146,7 +146,7 @@ impl Compiler
 
     fn codegen<C: CodegenBackend>(
         compiler_ctx: &mut CompilerContext,
-        main_source_id: SourceId,
+        main_source_id: SourceKey,
         codegen: &mut C,
     ) -> Result<C::Output, CompilerError>
     {

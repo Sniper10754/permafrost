@@ -20,16 +20,19 @@ use frostbite_parser::ast::{
         BinaryOperatorKind, FunctionToken, LeftBraceToken, LeftParenthesisToken, Operator,
         ReturnToken, RightBraceToken, RightParenthesisToken, TypeAnnotation,
     },
-    Argument, Expr, ModulePath, Spannable, Spanned,
+    Spannable, Spanned,
 };
-use frostbite_reports::{sourcemap::SourceId, IntoReport, Label, Level, Report};
+
+use frostbite_reports::{sourcemap::SourceKey, IntoReport, Label, Level, Report};
 
 use crate::{
-    ir::typed::{
-        display::display_type, Assignable, Callable, FunctionType, ImportDirectiveKind, RefersTo,
-        Type, TypeKey, TypedAst, TypedExpression, TypedExpressionKind, TypedFunction,
+    ir::{
+        named::{Argument, NamedExpr as Expr},
+        typed::{
+            display::display_type, Assignable, Callable, FunctionType, RefersTo, Type, TypeKey,
+            TypedAst, TypedExpression, TypedExpressionKind, TypedFunction,
+        },
     },
-    modules::ModuleKey,
     utils::Scopes,
     Compiler,
 };
@@ -39,16 +42,16 @@ enum TypecheckError
 {
     TypeMismatch
     {
-        source_id: SourceId,
+        source_id: SourceKey,
         span: Range<usize>,
 
         expected: Cow<'static, str>,
         found: Cow<'static, str>,
     },
-    SymbolNotFound(SourceId, Spanned<String>),
+    SymbolNotFound(SourceKey, Spanned<String>),
     IncompatibleOperands
     {
-        source_id: SourceId,
+        source_id: SourceKey,
         span: Range<usize>,
 
         left: Cow<'static, str>,
@@ -56,16 +59,16 @@ enum TypecheckError
     },
     CannotAssignTo
     {
-        src_id: SourceId,
+        src_id: SourceKey,
         span: Range<usize>,
 
         reason: CannotAssignToReason,
     },
-    CannotCallNonIdent(SourceId, Range<usize>),
-    CannotCallNonFunction(SourceId, Range<usize>),
+    CannotCallNonIdent(SourceKey, Range<usize>),
+    CannotCallNonFunction(SourceKey, Range<usize>),
     TooManyArguments
     {
-        source_id: SourceId,
+        source_id: SourceKey,
         span: Range<usize>,
 
         call_arguments_len: usize,
@@ -73,7 +76,7 @@ enum TypecheckError
     },
     NotEnoughArguments
     {
-        source_id: SourceId,
+        source_id: SourceKey,
         span: Range<usize>,
 
         call_arguments_len: usize,
@@ -81,7 +84,7 @@ enum TypecheckError
     },
     FunctionDoesntReturn
     {
-        source_id: SourceId,
+        source_id: SourceKey,
         faulty_branch_position: Range<usize>,
     },
 }
@@ -201,7 +204,7 @@ impl IntoReport for TypecheckError
 
 pub fn check_types(
     compiler: &mut Compiler,
-    source_id: SourceId,
+    source_id: SourceKey,
 )
 {
     compiler
@@ -222,10 +225,13 @@ pub fn check_types(
         compiler,
     };
 
-    let ast = rts.compiler.ctx.asts[source_id].exprs.clone().into_iter();
+    let ast = rts.compiler.ctx.named_ctx.named_asts[source_id]
+        .exprs
+        .clone()
+        .into_iter();
 
-    for expr in ast {
-        let result = rts.visit_expr(source_id, &expr);
+    for ref expr in ast {
+        let result = rts.visit_expr(source_id, expr);
 
         match result {
             Ok(t_expr) => rts.compiler.ctx.type_ctx.t_asts[source_id]
@@ -280,7 +286,7 @@ impl<'a> RecursiveTypechecker<'a>
 
     fn infer_type(
         &mut self,
-        source_id: SourceId,
+        source_id: SourceKey,
         expr: &Expr,
     ) -> Result<TypeKey, TypecheckError>
     {
@@ -289,27 +295,20 @@ impl<'a> RecursiveTypechecker<'a>
             Expr::Float(_) => Ok(self.compiler.ctx.type_ctx.types_arena.insert(Type::Float)),
             Expr::String(_) => Ok(self.compiler.ctx.type_ctx.types_arena.insert(Type::String)),
             Expr::Bool(_) => Ok(self.compiler.ctx.type_ctx.types_arena.insert(Type::Bool)),
-            Expr::ImportDirective(_) => {
-                Ok(self.compiler.ctx.type_ctx.types_arena.insert(Type::Unit))
-            }
+
             Expr::Ident(Spanned(span, name)) => self.infer_ident(source_id, name, span.clone()),
             Expr::BinaryOperation { lhs, operator, rhs } => {
                 self.infer_binary_op(source_id, lhs, operator, rhs, expr.span())
             }
-            Expr::Assign {
-                lhs: _,
-                eq_token: _,
-                value: _,
-            } => Ok(self.compiler.ctx.type_ctx.types_arena.insert(Type::Unit)),
+            Expr::Assign { lhs: _, value: _ } => {
+                Ok(self.compiler.ctx.type_ctx.types_arena.insert(Type::Unit))
+            }
             Expr::Function {
                 fn_token: _,
                 name,
-                lpt: _,
                 arguments,
-                rpt: _,
                 return_type_token: _,
                 return_type_annotation,
-                equals: _,
                 body: _,
             } => self.infer_function(
                 source_id,
@@ -362,7 +361,7 @@ impl<'a> RecursiveTypechecker<'a>
 
     fn infer_ident(
         &mut self,
-        source_id: SourceId,
+        source_id: SourceKey,
         name: &str,
         span: Range<usize>,
     ) -> Result<TypeKey, TypecheckError>
@@ -384,7 +383,7 @@ impl<'a> RecursiveTypechecker<'a>
 
     fn infer_binary_op(
         &mut self,
-        source_id: SourceId,
+        source_id: SourceKey,
         lhs: &Expr,
         operator: &Operator,
         rhs: &Expr,
@@ -443,7 +442,7 @@ impl<'a> RecursiveTypechecker<'a>
 
     fn infer_function(
         &mut self,
-        _source_id: SourceId,
+        _source_id: SourceKey,
         _name: Option<Spanned<&str>>,
         arguments: &[Argument],
         return_type_annotation: Option<Spanned<&TypeAnnotation>>,
@@ -488,7 +487,7 @@ impl<'a> RecursiveTypechecker<'a>
 
     fn visit_expr(
         &mut self,
-        source_id: SourceId,
+        source_id: SourceKey,
         expr: &Expr,
     ) -> Result<TypedExpression, TypecheckError>
     {
@@ -515,20 +514,13 @@ impl<'a> RecursiveTypechecker<'a>
             Expr::BinaryOperation { lhs, operator, rhs } => {
                 self.visit_binary_op(source_id, expr, lhs, operator.clone(), rhs)
             }
-            Expr::Assign {
-                lhs,
-                eq_token: _,
-                value,
-            } => self.visit_assign(source_id, lhs, value),
+            Expr::Assign { lhs, value } => self.visit_assign(source_id, lhs, value),
             Expr::Function {
                 fn_token,
                 name,
-                lpt: _,
                 arguments,
-                rpt: _,
                 return_type_token: _,
                 return_type_annotation,
-                equals: _,
                 body,
             } => self.visit_function(
                 source_id,
@@ -566,7 +558,7 @@ impl<'a> RecursiveTypechecker<'a>
 
     fn visit_ident(
         &mut self,
-        source_id: SourceId,
+        source_id: SourceKey,
         span: &Range<usize>,
         ident: &str,
     ) -> Result<TypedExpression, TypecheckError>
@@ -591,7 +583,7 @@ impl<'a> RecursiveTypechecker<'a>
 
     fn visit_binary_op(
         &mut self,
-        source_id: SourceId,
+        source_id: SourceKey,
         expr: &Expr,
         lhs: &Expr,
         operator: Operator,
@@ -617,7 +609,7 @@ impl<'a> RecursiveTypechecker<'a>
 
     fn visit_assign(
         &mut self,
-        source_id: SourceId,
+        source_id: SourceKey,
         lhs: &Expr,
         value: &Expr,
     ) -> Result<TypedExpression, TypecheckError>
@@ -670,7 +662,7 @@ impl<'a> RecursiveTypechecker<'a>
 
     fn visit_function(
         &mut self,
-        source_id: SourceId,
+        source_id: SourceKey,
         expr: &Expr,
         fn_token: &FunctionToken,
         name: Option<Spanned<String>>,
@@ -750,7 +742,7 @@ impl<'a> RecursiveTypechecker<'a>
     /// assure that all branches of a function return
     fn typecheck_function_body_returns(
         &mut self,
-        source_id: SourceId,
+        source_id: SourceKey,
         function: &TypedFunction,
     ) -> Result<(), TypecheckError>
     {
@@ -762,7 +754,7 @@ impl<'a> RecursiveTypechecker<'a>
 
     fn typecheck_fn_body_returns(
         &mut self,
-        source_id: SourceId,
+        source_id: SourceKey,
         expected_type: TypeKey,
         expr: &TypedExpression,
     ) -> Result<(), TypecheckError>
@@ -801,7 +793,7 @@ impl<'a> RecursiveTypechecker<'a>
 
     fn check_fn_body_branches(
         &mut self,
-        source_id: SourceId,
+        source_id: SourceKey,
         expr: &TypedExpression,
     ) -> Result<(), TypecheckError>
     {
@@ -845,7 +837,7 @@ impl<'a> RecursiveTypechecker<'a>
 
     fn visit_call(
         &mut self,
-        source_id: SourceId,
+        source_id: SourceKey,
         expr: &Expr,
         callee: &Expr,
         left_paren: &LeftParenthesisToken,
@@ -954,7 +946,7 @@ impl<'a> RecursiveTypechecker<'a>
 
     fn visit_return(
         &mut self,
-        source_id: SourceId,
+        source_id: SourceKey,
         return_token: ReturnToken,
         ret_expr: Option<&Expr>,
     ) -> Result<TypedExpression, TypecheckError>
@@ -987,7 +979,7 @@ impl<'a> RecursiveTypechecker<'a>
 
     fn visit_block(
         &mut self,
-        source_id: SourceId,
+        source_id: SourceKey,
         left_brace: &LeftBraceToken,
         expressions: &[Expr],
         right_brace: &RightBraceToken,

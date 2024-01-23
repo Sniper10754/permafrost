@@ -1,6 +1,6 @@
 use alloc::{collections::VecDeque, string::String, vec, vec::Vec};
 
-use frostbite_reports::{sourcemap::SourceId, IntoReport, Level, Report, ReportContext};
+use frostbite_reports::{sourcemap::SourceKey, IntoReport, Level, Report, ReportContext};
 use logos::{Logos, Span};
 
 use crate::ast::{tokens::BinaryOperatorKind, Spanned};
@@ -50,7 +50,7 @@ pub type SpannedToken = Spanned<Token>;
 #[derive(Debug, PartialEq, Clone)]
 pub struct LexerError
 {
-    source_id: SourceId,
+    source_id: SourceKey,
     kind: LexerErrorKind,
 }
 
@@ -279,7 +279,7 @@ impl TokenStream
 
 pub fn tokenize(
     report_ctx: &mut ReportContext,
-    source_id: SourceId,
+    source_id: SourceKey,
     input: &str,
 ) -> TokenStream
 {

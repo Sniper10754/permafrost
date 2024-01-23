@@ -5,7 +5,7 @@ use frostbite_parser::ast::{
         FunctionToken, LeftBraceToken, LeftParenthesisToken, Operator, ReturnToken,
         RightBraceToken, RightParenthesisToken, TypeAnnotation,
     },
-    ModulePath, Spannable, Spanned,
+    Spannable, Spanned,
 };
 use slotmap::{new_key_type, SlotMap};
 
@@ -178,8 +178,6 @@ pub enum TypedExpressionKind
     Bool(Spanned<bool>),
     String(Spanned<String>),
 
-    ImportDirective(Spanned<ImportDirectiveKind>),
-
     Ident
     {
         refers_to: RefersTo,
@@ -230,8 +228,7 @@ impl Spannable for TypedExpressionKind
             Int(Spanned(span, _))
             | Float(Spanned(span, _))
             | Bool(Spanned(span, _))
-            | String(Spanned(span, _))
-            | ImportDirective(Spanned(span, _)) => span.clone(),
+            | String(Spanned(span, _)) => span.clone(),
 
             Ident {
                 refers_to: _,
@@ -266,31 +263,6 @@ impl Spannable for TypedExpressionKind
                 expressions: _,
                 right_brace,
             } => (left_brace.span().start)..(right_brace.span().end),
-        }
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, DebugPls)]
-pub enum ImportDirectiveKind
-{
-    FromModuleImportSymbol
-    {
-        module: ModulePath,
-        symbol: Spanned<String>,
-    },
-    ImportModule
-    {
-        module: ModulePath
-    },
-}
-
-impl ImportDirectiveKind
-{
-    pub fn module_path(&self) -> &ModulePath
-    {
-        match self {
-            ImportDirectiveKind::FromModuleImportSymbol { module, symbol: _ } => module,
-            ImportDirectiveKind::ImportModule { module } => module,
         }
     }
 }
