@@ -1,10 +1,22 @@
-use frostbite_parser::ast::Expr;
-use frostbite_reports::sourcemap::SourceKey;
+use core::ops::Range;
+
+use frostbite_parser::ast::{Expr, Spannable, Spanned};
+use frostbite_reports::{sourcemap::SourceKey, IntoReport};
 
 use crate::{
     ir::named::{NamedAst, NamedExpr},
     Compiler,
 };
+
+enum NameResolutionError {}
+
+impl IntoReport for NameResolutionError
+{
+    fn into_report(self) -> frostbite_reports::Report
+    {
+        match self {}
+    }
+}
 
 pub fn check_names(
     compiler: &mut Compiler,
@@ -43,45 +55,55 @@ impl<'compiler> RecursiveNameChecker<'compiler>
     fn visit_expr(
         &mut self,
         expr: &Expr,
-    ) -> Result<NamedExpr, ()>
+    ) -> Result<NamedExpr, NameResolutionError>
     {
         match expr {
-            Expr::Int(_) => todo!(),
-            Expr::Float(_) => todo!(),
-            Expr::Ident(_) => todo!(),
-            Expr::Bool(_) => todo!(),
-            Expr::String(_) => todo!(),
+            Expr::Int(value) => Ok(NamedExpr::Int(value.clone())),
+            Expr::Float(value) => Ok(NamedExpr::Float(value.clone())),
+            Expr::Bool(value) => Ok(NamedExpr::Bool(value.clone())),
+            Expr::String(value) => Ok(NamedExpr::String(value.clone())),
+            Expr::Ident(identifier) => self.visit_ident(identifier.value(), identifier.span()),
             Expr::ImportDirective(_) => todo!(),
-            Expr::BinaryOperation { lhs, operator, rhs } => todo!(),
+            Expr::BinaryOperation { lhs, operator, rhs } => {}
             Expr::Assign {
                 lhs,
-                eq_token,
+                eq_token: _,
                 value,
             } => todo!(),
             Expr::Function {
-                fn_token,
+                fn_token: _,
                 name,
-                lpt,
+                lpt: _,
                 arguments,
-                rpt,
-                return_type_token,
+                rpt: _,
+                return_type_token: _,
                 return_type_annotation,
-                equals,
+                equals: _,
                 body,
             } => todo!(),
             Expr::Call {
                 callee,
-                left_paren,
+                left_paren: _,
                 arguments,
-                right_paren,
+                right_paren: _,
             } => todo!(),
             Expr::Block {
-                left_brace,
+                left_brace: _,
                 expressions,
-                right_brace,
+                right_brace: _,
             } => todo!(),
-            Expr::Return(..) => todo!(),
-            Expr::Poisoned => todo!(),
+            Expr::Return(_, expr) => todo!(),
+
+            Expr::Poisoned => unreachable!(),
         }
+    }
+
+    fn visit_ident(
+        &mut self,
+        ident: &str,
+        span: Range<usize>,
+    ) -> Result<NamedExpr, NameResolutionError>
+    {
+        Ok(NamedExpr::Ident(Spanned(span, ident.into())))
     }
 }
