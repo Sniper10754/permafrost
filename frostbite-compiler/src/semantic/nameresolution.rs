@@ -116,6 +116,7 @@ impl<'compiler> RecursiveNameChecker<'compiler>
                 self.visit_ident(source_key, identifier.value(), identifier.span())
             }
             Expr::ImportDirective(_) => todo!(),
+            Expr::ModuleDirective(..) => todo!(),
             Expr::BinaryOperation { lhs, operator, rhs } => Ok(NamedExpr::BinaryOperation {
                 lhs: Box::new(self.visit_expr(source_key, lhs)?),
                 operator: operator.clone(),

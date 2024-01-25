@@ -1,5 +1,9 @@
 #![allow(clippy::too_many_arguments)]
 
+extern crate std;
+
+use std::dbg;
+
 use core::{
     cmp::Ordering::{Equal, Greater, Less},
     ops::Range,
@@ -180,7 +184,7 @@ pub fn check_types(
     //     .for_each(|(name, type_key)| rts.scopes.insert_local(name, RefersTo::Type(type_key)));
 
     let mut rts = RecursiveTypechecker {
-        scopes: SecondaryMap::new(),
+        locals_to_types: SecondaryMap::new(),
         compiler,
     };
 
@@ -203,7 +207,7 @@ pub fn check_types(
 
 struct RecursiveTypechecker<'compiler>
 {
-    pub scopes: SecondaryMap<LocalKey, TypeKey>,
+    pub locals_to_types: SecondaryMap<LocalKey, TypeKey>,
     pub compiler: &'compiler mut Compiler,
 }
 
@@ -286,32 +290,7 @@ impl<'a> RecursiveTypechecker<'a>
                 left_paren: _,
                 arguments: _,
                 right_paren: _,
-            } => match &**callee {
-                NamedExpr::Ident {
-                    local_key,
-                    identifier: _,
-                } => {
-                    let type_key = self.scopes[*local_key];
-
-                    if let Type::Function(FunctionType {
-                        arguments: _,
-                        return_type,
-                    }) = &self.compiler.ctx.type_ctx.types_arena[type_key]
-                    {
-                        Ok(*return_type)
-                    } else {
-                        Err(TypecheckError::CannotCallNonFunction(
-                            source_key,
-                            callee.span(),
-                        ))
-                    }
-                }
-
-                _ => Err(TypecheckError::CannotCallNonIdent(
-                    source_key,
-                    callee.span(),
-                )),
-            },
+            } => self.infer_call(source_key, callee),
 
             NamedExpr::Block { .. } => {
                 Ok(self.compiler.ctx.type_ctx.types_arena.insert(Type::Unit))
@@ -327,7 +306,7 @@ impl<'a> RecursiveTypechecker<'a>
         local_key: LocalKey,
     ) -> Result<TypeKey, TypecheckError>
     {
-        Ok(self.scopes[local_key])
+        Ok(self.locals_to_types[local_key])
     }
 
     fn infer_binary_op(
@@ -436,6 +415,40 @@ impl<'a> RecursiveTypechecker<'a>
         Ok(self.compiler.ctx.type_ctx.types_arena.insert(fn_type))
     }
 
+    fn infer_call(
+        &mut self,
+        source_key: SourceKey,
+        callee: &NamedExpr,
+    ) -> Result<TypeKey, TypecheckError>
+    {
+        match callee {
+            NamedExpr::Ident {
+                local_key,
+                identifier: _,
+            } => {
+                let type_key = dbg!(&self.locals_to_types)[*dbg!(local_key)];
+
+                if let Type::Function(FunctionType {
+                    arguments: _,
+                    return_type,
+                }) = &self.compiler.ctx.type_ctx.types_arena[type_key]
+                {
+                    Ok(*return_type)
+                } else {
+                    Err(TypecheckError::CannotCallNonFunction(
+                        source_key,
+                        callee.span(),
+                    ))
+                }
+            }
+
+            _ => Err(TypecheckError::CannotCallNonIdent(
+                source_key,
+                callee.span(),
+            )),
+        }
+    }
+
     fn visit_expr(
         &mut self,
         source_key: SourceKey,
@@ -514,7 +527,7 @@ impl<'a> RecursiveTypechecker<'a>
         ident: &str,
     ) -> Result<TypedExpression, TypecheckError>
     {
-        let type_key = self.scopes[local_key];
+        let type_key = self.locals_to_types[local_key];
 
         Ok(TypedExpression {
             type_key,
@@ -562,7 +575,7 @@ impl<'a> RecursiveTypechecker<'a>
         // FIXME(Sniper10754): im pretty sure this clone can be avoided
         match lhs {
             NamedAssignable::Ident(local_key, ..) => {
-                self.scopes.insert(*local_key, value.type_key);
+                self.locals_to_types.insert(*local_key, value.type_key);
             }
         }
 
@@ -625,7 +638,7 @@ impl<'a> RecursiveTypechecker<'a>
                 },
                 type_key,
             )| {
-                self.scopes.insert(*local_key, *type_key);
+                self.locals_to_types.insert(*local_key, *type_key);
             },
         );
 
@@ -764,7 +777,7 @@ impl<'a> RecursiveTypechecker<'a>
                 local_key,
                 identifier: Spanned(span, name),
             } => {
-                let type_key = self.scopes[*local_key];
+                let type_key = self.locals_to_types[*local_key];
 
                 let Type::Function(function) =
                     self.compiler.ctx.type_ctx.types_arena[type_key].clone()

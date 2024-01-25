@@ -5,8 +5,8 @@ use dbg_pls::DebugPls;
 use derive_more::From;
 
 use self::tokens::{
-    ArrowToken, Eq, FunctionToken, LeftBraceToken, LeftParenthesisToken, Operator, ReturnToken,
-    RightBraceToken, RightParenthesisToken, TypeAnnotation,
+    ArrowToken, Eq, FunctionToken, LeftBraceToken, LeftParenthesisToken, ModToken, Operator,
+    ReturnToken, RightBraceToken, RightParenthesisToken, TypeAnnotation,
 };
 
 pub type Span = Range<usize>;
@@ -103,6 +103,7 @@ pub mod tokens
     token!(RightBraceToken);
     token!(ArrowToken);
     token!(ReturnToken);
+    token!(ModToken);
 }
 
 pub trait Spannable
@@ -261,6 +262,8 @@ impl Spannable for Expr
             | Expr::Bool(Spanned(span, _))
             | Expr::ImportDirective(Spanned(span, _)) => span.clone(),
 
+            Expr::ModuleDirective(mod_token, module_name) => todo!(),
+
             Expr::BinaryOperation {
                 lhs,
                 operator: _,
@@ -308,6 +311,7 @@ pub enum Expr
     Bool(Spanned<bool>),
     String(Spanned<String>),
 
+    ModuleDirective(ModToken, ModuleDirectiveKind),
     ImportDirective(Spanned<ImportDirectiveKind>),
 
     BinaryOperation
@@ -362,6 +366,12 @@ pub struct Argument
 {
     pub name: Spanned<String>,
     pub type_annotation: Spanned<TypeAnnotation>,
+}
+
+#[derive(Debug, Clone, PartialEq, DebugPls)]
+pub enum ModuleDirectiveKind
+{
+    ImportName(Spanned<String>),
 }
 
 #[derive(Debug, Clone, PartialEq, DebugPls)]
