@@ -481,7 +481,7 @@ impl<'a> RecursiveTypechecker<'a>
             }
             NamedExpr::Assign { lhs, value } => self.visit_assign(source_key, lhs, value),
             NamedExpr::Function {
-                local_key: _,
+                local_key,
                 fn_token,
                 name,
                 arguments,
@@ -490,6 +490,7 @@ impl<'a> RecursiveTypechecker<'a>
                 body,
             } => self.visit_function(
                 source_key,
+                local_key.as_ref().copied(),
                 expr,
                 fn_token,
                 name.clone(),
@@ -596,6 +597,7 @@ impl<'a> RecursiveTypechecker<'a>
     fn visit_function(
         &mut self,
         source_key: SourceKey,
+        local_key: Option<LocalKey>,
         expr: &NamedExpr,
         fn_token: &FunctionToken,
         name: Option<Spanned<String>>,
@@ -605,6 +607,10 @@ impl<'a> RecursiveTypechecker<'a>
     ) -> Result<TypedExpression, TypecheckError>
     {
         let type_key = self.infer_type(source_key, expr)?;
+
+        if let Some(local_key) = local_key {
+            self.locals_to_types.insert(local_key, type_key);
+        }
 
         let typed_arguments = arguments
             .iter()

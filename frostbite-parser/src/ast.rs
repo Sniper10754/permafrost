@@ -1,6 +1,7 @@
 use alloc::{boxed::Box, string::String, vec::Vec};
 use core::ops::{Deref, DerefMut, Range};
 use dbg_pls::DebugPls;
+use enum_dispatch::enum_dispatch;
 
 use derive_more::From;
 
@@ -106,6 +107,7 @@ pub mod tokens
     token!(ModToken);
 }
 
+#[enum_dispatch]
 pub trait Spannable
 {
     fn span(&self) -> Span;
@@ -262,7 +264,9 @@ impl Spannable for Expr
             | Expr::Bool(Spanned(span, _))
             | Expr::ImportDirective(Spanned(span, _)) => span.clone(),
 
-            Expr::ModuleDirective(mod_token, module_name) => todo!(),
+            Expr::ModuleDirective(mod_token, module_name) => {
+                (mod_token.span().start)..(module_name.span().end)
+            }
 
             Expr::BinaryOperation {
                 lhs,
@@ -369,6 +373,7 @@ pub struct Argument
 }
 
 #[derive(Debug, Clone, PartialEq, DebugPls)]
+#[enum_dispatch(Spannable)]
 pub enum ModuleDirectiveKind
 {
     ImportName(Spanned<String>),
