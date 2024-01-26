@@ -525,6 +525,7 @@ dependencies = [
  "fern",
  "frostbite-bytecode",
  "frostbite-compiler",
+ "frostbite-disassembler",
  "frostbite-parser",
  "frostbite-reports",
  "log",

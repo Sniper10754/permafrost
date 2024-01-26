@@ -3,6 +3,7 @@ use std::{env, fs, io::Write, path::PathBuf, process};
 use clap::Parser;
 use color_eyre::eyre;
 
+use frostbite_bytecode::Module;
 use frostbite_compiler::{
     codegen::CodegenBackends, context::CompilerContext, CompilationResults, Compiler,
 };
@@ -28,6 +29,9 @@ pub enum CliSubcommand
 
         #[arg(short = 'o', long = "output")]
         output_file: Option<PathBuf>,
+
+        #[arg(help = "Disassemble once compilation is done", long = "disassemble")]
+        disassemble: bool,
     },
 }
 
@@ -53,7 +57,7 @@ fn setup_logger() -> eyre::Result<()>
                     message,
                 ))
             })
-            .level(LevelFilter::Trace)
+            .level(LevelFilter::Info)
             .chain(std::io::stdout())
             .apply()?;
     }
@@ -70,7 +74,11 @@ fn main() -> eyre::Result<()>
     color_eyre::install()?;
 
     match args.subcommand {
-        CliSubcommand::Compile { file, output_file } => {
+        CliSubcommand::Compile {
+            file,
+            output_file,
+            disassemble,
+        } => {
             let src = fs::read_to_string(&file)?;
 
             let mut compiler = Compiler::new();
@@ -91,6 +99,10 @@ fn main() -> eyre::Result<()>
 
                 unreachable!();
             };
+
+            if disassemble {
+                disassemble_and_print(&codegen_output)?;
+            }
 
             let mut buf = vec![];
 
@@ -135,4 +147,15 @@ fn print_reports(ctx: &CompilerContext)
     });
 
     println!("{buf}");
+}
+
+fn disassemble_and_print(module: &Module) -> eyre::Result<()>
+{
+    let mut buf = String::new();
+
+    frostbite_bytecode::text_repr::print_bytecode(&mut buf, module)?;
+
+    println!("{buf}");
+
+    Ok(())
 }

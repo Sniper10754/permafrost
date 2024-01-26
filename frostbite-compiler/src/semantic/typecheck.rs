@@ -1,9 +1,5 @@
 #![allow(clippy::too_many_arguments)]
 
-extern crate std;
-
-use std::dbg;
-
 use core::{
     cmp::Ordering::{Equal, Greater, Less},
     ops::Range,
@@ -422,7 +418,7 @@ impl<'a> RecursiveTypechecker<'a>
                 local_key,
                 identifier: _,
             } => {
-                let type_key = dbg!(&self.locals_to_types)[*dbg!(local_key)];
+                let type_key = self.locals_to_types[*local_key];
 
                 if let Type::Function(FunctionType {
                     arguments: _,
