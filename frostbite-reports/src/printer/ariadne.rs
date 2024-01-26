@@ -3,7 +3,6 @@ extern crate std;
 use std::fmt;
 
 use self::utils::SourceMapCache;
-
 use crate::{printer, printer::PrintBackend, sourcemap::SourceMap, Level, Report};
 
 pub struct AriadnePrintBackend;
@@ -30,10 +29,10 @@ mod utils
             buf: &[u8],
         ) -> io::Result<usize>
         {
-            let uft8_string = String::from_utf8_lossy(buf);
+            let utf8_string = String::from_utf8_lossy(buf);
 
             self.destination
-                .write_str(&uft8_string)
+                .write_str(&utf8_string)
                 .map_err(|_| io::Error::new(io::ErrorKind::Other, ""))?;
 
             Ok(buf.len())

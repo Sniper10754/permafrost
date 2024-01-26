@@ -136,6 +136,11 @@ impl ReportContext
             .iter()
             .any(|report| matches!(report.level, Level::Error))
     }
+
+    pub fn has_reports(&self) -> bool
+    {
+        !self.reports.is_empty()
+    }
 }
 
 impl core::ops::DerefMut for ReportContext
