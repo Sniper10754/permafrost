@@ -254,10 +254,10 @@ impl<'a> RecursiveTypechecker<'a>
     ) -> Result<TypeKey, TypecheckError>
     {
         match expr {
-            NamedExpr::Int(_) => Ok(self.compiler.ctx.type_ctx.types_arena.insert(Type::Int)),
-            NamedExpr::Float(_) => Ok(self.compiler.ctx.type_ctx.types_arena.insert(Type::Float)),
-            NamedExpr::String(_) => Ok(self.compiler.ctx.type_ctx.types_arena.insert(Type::String)),
-            NamedExpr::Bool(_) => Ok(self.compiler.ctx.type_ctx.types_arena.insert(Type::Bool)),
+            NamedExpr::Int(_) => Ok(self.insert_type(Type::Int)),
+            NamedExpr::Float(_) => Ok(self.insert_type(Type::Float)),
+            NamedExpr::String(_) => Ok(self.insert_type(Type::String)),
+            NamedExpr::Bool(_) => Ok(self.insert_type(Type::Bool)),
 
             NamedExpr::Ident {
                 local_key,
@@ -266,9 +266,7 @@ impl<'a> RecursiveTypechecker<'a>
             NamedExpr::BinaryOperation { lhs, operator, rhs } => {
                 self.infer_binary_op(source_key, lhs, operator, rhs, expr.span())
             }
-            NamedExpr::Assign { lhs: _, value: _ } => {
-                Ok(self.compiler.ctx.type_ctx.types_arena.insert(Type::Unit))
-            }
+            NamedExpr::Assign { lhs: _, value: _ } => Ok(self.insert_type(Type::Unit)),
             NamedExpr::Function {
                 local_key: _,
                 fn_token: _,
@@ -292,10 +290,8 @@ impl<'a> RecursiveTypechecker<'a>
                 right_paren: _,
             } => self.infer_call(source_key, callee),
 
-            NamedExpr::Block { .. } => {
-                Ok(self.compiler.ctx.type_ctx.types_arena.insert(Type::Unit))
-            }
-            NamedExpr::Return(..) => Ok(self.compiler.ctx.type_ctx.types_arena.insert(Type::Unit)),
+            NamedExpr::Block { .. } => Ok(self.insert_type(Type::Unit)),
+            NamedExpr::Return(..) => Ok(self.insert_type(Type::Unit)),
 
             NamedExpr::Poisoned => unreachable!(),
         }
@@ -333,7 +329,7 @@ impl<'a> RecursiveTypechecker<'a>
             (
                 BinaryOperatorKind::Add | BinaryOperatorKind::Sub | BinaryOperatorKind::Mul,
                 (Type::Int, Type::Int),
-            ) => Ok(self.compiler.ctx.type_ctx.types_arena.insert(Type::Int)),
+            ) => Ok(self.insert_type(Type::Int)),
 
             (
                 BinaryOperatorKind::Add
@@ -341,11 +337,11 @@ impl<'a> RecursiveTypechecker<'a>
                 | BinaryOperatorKind::Mul
                 | BinaryOperatorKind::Div,
                 (Type::Float, Type::Float) | (Type::Float, Type::Int) | (Type::Int, Type::Float),
-            ) => Ok(self.compiler.ctx.type_ctx.types_arena.insert(Type::Float)),
+            ) => Ok(self.insert_type(Type::Float)),
 
             (BinaryOperatorKind::Equal, (..)) => {
                 if self.unify(lhs_type_key, rhs_type_key).is_ok() {
-                    Ok(self.compiler.ctx.type_ctx.types_arena.insert(Type::Bool))
+                    Ok(self.insert_type(Type::Bool))
                 } else {
                     Err(TypecheckError::TypeMismatch {
                         source_key,
@@ -377,7 +373,7 @@ impl<'a> RecursiveTypechecker<'a>
     ) -> Result<TypeKey, TypecheckError>
     {
         let fn_type = {
-            let return_type = self.compiler.ctx.type_ctx.types_arena.insert(
+            let return_type = self.insert_type(
                 return_type_annotation
                     .map(|Spanned(_, ty)| ty)
                     .cloned()
@@ -412,7 +408,7 @@ impl<'a> RecursiveTypechecker<'a>
             })
         };
 
-        Ok(self.compiler.ctx.type_ctx.types_arena.insert(fn_type))
+        Ok(self.insert_type(fn_type))
     }
 
     fn infer_call(
@@ -583,7 +579,7 @@ impl<'a> RecursiveTypechecker<'a>
         let typed_lhs = self.visit_expr(source_key, &(lhs.clone().into()))?;
         let typed_lhs = Assignable::try_from(typed_lhs).unwrap();
 
-        let type_key = self.compiler.ctx.type_ctx.types_arena.insert(Type::Unit);
+        let type_key = self.insert_type(Type::Unit);
 
         Ok(TypedExpression {
             type_key,
@@ -623,10 +619,10 @@ impl<'a> RecursiveTypechecker<'a>
                     (arg_name.into(), Type::from(type_annotation.value().clone()))
                 },
             )
-            .map(|(name, ty)| (name, self.compiler.ctx.type_ctx.types_arena.insert(ty)))
+            .map(|(name, ty)| (name, self.insert_type(ty)))
             .collect::<BTreeMap<_, _>>();
 
-        let return_type = self.compiler.ctx.type_ctx.types_arena.insert(
+        let return_type = self.insert_type(
             return_type_annotation
                 .as_ref()
                 .cloned()
@@ -884,7 +880,7 @@ impl<'a> RecursiveTypechecker<'a>
         let return_value_type = if let Some(ret_expr) = ret_expr {
             self.infer_type(source_key, ret_expr)?
         } else {
-            self.compiler.ctx.type_ctx.types_arena.insert(Type::Unit)
+            self.insert_type(Type::Unit)
         };
 
         let mut value = None;
@@ -895,7 +891,7 @@ impl<'a> RecursiveTypechecker<'a>
             value = Some(temp_val);
         }
 
-        let type_key = self.compiler.ctx.type_ctx.types_arena.insert(Type::Unit);
+        let type_key = self.insert_type(Type::Unit);
 
         Ok(TypedExpression {
             type_key,
@@ -915,7 +911,7 @@ impl<'a> RecursiveTypechecker<'a>
         right_brace: &RightBraceToken,
     ) -> Result<TypedExpression, TypecheckError>
     {
-        let type_key = self.compiler.ctx.type_ctx.types_arena.insert(Type::Unit);
+        let type_key = self.insert_type(Type::Unit);
 
         Ok(TypedExpression {
             type_key,
@@ -928,5 +924,13 @@ impl<'a> RecursiveTypechecker<'a>
                 right_brace: right_brace.clone(),
             },
         })
+    }
+
+    fn insert_type(
+        &mut self,
+        ty: Type,
+    ) -> TypeKey
+    {
+        self.compiler.ctx.type_ctx.types_arena.insert(ty)
     }
 }
