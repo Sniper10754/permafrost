@@ -83,7 +83,7 @@ pub struct SourceDescription
 pub enum SourceUrl
 {
     #[cfg(feature = "std")]
-    #[display(fmt = "{}", "_0.file_prefix().unwrap().to_string_lossy()")]
+    #[display(fmt = "{}", "_0.file_stem().unwrap().to_string_lossy()")]
     Path(std::path::PathBuf),
 
     String(String),

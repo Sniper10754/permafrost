@@ -525,20 +525,9 @@ dependencies = [
  "fern",
  "frostbite-bytecode",
  "frostbite-compiler",
- "frostbite-disassembler",
  "frostbite-parser",
  "frostbite-reports",
  "log",
-]
-
-[[package]]
-name = "frostbite-disassembler"
-version = "0.1.0"
-dependencies = [
- "clap",
- "color-eyre",
- "frostbite-bytecode",
- "owo-colors 4.0.0",
 ]
 
 [[package]]

@@ -10,7 +10,6 @@ members = [
     "frostbite-compiler",
     "frostbite-compiler-driver",
     "frostbite-bytecode",
-    "frostbite-disassembler",
     "frostbite-repl",
 ]
 

@@ -14,7 +14,6 @@ frostbite-reports = { path = "../frostbite-reports", features = [
     "std",
 ] }
 frostbite-parser = { path = "../frostbite-parser" }
-frostbite-disassembler = { path = "../frostbite-disassembler" }
 
 color-eyre = { workspace = true }
 log = { workspace = true }
