@@ -27,6 +27,7 @@ pub struct BytecodeCodegenBackend
 
 impl BytecodeCodegenBackend
 {
+    /// Compile a program
     fn compile_program(
         &mut self,
         t_ast: &TypedAst,
@@ -37,11 +38,17 @@ impl BytecodeCodegenBackend
         let body = &mut module.body;
         let globals = &mut module.globals;
 
-        for node in &t_ast.nodes {
+        // compile each node in the program
+        t_ast.nodes.iter().for_each(|node| {
             self.compile_node(t_ast, types_arena, body, globals, node);
-        }
+        });
     }
 
+    /// compiles a node
+    ///
+    /// # ASSUMPTIONS
+    ///
+    /// Every node compiled has to perform some kind of operation/load onto the stack something
     fn compile_node(
         &mut self,
         t_ast: &TypedAst,
@@ -118,6 +125,7 @@ impl BytecodeCodegenBackend
         }
     }
 
+    /// Converts a literal into bytecode
     fn compile_constant(
         &mut self,
         instructions: &mut Vec<Instruction>,
@@ -157,40 +165,45 @@ impl BytecodeCodegenBackend
             BinaryOperatorKind::Mul => instructions.push(Instruction::Multiply),
             BinaryOperatorKind::Div => instructions.push(Instruction::Divide),
             BinaryOperatorKind::Equal => {
-                instructions.push(Instruction::Cmp);
-
-                // binary operations must produce the result on the stack
-                // we can achieve this using function calls pushing a result on the stack
-
-                {
-                    let const_val_idx = globals.constants_pool.insert(ConstantValue::Bool(true));
-
-                    let tmp_fn_idx = globals.functions.insert(unsafe {
-                        Self::compile_function_with_body(
-                            [Instruction::LoadConstant(const_val_idx)].into(),
-                        )
-                    });
-
-                    instructions.push(Instruction::LoadFunction(tmp_fn_idx));
-
-                    instructions.push(Instruction::CallEq)
-                }
-
-                {
-                    let const_val_idx = globals.constants_pool.insert(ConstantValue::Bool(false));
-
-                    let tmp_fn_idx = globals.functions.insert(unsafe {
-                        Self::compile_function_with_body(
-                            [Instruction::LoadConstant(const_val_idx)].into(),
-                        )
-                    });
-
-                    instructions.push(Instruction::LoadFunction(tmp_fn_idx));
-
-                    instructions.push(Instruction::CallNe)
-                }
+                self.compile_equal_binary_op(globals, instructions);
             }
         };
+    }
+
+    fn compile_equal_binary_op(
+        &mut self,
+        globals: &mut Globals,
+        instructions: &mut Vec<Instruction>,
+    )
+    {
+        instructions.push(Instruction::Cmp);
+
+        // binary operations must produce the result on the stack
+        // we can achieve this using function calls pushing a result on the stack
+
+        {
+            let const_val_idx = globals.constants_pool.insert(ConstantValue::Bool(true));
+
+            let tmp_fn_idx = globals.functions.insert(unsafe {
+                Self::compile_function_with_body([Instruction::LoadConstant(const_val_idx)].into())
+            });
+
+            instructions.push(Instruction::LoadFunction(tmp_fn_idx));
+
+            instructions.push(Instruction::CallEq)
+        }
+
+        {
+            let const_val_idx = globals.constants_pool.insert(ConstantValue::Bool(false));
+
+            let tmp_fn_idx = globals.functions.insert(unsafe {
+                Self::compile_function_with_body([Instruction::LoadConstant(const_val_idx)].into())
+            });
+
+            instructions.push(Instruction::LoadFunction(tmp_fn_idx));
+
+            instructions.push(Instruction::CallNe)
+        }
     }
 
     fn compile_assignment(
@@ -316,9 +329,10 @@ impl CodegenBackend for BytecodeCodegenBackend
     {
         let mut module = Module {
             manifest: Manifest {
-                bytecode_version: option_env!("PROJECT_VERSION")
+                emitted_by_compiler_version: option_env!("PROJECT_VERSION")
                     .unwrap_or(env!("CARGO_PKG_VERSION"))
-                    .into(),
+                    .parse()
+                    .unwrap(),
             },
             globals: Globals::default(),
             body: Vec::new(),
@@ -332,15 +346,4 @@ impl CodegenBackend for BytecodeCodegenBackend
 
         module
     }
-}
-
-impl BytecodeCodegenBackend
-{
-    // fn translate_intrinsics(
-    //     &mut self,
-    //     compiler_ctx: &mut CompilerContext,
-    //     module: &mut Module,
-    // )
-    // {
-    // }
 }

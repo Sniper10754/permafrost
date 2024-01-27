@@ -6,7 +6,7 @@ extern crate std;
 extern crate alloc;
 
 use alloc::{string::String, vec::Vec};
-use core::fmt::Debug;
+use core::{fmt::Debug, num::ParseIntError, str::FromStr};
 use slotmap::{new_key_type, SlotMap};
 
 use ciborium::de::Error;
@@ -24,10 +24,40 @@ new_key_type! {
     pub struct FunctionKey;
 }
 
+#[derive(
+    Debug, derive_more::Display, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize,
+)]
+#[display(fmt = "{_0}.{_1}.{_2}")]
+pub struct CompilerVersion(u64, u64, u64);
+
+impl FromStr for CompilerVersion
+{
+    type Err = CompilerVersionParseError;
+
+    fn from_str(string: &str) -> Result<Self, Self::Err>
+    {
+        let [major, minor, patch] = string
+            .split('.')
+            .map(u64::from_str)
+            .collect::<Result<Vec<_>, _>>()?
+            .try_into()
+            .map_err(|_| CompilerVersionParseError::TooMuchDigits)?;
+
+        Ok(CompilerVersion(major, minor, patch))
+    }
+}
+
+#[derive(Debug, derive_more::Display, derive_more::From)]
+pub enum CompilerVersionParseError
+{
+    ParseIntError(ParseIntError),
+    TooMuchDigits,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Manifest
 {
-    pub bytecode_version: String,
+    pub emitted_by_compiler_version: CompilerVersion,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

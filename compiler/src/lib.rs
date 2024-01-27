@@ -3,9 +3,10 @@
 extern crate alloc;
 
 use crate::{
-    modules::Module,
+    context::names::{Module, ModuleKey},
     semantic::{nameresolution, typecheck},
 };
+
 use alloc::string::{String, ToString};
 use codegen::CodegenBackend;
 use context::CompilerContext;
@@ -14,14 +15,11 @@ use frostbite_parser::{
     Parser,
 };
 use frostbite_reports::sourcemap::{SourceDescription, SourceKey, SourceUrl};
-use modules::ModuleKey;
 
 pub mod codegen;
 pub mod context;
 pub mod ir;
-pub mod modules;
 pub mod semantic;
-pub mod types;
 pub mod utils;
 
 #[derive(Debug, Clone, Copy, Default, Hash, PartialEq, Eq, PartialOrd, Ord)]
