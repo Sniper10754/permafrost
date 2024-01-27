@@ -1,5 +1,6 @@
-function fib(n: int) -> int
-    = fib(n - 1) + fib(n - 2);
+fib =
+    function(n: int) -> int 
+        = fib(n - 1) + fib(n - 2);
 
 fib(6);
 

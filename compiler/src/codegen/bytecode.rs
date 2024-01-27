@@ -227,7 +227,7 @@ impl BytecodeCodegenBackend
         self.functions.insert(type_key, dummy_function_index);
 
         globals.functions[dummy_function_index] =
-            self.compile_function(t_ast, types_arena, globals, &function.body);
+            self.compile_function(t_ast, types_arena, globals, function);
 
         instructions.push(Instruction::LoadFunction(dummy_function_index));
 
@@ -241,17 +241,21 @@ impl BytecodeCodegenBackend
         t_ast: &TypedAst,
         types_arena: &TypesArena,
         globals: &mut Globals,
-        function_body: &TypedExpression,
+        function: &TypedFunction,
     ) -> frostbite_bytecode::Function
     {
         let mut bytecode_function_body = Vec::new();
+
+        function.arguments.keys().rev().for_each(|argument_name| {
+            bytecode_function_body.push(Instruction::PopAndStoreName(argument_name.into()))
+        });
 
         self.compile_node(
             t_ast,
             types_arena,
             &mut bytecode_function_body,
             globals,
-            function_body,
+            &function.body,
         );
 
         unsafe { BytecodeCodegenBackend::compile_function_with_body(bytecode_function_body) }
@@ -279,20 +283,16 @@ impl BytecodeCodegenBackend
         match callee {
             Callable::Function(type_key, _) => {
                 let Type::Function(FunctionType {
-                    arguments,
+                    arguments: _,
                     return_type: _,
                 }) = &types_arena[*type_key]
                 else {
                     unreachable!()
                 };
 
-                Iterator::zip(arguments.keys(), arguments_exprs.iter()).for_each(
-                    |(argument_name, argument_expr)| {
-                        self.compile_node(t_ast, types_arena, instructions, globals, argument_expr);
-
-                        instructions.push(Instruction::StoreName(argument_name.into()));
-                    },
-                );
+                arguments_exprs.iter().for_each(|argument_expr| {
+                    self.compile_node(t_ast, types_arena, instructions, globals, argument_expr);
+                });
 
                 let function_index = self.functions[*type_key];
 

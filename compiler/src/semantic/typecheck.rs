@@ -262,7 +262,7 @@ impl<'a> RecursiveTypechecker<'a>
             NamedExpr::BinaryOperation { lhs, operator, rhs } => {
                 self.infer_binary_op(source_key, lhs, operator, rhs, expr.span())
             }
-            NamedExpr::Assign { lhs: _, value: _ } => Ok(self.insert_type(Type::Unit)),
+            NamedExpr::Assign { lhs: _, body: _ } => Ok(self.insert_type(Type::Unit)),
             NamedExpr::Function {
                 local_key: _,
                 fn_token: _,
@@ -471,7 +471,7 @@ impl<'a> RecursiveTypechecker<'a>
             NamedExpr::BinaryOperation { lhs, operator, rhs } => {
                 self.visit_binary_op(source_key, expr, lhs, operator.clone(), rhs)
             }
-            NamedExpr::Assign { lhs, value } => self.visit_assign(source_key, lhs, value),
+            NamedExpr::Assign { lhs, body: value } => self.visit_assign(source_key, lhs, value),
             NamedExpr::Function {
                 local_key,
                 fn_token,
@@ -565,13 +565,13 @@ impl<'a> RecursiveTypechecker<'a>
     {
         let value = self.visit_expr(source_key, value)?;
 
-        // FIXME(Sniper10754): im pretty sure this clone can be avoided
         match lhs {
             NamedAssignable::Ident(local_key, ..) => {
                 self.locals_to_types.insert(*local_key, value.type_key);
             }
         }
 
+        // FIXME(Sniper10754): im pretty sure this clone can be avoided
         let typed_lhs = self.visit_expr(source_key, &(lhs.clone().into()))?;
         let typed_lhs = Assignable::try_from(typed_lhs).unwrap();
 

@@ -207,6 +207,8 @@ impl<'compiler> RecursiveNameChecker<'compiler>
         value: &Expr,
     ) -> Result<NamedExpr, NameResolutionError>
     {
+        let body = Box::new(self.visit_expr(source_key, value)?);
+
         let lhs = match lhs {
             Expr::Poisoned => unreachable!(),
 
@@ -224,10 +226,7 @@ impl<'compiler> RecursiveNameChecker<'compiler>
             }
         };
 
-        Ok(NamedExpr::Assign {
-            lhs,
-            value: Box::new(self.visit_expr(source_key, value)?),
-        })
+        Ok(NamedExpr::Assign { lhs, body })
     }
 
     fn visit_function(

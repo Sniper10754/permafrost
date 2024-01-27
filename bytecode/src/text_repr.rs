@@ -114,6 +114,9 @@ where
         }
         Instruction::StoreName(name) => write!(w, "{:?}", name.bright_yellow())?,
         Instruction::LoadName(name) => write!(w, "{:?}", name.bright_yellow())?,
+        Instruction::PopAndStoreName(name) => {
+            write!(w, "{0} // pops and stores onto {0}", name.cyan())?
+        }
 
         Instruction::Pop
         | Instruction::Call

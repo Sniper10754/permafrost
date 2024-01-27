@@ -56,7 +56,7 @@ impl Spannable for NamedExpr
                 operator: _,
                 rhs,
             } => (lhs.span().start)..(rhs.span().end),
-            NamedExpr::Assign { lhs, value } => (lhs.span().start)..(value.span().end),
+            NamedExpr::Assign { lhs, body: value } => (lhs.span().start)..(value.span().end),
 
             NamedExpr::Function { fn_token, body, .. } => {
                 (fn_token.span().start)..(body.span().end)
@@ -110,7 +110,7 @@ pub enum NamedExpr
     Assign
     {
         lhs: Assignable,
-        value: Box<Self>,
+        body: Box<Self>,
     },
 
     Function

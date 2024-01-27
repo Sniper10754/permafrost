@@ -64,6 +64,9 @@ pub enum Instruction
     /// Removes an element from the stack
     Pop,
 
+    /// Removes an element from the stack and loads it onto name 0
+    PopAndStoreName(String),
+
     /// Calls a function
     Call,
 
