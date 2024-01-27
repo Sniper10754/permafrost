@@ -1,3 +1,20 @@
+# Naming system description
+
+Scoping is very simple, side notes:
+
+In an assign, the body cannot reference the identifier its being bond onto.
+
+```js
+
+// Invalid!
+a = a
+
+a = 1
+
+// Valid (altought noop)
+a = a
+```
+
 # Type System description
 
 > https://en.wikipedia.org/wiki/Subtyping
