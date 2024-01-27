@@ -33,3 +33,9 @@ $$ Float = Float $$
 $$ A = Int $$
 $$ B = Number $$
 $$ B >: A $$
+
+# Module system sketchs
+
+- Every file is a module
+- Every module has locals
+- These locals have types
