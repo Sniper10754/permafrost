@@ -31,10 +31,8 @@ impl CompilerContext
         Self {
             src_map,
             report_ctx,
-            named_ctx: NamedContext::default(),
-            type_ctx: TypeContext::default(),
 
-            asts: SecondaryMap::new(),
+            ..Default::default()
         }
     }
 

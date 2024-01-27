@@ -17,7 +17,7 @@ dbg-pls = { workspace = true }
 log = { workspace = true }
 
 [features]
-std = []
+std = ["frostbite-reports/std"]
 
 [lints]
 workspace = true

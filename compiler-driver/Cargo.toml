@@ -6,7 +6,7 @@ edition.workspace = true
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-frostbite-compiler = { path = "../compiler" }
+frostbite-compiler = { path = "../compiler", features = ["std"] }
 frostbite-bytecode = { path = "../bytecode" }
 frostbite-reports = { path = "../reports", features = [
     "diagnostic_printer",
