@@ -7,9 +7,9 @@ edition.workspace = true
 
 
 [dependencies]
-frostbite-bytecode = { path = "../frostbite-bytecode" }
-frostbite-reports = { path = "../frostbite-reports" }
-frostbite-parser = { path = "../frostbite-parser" }
+frostbite-bytecode = { path = "../bytecode" }
+frostbite-reports = { path = "../reports" }
+frostbite-parser = { path = "../parser" }
 
 derive_more = { workspace = true }
 slotmap = { workspace = true }

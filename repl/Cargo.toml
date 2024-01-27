@@ -8,9 +8,9 @@ edition.workspace = true
 [dependencies]
 reedline = "0"
 
-frostbite-compiler = { path = "../frostbite-compiler" }
-frostbite-bytecode = { path = "../frostbite-bytecode" }
-frostbite-reports = { path = "../frostbite-reports", features = [
+frostbite-compiler = { path = "../compiler" }
+frostbite-bytecode = { path = "../bytecode" }
+frostbite-reports = { path = "../reports", features = [
     "diagnostic_printer",
     "ariadne",
 ] }

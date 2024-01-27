@@ -14,7 +14,7 @@ num-traits = { workspace = true }
 dbg-pls = { workspace = true }
 cfg-if = { workspace = true }
 
-frostbite-reports = { path = "../frostbite-reports" }
+frostbite-reports = { path = "../reports" }
 
 logos = { version = "0.13.0", default-features = false, features = [
     "export_derive",
