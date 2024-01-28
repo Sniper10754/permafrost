@@ -5,7 +5,10 @@ use frostbite_reports::{
 };
 use slotmap::SecondaryMap;
 
-use crate::{modules::NamedContext, types::TypeContext};
+pub use self::{names::NamedContext, types::TypeContext};
+
+pub mod names;
+pub mod types;
 
 #[derive(Debug, Default)]
 pub struct CompilerContext
@@ -28,10 +31,8 @@ impl CompilerContext
         Self {
             src_map,
             report_ctx,
-            named_ctx: NamedContext::default(),
-            type_ctx: TypeContext::default(),
 
-            asts: SecondaryMap::new(),
+            ..Default::default()
         }
     }
 
@@ -54,7 +55,6 @@ impl CompilerContext
     where
         E: Default,
     {
-        // Equivalent of
         if self.has_errors() {
             Err(E::default())
         } else {

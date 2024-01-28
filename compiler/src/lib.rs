@@ -2,11 +2,15 @@
 
 extern crate alloc;
 
+#[cfg(feature = "std")]
+extern crate std;
+
 use crate::{
-    modules::Module,
+    context::names::{NamedModule, NamedModuleKey, Visibility},
     semantic::{nameresolution, typecheck},
 };
-use alloc::string::{String, ToString};
+
+use alloc::{string::String, vec::Vec};
 use codegen::CodegenBackend;
 use context::CompilerContext;
 use frostbite_parser::{
@@ -14,14 +18,11 @@ use frostbite_parser::{
     Parser,
 };
 use frostbite_reports::sourcemap::{SourceDescription, SourceKey, SourceUrl};
-use modules::ModuleKey;
 
 pub mod codegen;
 pub mod context;
 pub mod ir;
-pub mod modules;
 pub mod semantic;
-pub mod types;
 pub mod utils;
 
 #[derive(Debug, Clone, Copy, Default, Hash, PartialEq, Eq, PartialOrd, Ord)]
@@ -61,7 +62,7 @@ impl Compiler
     pub fn compile_module(
         &mut self,
         src_id: SourceKey,
-    ) -> Result<ModuleKey, CompilerError>
+    ) -> Result<NamedModuleKey, CompilerError>
     {
         log::trace!("Lexing...");
         let token_stream = Self::lex(&mut self.ctx, src_id)?;
@@ -75,9 +76,10 @@ impl Compiler
 
         log::trace!("Done...");
 
-        let name = self.ctx.src_map[src_id].url.to_string();
-
-        let module_key = self.ctx.named_ctx.modules.insert(Module { name, src_id });
+        let module_key = self.ctx.named_ctx.modules.insert(NamedModule {
+            src_id,
+            exports: Vec::new(),
+        });
 
         self.ctx
             .named_ctx
@@ -89,7 +91,7 @@ impl Compiler
 
     pub fn codegen_module<C: CodegenBackend>(
         &mut self,
-        module_key: ModuleKey,
+        module_key: NamedModuleKey,
         codegen: &mut C,
     ) -> Result<CompilationResults<C>, CompilerError>
     {

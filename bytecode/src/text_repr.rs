@@ -15,8 +15,8 @@ where
 {
     writeln!(
         w,
-        "Bytecode version {}",
-        module.manifest.bytecode_version.yellow()
+        "compiled by frostbite-compiler@{}",
+        module.manifest.emitted_by_compiler_version.yellow()
     )?;
 
     writeln!(w)?;
