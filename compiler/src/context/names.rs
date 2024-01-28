@@ -1,9 +1,9 @@
-use alloc::string::String;
+use alloc::{string::String, vec::Vec};
 use dbg_pls::DebugPls;
 use frostbite_reports::sourcemap::{SourceKey, SourceUrl};
 use slotmap::{new_key_type, SecondaryMap, SlotMap};
 
-use crate::ir::named::NamedAst;
+use crate::ir::named::{LocalKey, NamedAst};
 
 new_key_type! {
     #[derive(derive_more::Display)]
@@ -39,9 +39,22 @@ pub struct NamedContext
 #[derive(Debug, Clone)]
 pub struct NamedModule
 {
-    pub parent: Option<NamedModuleKey>,
-    pub visibility: Visibility,
     pub src_id: SourceKey,
+    pub exports: Vec<Export>,
+}
+
+#[derive(Debug, Clone)]
+pub struct Export
+{
+    visibility: Visibility,
+    kind: ExportKind,
+}
+
+#[derive(Debug, Clone)]
+pub enum ExportKind
+{
+    Local(LocalKey),
+    Module(NamedModuleKey),
 }
 
 #[derive(Debug, Clone)]

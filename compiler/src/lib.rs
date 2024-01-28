@@ -10,7 +10,7 @@ use crate::{
     semantic::{nameresolution, typecheck},
 };
 
-use alloc::string::String;
+use alloc::{string::String, vec::Vec};
 use codegen::CodegenBackend;
 use context::CompilerContext;
 use frostbite_parser::{
@@ -77,9 +77,8 @@ impl Compiler
         log::trace!("Done...");
 
         let module_key = self.ctx.named_ctx.modules.insert(NamedModule {
-            parent: None,
-            visibility: Visibility::Global,
             src_id,
+            exports: Vec::new(),
         });
 
         self.ctx
