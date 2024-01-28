@@ -39,3 +39,17 @@ $$ B >: A $$
 - Every file is a module
 - Every module has locals
 - These locals have types
+
+A module is just a set of exported symbols from a file
+
+in this codebase its represented grossly in this way
+```rs
+struct Module {
+    exports: Vec<Export>
+}
+
+enum Export {
+    Local,
+    Module,
+}
+```
