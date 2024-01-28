@@ -31,7 +31,7 @@ pub struct ModuleImportError;
 pub struct NamedContext
 {
     pub modules: SlotMap<NamedModuleKey, NamedModule>,
-    pub modules_to_srcs: SecondaryMap<NamedModuleKey, SourceKey>,
+    pub modules_to_srcs: SecondaryMap<SourceKey, NamedModuleKey>,
 
     pub named_asts: SecondaryMap<SourceKey, NamedAst>,
 }

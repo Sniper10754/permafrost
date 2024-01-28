@@ -18,6 +18,7 @@ use frostbite_parser::{
     Parser,
 };
 use frostbite_reports::sourcemap::{SourceDescription, SourceKey, SourceUrl};
+use log::{debug, trace};
 
 pub mod codegen;
 pub mod context;
@@ -64,29 +65,19 @@ impl Compiler
         src_id: SourceKey,
     ) -> Result<NamedModuleKey, CompilerError>
     {
-        log::trace!("Lexing...");
-        let token_stream = Self::lex(&mut self.ctx, src_id)?;
+        trace!("Lexing...");
+        let token_stream = self.lex(src_id)?;
 
-        log::trace!("Parsing...");
-        Self::parse(&mut self.ctx, token_stream, src_id)?;
+        trace!("Parsing...");
+        self.parse(token_stream, src_id)?;
 
-        log::trace!("Running semantic checks...");
+        trace!("Running semantic checks...");
 
         self.run_semantic_checks(src_id)?;
 
-        log::trace!("Done...");
+        trace!("Done...");
 
-        let module_key = self.ctx.named_ctx.modules.insert(NamedModule {
-            src_id,
-            exports: Vec::new(),
-        });
-
-        self.ctx
-            .named_ctx
-            .modules_to_srcs
-            .insert(module_key, src_id);
-
-        Ok(module_key)
+        Ok(self.ctx.named_ctx.modules_to_srcs[])
     }
 
     pub fn codegen_module<C: CodegenBackend>(
@@ -111,10 +102,12 @@ impl Compiler
         nameresolution::check_names(self, source_key);
         self.ctx.errors_as_result()?;
 
+        debug!();
+
         typecheck::check_types(self, source_key);
         self.ctx.errors_as_result()?;
 
-        log::debug!(
+        debug!(
             "Typed Internal representation:\n{}",
             dbg_pls::color(&self.ctx.type_ctx.t_asts[source_key]),
         );
@@ -123,31 +116,31 @@ impl Compiler
     }
 
     fn parse(
-        compiler_ctx: &mut CompilerContext,
+        &mut self,
         token_stream: TokenStream,
         source_key: SourceKey,
     ) -> Result<(), CompilerError>
     {
-        let ast = Parser::with_tokenstream(&mut compiler_ctx.report_ctx, token_stream, source_key)
-            .parse();
+        let ast =
+            Parser::with_tokenstream(&mut self.ctx.report_ctx, token_stream, source_key).parse();
 
-        compiler_ctx.asts.insert(source_key, ast);
+        self.ctx.asts.insert(source_key, ast);
 
-        compiler_ctx.errors_as_result()?;
+        self.ctx.errors_as_result()?;
 
         Ok(())
     }
 
     fn lex(
-        compiler_ctx: &mut CompilerContext,
+        &mut self,
         source_key: SourceKey,
     ) -> Result<TokenStream, CompilerError>
     {
-        let source = compiler_ctx.src_map[source_key].source_code.as_str();
+        let source = self.ctx.src_map[source_key].source_code.as_str();
 
-        let token_stream = tokenize(&mut compiler_ctx.report_ctx, source_key, source);
+        let token_stream = tokenize(&mut self.ctx.report_ctx, source_key, source);
 
-        compiler_ctx.errors_as_result()?;
+        self.ctx.errors_as_result()?;
 
         Ok(token_stream)
     }
