@@ -4,9 +4,7 @@ use clap::Parser;
 use color_eyre::eyre;
 
 use frostbite_bytecode::Module;
-use frostbite_compiler::{
-    codegen::CodegenBackends, context::CompilerContext, CompilationResults, Compiler,
-};
+use frostbite_compiler::{codegen::CodegenBackends, context::CompilerContext, Compiler};
 use frostbite_reports::printer::{DefaultPrintBackend, ReportPrinter};
 
 mod compile;
@@ -94,7 +92,7 @@ fn main() -> eyre::Result<()>
             let output =
                 compiler.codegen_module(module_key, &mut CodegenBackends::bytecode_backend());
 
-            let Ok(CompilationResults { codegen_output }) = output else {
+            let Ok(codegen_output) = output else {
                 bail_on_compiler_err(compiler.ctx());
 
                 unreachable!();

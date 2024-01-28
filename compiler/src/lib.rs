@@ -6,11 +6,11 @@ extern crate alloc;
 extern crate std;
 
 use crate::{
-    context::names::{NamedModule, NamedModuleKey, Visibility},
+    context::names::NamedModuleKey,
     semantic::{nameresolution, typecheck},
 };
 
-use alloc::{string::String, vec::Vec};
+use alloc::string::String;
 use codegen::CodegenBackend;
 use context::CompilerContext;
 use frostbite_parser::{
@@ -28,12 +28,6 @@ pub mod utils;
 
 #[derive(Debug, Clone, Copy, Default, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub struct CompilerError;
-
-#[derive(Debug)]
-pub struct CompilationResults<C: CodegenBackend>
-{
-    pub codegen_output: C::Output,
-}
 
 #[derive(Debug, Default)]
 pub struct Compiler
@@ -77,21 +71,19 @@ impl Compiler
 
         trace!("Done...");
 
-        Ok(self.ctx.named_ctx.modules_to_srcs[])
+        Ok(self.ctx.named_ctx.modules_by_src_keys[src_id])
     }
 
     pub fn codegen_module<C: CodegenBackend>(
         &mut self,
         module_key: NamedModuleKey,
         codegen: &mut C,
-    ) -> Result<CompilationResults<C>, CompilerError>
+    ) -> Result<C::Output, CompilerError>
     {
-        let module = &self.ctx.named_ctx.modules[module_key];
-        let main_source_key = module.src_id;
+        let codegen_output =
+            self.codegen(self.ctx.named_ctx.modules[module_key].src_id, codegen)?;
 
-        let codegen_output = Self::codegen(&mut self.ctx, main_source_key, codegen)?;
-
-        Ok(CompilationResults { codegen_output })
+        Ok(codegen_output)
     }
 
     pub fn run_semantic_checks(
@@ -102,13 +94,16 @@ impl Compiler
         nameresolution::check_names(self, source_key);
         self.ctx.errors_as_result()?;
 
-        debug!();
+        debug!(
+            "Name resoluted & Import resoluted IR:\n{}",
+            dbg_pls::color(&self.ctx.named_ctx.named_asts[source_key])
+        );
 
         typecheck::check_types(self, source_key);
         self.ctx.errors_as_result()?;
 
         debug!(
-            "Typed Internal representation:\n{}",
+            "Typed IR:\n{}",
             dbg_pls::color(&self.ctx.type_ctx.t_asts[source_key]),
         );
 
@@ -146,14 +141,14 @@ impl Compiler
     }
 
     fn codegen<C: CodegenBackend>(
-        compiler_ctx: &mut CompilerContext,
+        &mut self,
         main_source_key: SourceKey,
         codegen: &mut C,
     ) -> Result<C::Output, CompilerError>
     {
-        let output = codegen.codegen(main_source_key, compiler_ctx);
+        let output = codegen.codegen(main_source_key, &mut self.ctx);
 
-        compiler_ctx.errors_as_result()?;
+        self.ctx.errors_as_result()?;
 
         Ok(output)
     }

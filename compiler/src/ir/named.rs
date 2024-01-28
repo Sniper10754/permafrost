@@ -37,6 +37,33 @@ pub struct NamedAst
     pub locals: SlotMap<LocalKey, ()>,
 }
 
+impl DebugPls for NamedAst
+{
+    fn fmt(
+        &self,
+        f: dbg_pls::Formatter<'_>,
+    )
+    {
+        struct LocalsDebugPls<'a>(&'a SlotMap<LocalKey, ()>);
+
+        impl<'a> DebugPls for LocalsDebugPls<'a>
+        {
+            fn fmt(
+                &self,
+                f: dbg_pls::Formatter<'_>,
+            )
+            {
+                f.debug_map().entries(self.0.iter()).finish()
+            }
+        }
+
+        f.debug_struct("TypedAst")
+            .field("nodes", &self.exprs)
+            .field("locals", &LocalsDebugPls(&self.locals))
+            .finish()
+    }
+}
+
 impl Spannable for NamedExpr
 {
     fn span(&self) -> Range<usize>

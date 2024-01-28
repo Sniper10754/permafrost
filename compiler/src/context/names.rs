@@ -31,7 +31,7 @@ pub struct ModuleImportError;
 pub struct NamedContext
 {
     pub modules: SlotMap<NamedModuleKey, NamedModule>,
-    pub modules_to_srcs: SecondaryMap<SourceKey, NamedModuleKey>,
+    pub modules_by_src_keys: SecondaryMap<SourceKey, NamedModuleKey>,
 
     pub named_asts: SecondaryMap<SourceKey, NamedAst>,
 }
@@ -40,51 +40,12 @@ pub struct NamedContext
 pub struct NamedModule
 {
     pub src_id: SourceKey,
-    pub exports: Vec<Export>,
+    pub items: Vec<Export>,
 }
 
-#[derive(Debug, Clone)]
-pub struct Export
-{
-    visibility: Visibility,
-    kind: ExportKind,
-}
-
-#[derive(Debug, Clone)]
-pub enum ExportKind
+#[derive(Debug, Clone, derive_more::IsVariant)]
+pub enum Export
 {
     Local(LocalKey),
     Module(NamedModuleKey),
-}
-
-#[derive(Debug, Clone)]
-pub enum Visibility
-{
-    Global,
-
-    Local(LocalIdentifier),
-}
-
-#[derive(Debug, Clone)]
-pub enum LocalIdentifier
-{
-    Anonymous,
-    Sparse(String),
-
-    #[cfg(feature = "std")]
-    PathBuf(std::path::PathBuf),
-}
-
-impl From<SourceUrl> for LocalIdentifier
-{
-    fn from(value: SourceUrl) -> Self
-    {
-        match value {
-            SourceUrl::Anonymous => Self::Anonymous,
-            SourceUrl::Sparse(value) => Self::Sparse(value),
-
-            #[cfg(feature = "std")]
-            SourceUrl::PathBuf(value) => Self::PathBuf(value),
-        }
-    }
 }
