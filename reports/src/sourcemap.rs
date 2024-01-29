@@ -36,10 +36,10 @@ impl SourceMap
     #[must_use]
     pub fn get(
         &self,
-        src_id: SourceKey,
+        src_key: SourceKey,
     ) -> Option<&SourceDescription>
     {
-        self.0.get(src_id)
+        self.0.get(src_key)
     }
 
     pub fn insert(
