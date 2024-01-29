@@ -1,20 +1,17 @@
 #![allow(clippy::too_many_arguments)]
 
-use core::{
-    cmp::Ordering::{Equal, Greater, Less},
-    ops::Range,
-};
+use core::cmp::Ordering::{Equal, Greater, Less};
 
 use alloc::{
     borrow::Cow, boxed::Box, collections::BTreeMap, format, string::String, vec, vec::Vec,
 };
 
-use frostbite_parser::ast::{
+use frostbite_ast::{
     tokens::{
         BinaryOperatorKind, FunctionToken, LeftBraceToken, LeftParenthesisToken, Operator,
         ReturnToken, RightBraceToken, RightParenthesisToken, TypeAnnotation,
     },
-    Spannable, Spanned,
+    Span, Spannable, Spanned,
 };
 
 use frostbite_reports::{sourcemap::SourceKey, IntoReport, Label, Level, Report};
@@ -37,7 +34,7 @@ enum TypecheckError
     TypeMismatch
     {
         source_key: SourceKey,
-        span: Range<usize>,
+        span: Span,
 
         expected: Cow<'static, str>,
         found: Cow<'static, str>,
@@ -45,17 +42,17 @@ enum TypecheckError
     IncompatibleOperands
     {
         source_key: SourceKey,
-        span: Range<usize>,
+        span: Span,
 
         left: Cow<'static, str>,
         right: Cow<'static, str>,
     },
-    CannotCallNonIdent(SourceKey, Range<usize>),
-    CannotCallNonFunction(SourceKey, Range<usize>),
+    CannotCallNonIdent(SourceKey, Span),
+    CannotCallNonFunction(SourceKey, Span),
     TooManyArguments
     {
         source_key: SourceKey,
-        span: Range<usize>,
+        span: Span,
 
         call_arguments_len: usize,
         function_arguments_len: usize,
@@ -63,7 +60,7 @@ enum TypecheckError
     NotEnoughArguments
     {
         source_key: SourceKey,
-        span: Range<usize>,
+        span: Span,
 
         call_arguments_len: usize,
         function_arguments_len: usize,
@@ -71,7 +68,7 @@ enum TypecheckError
     FunctionDoesntReturn
     {
         source_key: SourceKey,
-        faulty_branch_position: Range<usize>,
+        faulty_branch_position: Span,
     },
 }
 
@@ -307,7 +304,7 @@ impl<'a> RecursiveTypechecker<'a>
         lhs: &NamedExpr,
         operator: &Operator,
         rhs: &NamedExpr,
-        span: Range<usize>,
+        span: Span,
     ) -> Result<TypeKey, TypecheckError>
     {
         let (lhs_type_key, rhs_type_key) = (
@@ -516,7 +513,7 @@ impl<'a> RecursiveTypechecker<'a>
     fn visit_ident(
         &mut self,
         local_key: LocalKey,
-        span: &Range<usize>,
+        span: &Span,
         ident: &str,
     ) -> Result<TypedExpression, TypecheckError>
     {
@@ -730,7 +727,7 @@ impl<'a> RecursiveTypechecker<'a>
         }
     }
 
-    fn check_branches_for_return(expr: &TypedExpressionKind) -> Result<(), Range<usize>>
+    fn check_branches_for_return(expr: &TypedExpressionKind) -> Result<(), Span>
     {
         use TypedExpressionKind::*;
 

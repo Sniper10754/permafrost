@@ -10,19 +10,18 @@ pub mod ast;
 pub mod error;
 pub mod lexer;
 
-use ast::{
-    tokens,
+use error::ErrorKind;
+use frostbite_ast::{
     tokens::{
-        ArrowToken, Eq, LeftBraceToken, LeftParenthesisToken, Operator, ReturnToken,
+        ArrowToken, Eq, FunctionToken, LeftBraceToken, LeftParenthesisToken, Operator, ReturnToken,
         RightBraceToken, RightParenthesisToken, TypeAnnotation,
     },
     Argument, Expr, ImportDirectiveKind, ModulePath, Program, Spanned,
 };
-use error::ErrorKind;
 use frostbite_reports::{sourcemap::SourceKey, ReportContext};
 use lexer::{Token, TokenStream};
 
-use crate::{ast::tokens::FunctionToken, error::Error};
+use crate::error::Error;
 
 mod utils
 {
@@ -152,7 +151,7 @@ impl<'report_context> Parser<'report_context>
                 }
 
                 Some(Spanned(eq_span, Token::Eq)) => {
-                    let eq_token = tokens::Eq(eq_span.clone());
+                    let eq_token = Eq(eq_span.clone());
 
                     self.token_stream.skip_token();
 

@@ -3,7 +3,7 @@
 extern crate alloc;
 
 use alloc::{borrow::Cow, vec::Vec};
-use core::{convert::Infallible, ops::Range};
+use core::convert::Infallible;
 use sourcemap::SourceKey;
 
 cfg_if! {
@@ -16,6 +16,8 @@ cfg_if! {
 pub mod printer;
 pub mod sourcemap;
 pub mod utils;
+
+pub use frostbite_ast::Span;
 
 use cfg_if::cfg_if;
 
@@ -37,7 +39,7 @@ impl IntoReport for Infallible
 #[derive(Debug, Clone, PartialEq)]
 pub struct Location
 {
-    span: Range<usize>,
+    span: Span,
     source_key: SourceKey,
 }
 
@@ -46,7 +48,7 @@ pub struct Location
 pub struct Report
 {
     level: Level,
-    span: Range<usize>,
+    span: Span,
     source_key: SourceKey,
     title: Cow<'static, str>,
     description: Option<Cow<'static, str>>,
@@ -58,7 +60,7 @@ impl Report
 {
     pub fn new(
         level: Level,
-        location: Range<usize>,
+        location: Span,
         source_key: impl Into<SourceKey>,
         title: impl Into<Cow<'static, str>>,
         description: Option<impl Into<Cow<'static, str>>>,
@@ -83,7 +85,7 @@ impl Report
 pub struct Label
 {
     pub info: Cow<'static, str>,
-    pub span: Option<Range<usize>>,
+    pub span: Option<Span>,
     pub src_key: SourceKey,
 }
 
@@ -91,7 +93,7 @@ impl Label
 {
     pub fn new(
         info: impl Into<Cow<'static, str>>,
-        location: impl Into<Option<Range<usize>>>,
+        location: impl Into<Option<Span>>,
         src_key: impl Into<SourceKey>,
     ) -> Self
     {
@@ -116,7 +118,7 @@ pub enum Level
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum Position
 {
-    Span(Range<usize>),
+    Span(Span),
     Line(usize),
 }
 

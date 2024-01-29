@@ -1,4 +1,4 @@
-use frostbite_parser::ast::Program;
+use frostbite_ast::Program;
 use frostbite_reports::{
     sourcemap::{SourceKey, SourceMap},
     ReportContext,

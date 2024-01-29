@@ -13,6 +13,7 @@ slotmap = { workspace = true }
 cfg-if = { workspace = true }
 
 ariadne = { version = "0.3", optional = true }
+frostbite-ast = { path = "../ast" }
 
 [features]
 ariadne = ["std", "dep:ariadne", "diagnostic_printer"]

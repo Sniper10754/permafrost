@@ -1,6 +1,6 @@
-use alloc::{string::String, vec::Vec};
+use alloc::vec::Vec;
 use dbg_pls::DebugPls;
-use frostbite_reports::sourcemap::{SourceKey, SourceUrl};
+use frostbite_reports::sourcemap::SourceKey;
 use slotmap::{new_key_type, SecondaryMap, SlotMap};
 
 use crate::ir::named::{LocalKey, NamedAst};
@@ -24,7 +24,7 @@ impl DebugPls for NamedModuleKey
     }
 }
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Copy, Default)]
 pub struct ModuleImportError;
 
 #[derive(Debug, Clone, Default)]

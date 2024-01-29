@@ -1,10 +1,10 @@
 #![allow(unsafe_code)]
 
 use alloc::{vec, vec::Vec};
+use frostbite_ast::{tokens::BinaryOperatorKind, Spanned};
 use frostbite_bytecode::{
     ConstantValue, Function, FunctionKey, Globals, Instruction, Manifest, Module,
 };
-use frostbite_parser::ast::{tokens::BinaryOperatorKind, Spanned};
 use frostbite_reports::sourcemap::SourceKey;
 use slotmap::SecondaryMap;
 

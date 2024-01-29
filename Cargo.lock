@@ -498,6 +498,18 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3f9eec918d3f24069decb9af1554cad7c880e2da24a9afd88aca000531ab82c1"
 
 [[package]]
+name = "frostbite-ast"
+version = "0.1.0"
+dependencies = [
+ "cfg-if",
+ "const_format",
+ "dbg-pls",
+ "derive_more",
+ "enum_dispatch",
+ "num-traits",
+]
+
+[[package]]
 name = "frostbite-bytecode"
 version = "0.1.0"
 dependencies = [
@@ -515,6 +527,7 @@ version = "0.1.0"
 dependencies = [
  "dbg-pls",
  "derive_more",
+ "frostbite-ast",
  "frostbite-bytecode",
  "frostbite-parser",
  "frostbite-reports",
@@ -545,6 +558,7 @@ dependencies = [
  "dbg-pls",
  "derive_more",
  "enum_dispatch",
+ "frostbite-ast",
  "frostbite-reports",
  "logos",
  "num-traits",
@@ -567,6 +581,7 @@ dependencies = [
  "ariadne",
  "cfg-if",
  "derive_more",
+ "frostbite-ast",
  "serde",
  "slotmap",
 ]

@@ -1,9 +1,8 @@
 use core::ops::Range;
 
 use alloc::format;
+use frostbite_ast::Span;
 use frostbite_reports::{sourcemap::SourceKey, IntoReport, Label, Level, Report};
-
-use crate::ast::Span;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Error

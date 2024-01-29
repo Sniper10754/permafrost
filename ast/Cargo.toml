@@ -1,6 +1,5 @@
 [package]
-name = "frostbite-parser"
-
+name = "frostbite-ast"
 version.workspace = true
 edition.workspace = true
 
@@ -14,15 +13,5 @@ num-traits = { workspace = true }
 dbg-pls = { workspace = true }
 cfg-if = { workspace = true }
 
-frostbite-reports = { path = "../reports" }
-frostbite-ast = { path = "../ast" }
-
-logos = { version = "0.13.0", default-features = false, features = [
-    "export_derive",
-] }
-
 [lints]
 workspace = true
-
-[features]
-std = []
