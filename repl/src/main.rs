@@ -32,9 +32,14 @@ fn main() -> Result<(), Box<dyn Error>>
                     }
                     Err(compiler_ctx) => {
                         let mut buffer = String::new();
-                        let report_printer = ReportPrinter::new(&mut buffer);
+                        let mut report_printer = ReportPrinter::new(&mut buffer);
 
-                        report_printer.print_reports()
+                        report_printer
+                            .print_reports::<DefaultPrintBackend, _>(
+                                &compiler_ctx.src_map,
+                                &*compiler_ctx.report_ctx,
+                            )
+                            .unwrap();
                     }
                 }
 

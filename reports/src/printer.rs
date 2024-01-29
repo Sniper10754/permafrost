@@ -54,8 +54,7 @@ impl<'output, O: fmt::Write> ReportPrinter<'output, O>
     {
         reports
             .into_iter()
-            .map(|report| self.print::<B>(source_map, report))
-            .collect()
+            .try_for_each(|report| self.print::<B>(source_map, report))
     }
 }
 
