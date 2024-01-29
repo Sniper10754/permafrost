@@ -2,12 +2,12 @@ use core::ops::Range;
 
 use alloc::{boxed::Box, string::String, vec::Vec};
 use dbg_pls::DebugPls;
-use frostbite_parser::ast::{
+use frostbite_ast::{
     tokens::{
         ArrowToken, FunctionToken, LeftBraceToken, LeftParenthesisToken, Operator, ReturnToken,
         RightBraceToken, RightParenthesisToken, TypeAnnotation,
     },
-    Spannable, Spanned,
+    Span, Spannable, Spanned,
 };
 use slotmap::{new_key_type, SlotMap};
 
@@ -66,7 +66,7 @@ impl DebugPls for NamedAst
 
 impl Spannable for NamedExpr
 {
-    fn span(&self) -> Range<usize>
+    fn span(&self) -> Span
     {
         match self {
             NamedExpr::Int(Spanned(span, _))
@@ -194,7 +194,7 @@ impl From<Assignable> for NamedExpr
 
 impl Spannable for Assignable
 {
-    fn span(&self) -> frostbite_parser::ast::Span
+    fn span(&self) -> frostbite_ast::Span
     {
         match self {
             Assignable::Ident(_, spanned) => spanned.span(),

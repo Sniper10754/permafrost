@@ -1,12 +1,12 @@
 use core::ops::Range;
 
 use alloc::{boxed::Box, format, string::String, vec::Vec};
-use frostbite_parser::ast::{
+use frostbite_ast::{
     tokens::{
         ArrowToken, FunctionToken, LeftBraceToken, LeftParenthesisToken, ReturnToken,
         RightBraceToken, RightParenthesisToken, TypeAnnotation,
     },
-    Expr, Spannable, Spanned,
+    Expr, Span, Spannable, Spanned,
 };
 use frostbite_reports::{sourcemap::SourceKey, IntoReport, Level, Report};
 
@@ -20,8 +20,7 @@ enum NameResolutionError
 {
     CannotAssignTo
     {
-        source_key: SourceKey,
-        span: Range<usize>,
+        source_key: SourceKey, span: Span
     },
 
     IdentifierNotFound
@@ -184,7 +183,7 @@ impl<'compiler> RecursiveNameChecker<'compiler>
         &mut self,
         source_key: SourceKey,
         identifier: &str,
-        span: Range<usize>,
+        span: Span,
     ) -> Result<NamedExpr, NameResolutionError>
     {
         let Some(local_key) = self.scopes.local(identifier).copied() else {
@@ -234,7 +233,7 @@ impl<'compiler> RecursiveNameChecker<'compiler>
         source_key: SourceKey,
         fn_token: FunctionToken,
         name: Option<Spanned<&str>>,
-        arguments: &[frostbite_parser::ast::Argument],
+        arguments: &[frostbite_ast::Argument],
         return_type_token: Option<ArrowToken>,
         return_type_annotation: Option<Spanned<TypeAnnotation>>,
         body: &Expr,
@@ -252,7 +251,7 @@ impl<'compiler> RecursiveNameChecker<'compiler>
             .iter()
             .cloned()
             .map(
-                |frostbite_parser::ast::Argument {
+                |frostbite_ast::Argument {
                      name,
                      type_annotation,
                  }| {

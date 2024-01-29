@@ -10,6 +10,7 @@ edition.workspace = true
 frostbite-bytecode = { path = "../bytecode" }
 frostbite-reports = { path = "../reports" }
 frostbite-parser = { path = "../parser" }
+frostbite-ast = { path = "../ast" }
 
 derive_more = { workspace = true }
 slotmap = { workspace = true }

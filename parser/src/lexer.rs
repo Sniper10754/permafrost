@@ -3,7 +3,7 @@ use alloc::{collections::VecDeque, string::String, vec, vec::Vec};
 use frostbite_reports::{sourcemap::SourceKey, IntoReport, Level, Report, ReportContext};
 use logos::{Logos, Span};
 
-use crate::ast::{tokens::BinaryOperatorKind, Spanned};
+use frostbite_ast::{tokens::BinaryOperatorKind, Spanned};
 
 mod helpers
 {
@@ -12,7 +12,7 @@ mod helpers
     use logos::Lexer;
     use num_traits::Num;
 
-    use crate::ast::tokens::BinaryOperatorKind;
+    use frostbite_ast::tokens::BinaryOperatorKind;
 
     use super::{LexerErrorKind, Token};
 

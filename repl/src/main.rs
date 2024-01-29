@@ -1,7 +1,5 @@
 use frostbite_bytecode::text_repr::print_bytecode;
-use frostbite_compiler::{
-    codegen::CodegenBackends, context::CompilerContext, CompilationResults, Compiler,
-};
+use frostbite_compiler::{codegen::CodegenBackends, context::CompilerContext, Compiler};
 use frostbite_reports::printer::{DefaultPrintBackend, ReportPrinter};
 use reedline::{DefaultPrompt, DefaultPromptSegment, Reedline, Signal};
 use std::error::Error;
@@ -69,7 +67,7 @@ fn compile_code(code: &str) -> Result<frostbite_bytecode::Module, CompilerContex
         }
     };
 
-    let CompilationResults { codegen_output } = compiler
+    let codegen_output = compiler
         .codegen_module(module_key, &mut CodegenBackends::bytecode_backend())
         .map_err(|_| compiler.move_ctx())?;
 

@@ -24,7 +24,7 @@ impl DebugPls for NamedModuleKey
     }
 }
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Copy, Default)]
 pub struct ModuleImportError;
 
 #[derive(Debug, Clone, Default)]
