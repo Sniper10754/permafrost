@@ -86,7 +86,7 @@ pub struct Label
 {
     pub info: Cow<'static, str>,
     pub span: Option<Span>,
-    pub src_id: SourceKey,
+    pub src_key: SourceKey,
 }
 
 impl Label
@@ -94,13 +94,13 @@ impl Label
     pub fn new(
         info: impl Into<Cow<'static, str>>,
         location: impl Into<Option<Span>>,
-        src_id: impl Into<SourceKey>,
+        src_key: impl Into<SourceKey>,
     ) -> Self
     {
         Self {
             info: info.into(),
             span: location.into(),
-            src_id: src_id.into(),
+            src_key: src_key.into(),
         }
     }
 }

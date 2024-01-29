@@ -5,10 +5,7 @@ extern crate alloc;
 #[cfg(feature = "std")]
 extern crate std;
 
-use crate::{
-    context::names::NamedModuleKey,
-    semantic::{nameresolution, typecheck},
-};
+use crate::semantic::{nameresolution, typecheck};
 
 use alloc::string::String;
 use codegen::CodegenBackend;
@@ -54,34 +51,30 @@ impl Compiler
         })
     }
 
-    pub fn compile_module(
+    pub fn compile_module<C>(
         &mut self,
-        src_id: SourceKey,
-    ) -> Result<NamedModuleKey, CompilerError>
+        src_key: SourceKey,
+        codegen: &mut C,
+    ) -> Result<C::Output, CompilerError>
+    where
+        C: CodegenBackend,
     {
         trace!("Lexing...");
-        let token_stream = self.lex(src_id)?;
+        let token_stream = self.lex(src_key)?;
 
         trace!("Parsing...");
-        self.parse(token_stream, src_id)?;
+        self.parse(token_stream, src_key)?;
 
         trace!("Running semantic checks...");
 
-        self.run_semantic_checks(src_id)?;
+        self.run_semantic_checks(src_key)?;
+
+        let module_key = self.ctx.named_ctx.modules_by_src_keys[src_key];
+
+        let codegen_output =
+            self.codegen(self.ctx.named_ctx.modules[module_key].src_key, codegen)?;
 
         trace!("Done...");
-
-        Ok(self.ctx.named_ctx.modules_by_src_keys[src_id])
-    }
-
-    pub fn codegen_module<C: CodegenBackend>(
-        &mut self,
-        module_key: NamedModuleKey,
-        codegen: &mut C,
-    ) -> Result<C::Output, CompilerError>
-    {
-        let codegen_output =
-            self.codegen(self.ctx.named_ctx.modules[module_key].src_id, codegen)?;
 
         Ok(codegen_output)
     }
@@ -92,7 +85,7 @@ impl Compiler
     ) -> Result<(), CompilerError>
     {
         nameresolution::check_names(self, source_key);
-        self.ctx.errors_as_result()?;
+        self.ctx.has_errors_fallible_default()?;
 
         debug!(
             "Name resoluted & Import resoluted IR:\n{}",
@@ -100,7 +93,7 @@ impl Compiler
         );
 
         typecheck::check_types(self, source_key);
-        self.ctx.errors_as_result()?;
+        self.ctx.has_errors_fallible_default()?;
 
         debug!(
             "Typed IR:\n{}",
@@ -121,7 +114,7 @@ impl Compiler
 
         self.ctx.asts.insert(source_key, ast);
 
-        self.ctx.errors_as_result()?;
+        self.ctx.has_errors_fallible_default()?;
 
         Ok(())
     }
@@ -135,7 +128,7 @@ impl Compiler
 
         let token_stream = tokenize(&mut self.ctx.report_ctx, source_key, source);
 
-        self.ctx.errors_as_result()?;
+        self.ctx.has_errors_fallible_default()?;
 
         Ok(token_stream)
     }
@@ -148,7 +141,7 @@ impl Compiler
     {
         let output = codegen.codegen(main_source_key, &mut self.ctx);
 
-        self.ctx.errors_as_result()?;
+        self.ctx.has_errors_fallible_default()?;
 
         Ok(output)
     }

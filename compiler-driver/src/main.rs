@@ -1,3 +1,5 @@
+#![feature(never_type)]
+
 use std::{env, fs, io::Write, path::PathBuf, process};
 
 use clap::Parser;
@@ -81,22 +83,14 @@ fn main() -> eyre::Result<()>
 
             let mut compiler = Compiler::new();
 
-            let src_id = compiler.add_source(file.display().to_string(), src);
+            let src_key = compiler.add_source(file.display().to_string(), src);
 
-            let Ok(module_key) = compiler.compile_module(src_id) else {
-                bail_on_compiler_err(compiler.ctx());
+            let mut codegen_backend = CodegenBackends::bytecode_backend();
 
-                unreachable!();
-            };
-
-            let output =
-                compiler.codegen_module(module_key, &mut CodegenBackends::bytecode_backend());
-
-            let Ok(codegen_output) = output else {
-                bail_on_compiler_err(compiler.ctx());
-
-                unreachable!();
-            };
+            let codegen_output = compiler
+                .compile_module(src_key, &mut codegen_backend)
+                .map_err(|_| bail(compiler.ctx()))
+                .unwrap();
 
             if disassemble {
                 disassemble_and_print(&codegen_output)?;
@@ -123,13 +117,11 @@ fn main() -> eyre::Result<()>
     Ok(())
 }
 
-fn bail_on_compiler_err(ctx: &CompilerContext)
+fn bail(ctx: &CompilerContext) -> !
 {
-    if ctx.report_ctx.has_errors() {
-        print_reports(ctx);
+    print_reports(ctx);
 
-        process::exit(1);
-    }
+    process::exit(1);
 }
 
 fn print_reports(ctx: &CompilerContext)
@@ -138,11 +130,9 @@ fn print_reports(ctx: &CompilerContext)
 
     let mut report_printer = ReportPrinter::new(&mut buf);
 
-    ctx.report_ctx.iter().for_each(|report| {
-        report_printer
-            .print::<DefaultPrintBackend>(&ctx.src_map, report)
-            .unwrap();
-    });
+    report_printer
+        .print_reports::<DefaultPrintBackend, _>(&ctx.src_map, &*ctx.report_ctx)
+        .unwrap();
 
     println!("{buf}");
 }

@@ -51,12 +51,30 @@ impl CompilerContext
         self.report_ctx.has_errors()
     }
 
-    pub fn errors_as_result<E>(&self) -> Result<(), E>
+    pub fn has_errors_fallible_default<E>(&self) -> Result<(), E>
     where
         E: Default,
     {
+        self.has_errors_fallible_lazy(|| E::default())
+    }
+
+    pub fn has_errors_fallible<E>(
+        &self,
+        error: E,
+    ) -> Result<(), E>
+    {
+        self.has_errors_fallible_lazy(|| error)
+    }
+
+    pub fn has_errors_fallible_lazy<F, E>(
+        &self,
+        err: F,
+    ) -> Result<(), E>
+    where
+        F: FnOnce() -> E,
+    {
         if self.has_errors() {
-            Err(E::default())
+            Err(err())
         } else {
             Ok(())
         }
