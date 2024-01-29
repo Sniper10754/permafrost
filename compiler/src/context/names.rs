@@ -1,6 +1,6 @@
-use alloc::{vec::Vec};
+use alloc::vec::Vec;
 use dbg_pls::DebugPls;
-use frostbite_reports::sourcemap::{SourceKey};
+use frostbite_reports::sourcemap::SourceKey;
 use slotmap::{new_key_type, SecondaryMap, SlotMap};
 
 use crate::ir::named::{LocalKey, NamedAst};

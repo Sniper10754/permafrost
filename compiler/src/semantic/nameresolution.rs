@@ -1,5 +1,3 @@
-
-
 use alloc::{boxed::Box, format, string::String, vec::Vec};
 use frostbite_ast::{
     tokens::{

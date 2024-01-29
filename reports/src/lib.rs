@@ -3,7 +3,7 @@
 extern crate alloc;
 
 use alloc::{borrow::Cow, vec::Vec};
-use core::{convert::Infallible};
+use core::convert::Infallible;
 use sourcemap::SourceKey;
 
 cfg_if! {
