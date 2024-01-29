@@ -7,11 +7,8 @@ edition.workspace = true
 
 [dependencies]
 enum_dispatch = { workspace = true }
-const_format = { workspace = true }
 derive_more = { workspace = true }
-num-traits = { workspace = true }
 dbg-pls = { workspace = true }
-cfg-if = { workspace = true }
 
 [lints]
 workspace = true

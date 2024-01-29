@@ -17,10 +17,10 @@ fn main() -> Result<(), Box<dyn Error>>
         right_prompt: DefaultPromptSegment::CurrentDateTime,
     };
 
+    let mut code_buffer = String::default();
+
     loop {
         let sig = line_editor.read_line(&prompt)?;
-
-        let mut code_buffer = String::default();
 
         match sig {
             Signal::Success(buffer) => {
@@ -31,11 +31,10 @@ fn main() -> Result<(), Box<dyn Error>>
                         print_bytecode(&mut code_buffer, &module)?;
                     }
                     Err(compiler_ctx) => {
-                        compiler_ctx.report_ctx.iter().for_each(|report| {
-                            ReportPrinter::new(&mut code_buffer)
-                                .print::<DefaultPrintBackend>(&compiler_ctx.src_map, report)
-                                .unwrap()
-                        });
+                        let mut buffer = String::new();
+                        let report_printer = ReportPrinter::new(&mut buffer);
+
+                        report_printer.print_reports()
                     }
                 }
 
