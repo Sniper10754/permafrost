@@ -1,9 +1,12 @@
+use delegate::delegate;
 use frostbite_ast::Program;
 use frostbite_reports::{
     sourcemap::{SourceKey, SourceMap},
     ReportContext,
 };
 use slotmap::SecondaryMap;
+
+use crate::ir::typed::{Type, TypeKey, TypedAst};
 
 pub use self::{names::NamedContext, types::TypeContext};
 
@@ -23,6 +26,41 @@ pub struct CompilerContext
 
 impl CompilerContext
 {
+    delegate! {
+        to self.type_ctx {
+            pub fn get_ast(
+                &self,
+                source_key: SourceKey,
+            ) -> &TypedAst;
+
+            pub fn get_ast_mut(
+                &mut self,
+                source_key: SourceKey,
+            ) -> &mut TypedAst;
+
+            pub fn get_type(
+                &self,
+                type_key: TypeKey,
+            ) -> &Type;
+
+            pub fn get_type_mut(
+                &mut self,
+                type_key: TypeKey,
+            ) -> &mut Type;
+
+            pub fn insert_type(
+                &mut self,
+                ty: Type,
+            ) -> TypeKey;
+
+            pub fn insert_ast(
+                &mut self,
+                source_key: SourceKey,
+                ast: TypedAst,
+            );
+        }
+    }
+
     pub fn new(
         src_map: SourceMap,
         report_ctx: ReportContext,

@@ -13,6 +13,7 @@ frostbite-parser = { path = "../parser" }
 frostbite-ast = { path = "../ast" }
 
 derive_more = { workspace = true }
+delegate = { workspace = true }
 slotmap = { workspace = true }
 dbg-pls = { workspace = true }
 log = { workspace = true }

@@ -173,10 +173,7 @@ pub fn check_types(
     source_key: SourceKey,
 )
 {
-    compiler
-        .ctx
-        .type_ctx
-        .insert_ast(source_key, TypedAst::default());
+    compiler.ctx.insert_ast(source_key, TypedAst::default());
 
     // compiler.ctx
     //     .intrinsic_ctx
@@ -190,22 +187,15 @@ pub fn check_types(
         compiler,
     };
 
-    let ast = rts.compiler.ctx.named_ctx.named_asts[source_key]
+    for ref expr in rts.compiler.ctx.named_ctx.named_asts[source_key]
         .exprs
         .clone()
-        .into_iter();
-
-    for ref expr in ast {
+        .into_iter()
+    {
         let result = rts.visit_expr(source_key, expr);
 
         match result {
-            Ok(t_expr) => rts
-                .compiler
-                .ctx
-                .type_ctx
-                .get_ast_mut(source_key)
-                .nodes
-                .push(t_expr),
+            Ok(t_expr) => rts.compiler.ctx.get_ast_mut(source_key).nodes.push(t_expr),
             Err(report) => rts.compiler.ctx.report_ctx.push(report.into_report()),
         }
     }
@@ -252,8 +242,8 @@ impl<'a> RecursiveTypechecker<'a>
     ) -> Result<(), ()>
     {
         match (
-            self.compiler.ctx.type_ctx.get_type(a).clone(),
-            self.compiler.ctx.type_ctx.get_type(b).clone(),
+            self.compiler.ctx.get_type(a).clone(),
+            self.compiler.ctx.get_type(b).clone(),
         ) {
             (Type::Function(a), Type::Function(b)) => {
                 Iterator::zip(a.arguments.values().copied(), b.arguments.values().copied())
@@ -352,8 +342,8 @@ impl<'a> RecursiveTypechecker<'a>
         match (
             operator.kind,
             (
-                &self.compiler.ctx.type_ctx.get_type(lhs_type_key),
-                &self.compiler.ctx.type_ctx.get_type(rhs_type_key),
+                &self.compiler.ctx.get_type(lhs_type_key),
+                &self.compiler.ctx.get_type(rhs_type_key),
             ),
         ) {
             (
@@ -450,7 +440,7 @@ impl<'a> RecursiveTypechecker<'a>
                 if let Type::Function(FunctionType {
                     arguments: _,
                     return_type,
-                }) = self.compiler.ctx.type_ctx.get_type(type_key)
+                }) = self.compiler.ctx.get_type(type_key)
                 {
                     Ok(*return_type)
                 } else {
@@ -626,7 +616,7 @@ impl<'a> RecursiveTypechecker<'a>
         let Type::Function(FunctionType {
             arguments: typed_arguments,
             return_type,
-        }) = self.compiler.ctx.type_ctx.get_type(type_key).clone()
+        }) = self.compiler.ctx.get_type(type_key).clone()
         else {
             unreachable!()
         };
@@ -780,9 +770,7 @@ impl<'a> RecursiveTypechecker<'a>
             } => {
                 let type_key = self.locals_to_types[*local_key];
 
-                let Type::Function(function) =
-                    self.compiler.ctx.type_ctx.get_type(type_key).clone()
-                else {
+                let Type::Function(function) = self.compiler.ctx.get_type(type_key).clone() else {
                     return Err(
                         TypecheckError::CannotCallNonFunction(source_key, callee.span()).into(),
                     );
@@ -923,6 +911,6 @@ impl<'a> RecursiveTypechecker<'a>
         ty: Type,
     ) -> TypeKey
     {
-        self.compiler.ctx.type_ctx.insert_type(ty)
+        self.compiler.ctx.insert_type(ty)
     }
 }
