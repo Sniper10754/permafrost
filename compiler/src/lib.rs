@@ -69,10 +69,7 @@ impl Compiler
 
         self.run_semantic_checks(src_key)?;
 
-        let module_key = self.ctx.named_ctx.modules_by_src_keys[src_key];
-
-        let codegen_output =
-            self.codegen(self.ctx.named_ctx.modules[module_key].src_key, codegen)?;
+        let codegen_output = self.codegen(src_key, codegen)?;
 
         trace!("Done...");
 

@@ -40,6 +40,8 @@ fn main() -> Result<(), Box<dyn Error>>
                                 &*compiler_ctx.report_ctx,
                             )
                             .unwrap();
+
+                        println!("{buffer}")
                     }
                 }
 
