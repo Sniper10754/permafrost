@@ -60,9 +60,9 @@ mod utils
         {
             Self {
                 fn_cache: FnCache::new(Box::new(|id: &_| {
-                    let (_, source) = src_map.iter().find(|(src_key, _)| *src_key == *id).unwrap();
+                    let source_description = &src_map[*id];
 
-                    Ok(source.source_code.to_owned())
+                    Ok(source_description.source_code.to_owned())
                 }) as Box<_>),
 
                 src_map,
