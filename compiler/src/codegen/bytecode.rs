@@ -12,7 +12,7 @@ use crate::{
     context::{CompilerContext, TypeContext},
     ir::typed::{
         Assignable, Callable, FunctionType, Type, TypeKey, TypedAst, TypedExpression,
-        TypedExpressionKind, TypedFunction, TypesArena,
+        TypedExpressionKind, TypedFunction,
     },
 };
 

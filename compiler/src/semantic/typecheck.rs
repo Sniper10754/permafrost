@@ -223,7 +223,7 @@ impl<'a> RecursiveTypechecker<'a>
         &mut self,
         source_key: SourceKey,
         type_annotation: Spanned<&TypeAnnotation>,
-    ) -> Result<TypeKey, TypecheckError>
+    ) -> Result<TypeKey, Box<TypecheckError>>
     {
         match type_annotation.value() {
             TypeAnnotation::Int => Ok(self.insert_type(Type::Int)),
@@ -232,7 +232,7 @@ impl<'a> RecursiveTypechecker<'a>
             TypeAnnotation::Bool => Ok(self.insert_type(Type::Bool)),
             TypeAnnotation::Any => Ok(self.insert_type(Type::Any)),
             TypeAnnotation::Unit => Ok(self.insert_type(Type::Unit)),
-            TypeAnnotation::Object(..) => Err(Report::new(
+            TypeAnnotation::Object(..) => Err(TypecheckError::Other(Report::new(
                 Level::Error,
                 type_annotation.span(),
                 source_key,
@@ -240,7 +240,7 @@ impl<'a> RecursiveTypechecker<'a>
                 None::<&str>,
                 [],
                 [],
-            )
+            ))
             .into()),
         }
     }
@@ -278,7 +278,7 @@ impl<'a> RecursiveTypechecker<'a>
         &mut self,
         source_key: SourceKey,
         expr: &NamedExpr,
-    ) -> Result<TypeKey, TypecheckError>
+    ) -> Result<TypeKey, Box<TypecheckError>>
     {
         match expr {
             NamedExpr::Int(_) => Ok(self.insert_type(Type::Int)),
@@ -310,7 +310,9 @@ impl<'a> RecursiveTypechecker<'a>
                         .as_ref()
                         .map(|spanned| spanned.as_ref()),
                 )
-                .map_err(|into_report| TypecheckError::Other(into_report.into_report())),
+                .map_err(|into_report| TypecheckError::Other(into_report.into_report()))
+                .map_err(Into::into),
+
             NamedExpr::Call {
                 callee,
                 left_paren: _,
@@ -328,7 +330,7 @@ impl<'a> RecursiveTypechecker<'a>
     fn infer_ident(
         &mut self,
         local_key: LocalKey,
-    ) -> Result<TypeKey, TypecheckError>
+    ) -> Result<TypeKey, Box<TypecheckError>>
     {
         Ok(self.locals_to_types[local_key])
     }
@@ -340,7 +342,7 @@ impl<'a> RecursiveTypechecker<'a>
         operator: &Operator,
         rhs: &NamedExpr,
         span: Span,
-    ) -> Result<TypeKey, TypecheckError>
+    ) -> Result<TypeKey, Box<TypecheckError>>
     {
         let (lhs_type_key, rhs_type_key) = (
             self.infer_type(source_key, lhs)?,
@@ -376,7 +378,8 @@ impl<'a> RecursiveTypechecker<'a>
                         span,
                         expected: display_type(lhs_type_key, &self.compiler.ctx.type_ctx),
                         found: display_type(rhs_type_key, &self.compiler.ctx.type_ctx),
-                    })
+                    }
+                    .into())
                 }
             }
 
@@ -385,7 +388,8 @@ impl<'a> RecursiveTypechecker<'a>
                 span,
                 left: display_type(lhs_type_key, &self.compiler.ctx.type_ctx),
                 right: display_type(rhs_type_key, &self.compiler.ctx.type_ctx),
-            }),
+            }
+            .into()),
         }
     }
 
@@ -394,7 +398,7 @@ impl<'a> RecursiveTypechecker<'a>
         source_key: SourceKey,
         arguments: &[Argument],
         return_type_annotation: Option<Spanned<&TypeAnnotation>>,
-    ) -> Result<TypeKey, TypecheckError>
+    ) -> Result<TypeKey, Box<TypecheckError>>
     {
         let fn_type = {
             let return_type = match return_type_annotation {
@@ -434,7 +438,7 @@ impl<'a> RecursiveTypechecker<'a>
         &mut self,
         source_key: SourceKey,
         callee: &NamedExpr,
-    ) -> Result<TypeKey, TypecheckError>
+    ) -> Result<TypeKey, Box<TypecheckError>>
     {
         match callee {
             NamedExpr::Ident {
@@ -450,17 +454,11 @@ impl<'a> RecursiveTypechecker<'a>
                 {
                     Ok(*return_type)
                 } else {
-                    Err(TypecheckError::CannotCallNonFunction(
-                        source_key,
-                        callee.span(),
-                    ))
+                    Err(TypecheckError::CannotCallNonFunction(source_key, callee.span()).into())
                 }
             }
 
-            _ => Err(TypecheckError::CannotCallNonIdent(
-                source_key,
-                callee.span(),
-            )),
+            _ => Err(TypecheckError::CannotCallNonIdent(source_key, callee.span()).into()),
         }
     }
 
