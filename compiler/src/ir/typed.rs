@@ -3,7 +3,7 @@ use dbg_pls::DebugPls;
 use frostbite_ast::{
     tokens::{
         FunctionToken, LeftBraceToken, LeftParenthesisToken, Operator, ReturnToken,
-        RightBraceToken, RightParenthesisToken, TypeAnnotation,
+        RightBraceToken, RightParenthesisToken,
     },
     Spannable, Spanned,
 };
@@ -37,8 +37,8 @@ pub mod display
     use alloc::{borrow::Cow, format, string::String};
     use core::fmt::{Display, Write as _};
 
-    use super::{FunctionType, TypeKey, TypesArena};
-    use crate::ir::typed::Type::*;
+    use super::{FunctionType, TypeKey};
+    use crate::{context::TypeContext, ir::typed::Type::*};
 
     fn join_map_into_string<K, V>(mut map: impl Iterator<Item = (K, V)>) -> String
     where
@@ -60,31 +60,30 @@ pub mod display
 
     pub fn display_type(
         type_key: TypeKey,
-        types_arena: &TypesArena,
+        type_ctx: &TypeContext,
     ) -> Cow<'static, str>
     {
-        let type_description: Cow<'_, _> =
-            match &types_arena[type_key] {
-                Int => "int".into(),
-                Float => "float".into(),
-                String => "str".into(),
-                Function(FunctionType {
-                    arguments,
-                    return_type,
-                }) => format!(
-                    "({}) -> {}",
-                    join_map_into_string(arguments.iter().map(|(name, type_idx)| (
-                        name.as_str(),
-                        display_type(*type_idx, types_arena)
-                    ))),
-                    display_type(*return_type, types_arena)
-                )
-                .into(),
-                Unit => "()".into(),
-                Object(object_name) => format!("object {object_name}").into(),
-                Any => "any".into(),
-                Bool => "bool".into(),
-            };
+        let type_description: Cow<'_, _> = match type_ctx.get_type(type_key) {
+            Int => "int".into(),
+            Float => "float".into(),
+            String => "str".into(),
+            Function(FunctionType {
+                arguments,
+                return_type,
+            }) => format!(
+                "({}) -> {}",
+                join_map_into_string(
+                    arguments
+                        .iter()
+                        .map(|(name, type_idx)| (name.as_str(), display_type(*type_idx, type_ctx)))
+                ),
+                display_type(*return_type, type_ctx)
+            )
+            .into(),
+            Unit => "()".into(),
+            Any => "any".into(),
+            Bool => "bool".into(),
+        };
 
         format!("{type_description} [{type_key}]").into()
     }
@@ -316,23 +315,5 @@ pub enum Type
 
     Unit,
 
-    Object(String),
-
     Any,
-}
-
-impl From<TypeAnnotation> for Type
-{
-    fn from(value: TypeAnnotation) -> Self
-    {
-        match value {
-            TypeAnnotation::Int => Self::Int,
-            TypeAnnotation::Float => Self::Float,
-            TypeAnnotation::String => Self::String,
-            TypeAnnotation::Any => Self::Any,
-            TypeAnnotation::Unit => Self::Unit,
-            TypeAnnotation::Object(obj) => Self::Object(obj),
-            TypeAnnotation::Bool => Self::Bool,
-        }
-    }
 }

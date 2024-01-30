@@ -97,7 +97,7 @@ impl Compiler
 
         debug!(
             "Typed IR:\n{}",
-            dbg_pls::color(&self.ctx.type_ctx.t_asts[source_key]),
+            dbg_pls::color(&self.ctx.type_ctx.get_ast(source_key)),
         );
 
         Ok(())

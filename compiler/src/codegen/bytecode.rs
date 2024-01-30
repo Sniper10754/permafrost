@@ -9,7 +9,7 @@ use frostbite_reports::sourcemap::SourceKey;
 use slotmap::SecondaryMap;
 
 use crate::{
-    context::CompilerContext,
+    context::{CompilerContext, TypeContext},
     ir::typed::{
         Assignable, Callable, FunctionType, Type, TypeKey, TypedAst, TypedExpression,
         TypedExpressionKind, TypedFunction, TypesArena,
@@ -18,10 +18,38 @@ use crate::{
 
 use super::CodegenBackend;
 
+impl CodegenBackend for BytecodeCodegenBackend
+{
+    type Output = Module;
+
+    fn codegen(
+        &mut self,
+        source_key: SourceKey,
+        compiler_ctx: &mut CompilerContext,
+    ) -> Self::Output
+    {
+        let mut module = Module {
+            manifest: Manifest {
+                emitted_by_compiler_version: option_env!("PROJECT_VERSION")
+                    .unwrap_or(env!("CARGO_PKG_VERSION"))
+                    .parse()
+                    .unwrap(),
+            },
+            globals: Globals::default(),
+            body: Vec::new(),
+        };
+
+        let t_ast = compiler_ctx.type_ctx.get_ast(source_key);
+
+        self.compile_program(t_ast, &compiler_ctx.type_ctx, &mut module);
+
+        module
+    }
+}
+
 #[derive(Debug, Default)]
 pub struct BytecodeCodegenBackend
 {
-    /// Instrinsics are just provided by the interpreter
     functions: SecondaryMap<TypeKey, FunctionKey>,
 }
 
@@ -31,7 +59,7 @@ impl BytecodeCodegenBackend
     fn compile_program(
         &mut self,
         t_ast: &TypedAst,
-        types_arena: &TypesArena,
+        type_ctx: &TypeContext,
         module: &mut Module,
     )
     {
@@ -40,7 +68,7 @@ impl BytecodeCodegenBackend
 
         // compile each node in the program
         t_ast.nodes.iter().for_each(|node| {
-            self.compile_node(t_ast, types_arena, body, globals, node);
+            self.compile_node(t_ast, type_ctx, body, globals, node);
         });
     }
 
@@ -52,7 +80,7 @@ impl BytecodeCodegenBackend
     fn compile_node(
         &mut self,
         t_ast: &TypedAst,
-        types_arena: &TypesArena,
+        type_ctx: &TypeContext,
         instructions: &mut Vec<Instruction>,
         globals: &mut Globals,
         t_expr: &TypedExpression,
@@ -75,7 +103,7 @@ impl BytecodeCodegenBackend
             TypedExpressionKind::BinaryOperation { lhs, operator, rhs } => self
                 .compile_binary_operation(
                     t_ast,
-                    types_arena,
+                    type_ctx,
                     instructions,
                     globals,
                     lhs,
@@ -84,12 +112,12 @@ impl BytecodeCodegenBackend
                 ),
 
             TypedExpressionKind::Assign { lhs, value } => {
-                self.compile_assignment(t_ast, types_arena, globals, instructions, lhs, value);
+                self.compile_assignment(t_ast, type_ctx, globals, instructions, lhs, value);
             }
 
             TypedExpressionKind::Function(function_expr) => self.compile_function_node(
                 t_ast,
-                types_arena,
+                type_ctx,
                 globals,
                 instructions,
                 t_expr.type_key,
@@ -100,7 +128,7 @@ impl BytecodeCodegenBackend
                 callee, arguments, ..
             } => self.compile_function_call(
                 t_ast,
-                types_arena,
+                type_ctx,
                 globals,
                 instructions,
                 callee,
@@ -109,7 +137,7 @@ impl BytecodeCodegenBackend
 
             TypedExpressionKind::Return(_, _, return_value) => {
                 if let Some(value) = return_value {
-                    self.compile_node(t_ast, types_arena, instructions, globals, value);
+                    self.compile_node(t_ast, type_ctx, instructions, globals, value);
                 } else {
                     instructions.push(Instruction::LoadConstant(
                         globals.constants_pool.insert(ConstantValue::Unit),
@@ -119,9 +147,9 @@ impl BytecodeCodegenBackend
                 instructions.push(Instruction::Return);
             }
 
-            TypedExpressionKind::Block { expressions, .. } => expressions.iter().for_each(|expr| {
-                self.compile_node(t_ast, types_arena, instructions, globals, expr)
-            }),
+            TypedExpressionKind::Block { expressions, .. } => expressions
+                .iter()
+                .for_each(|expr| self.compile_node(t_ast, type_ctx, instructions, globals, expr)),
         }
     }
 
@@ -148,7 +176,7 @@ impl BytecodeCodegenBackend
     fn compile_binary_operation(
         &mut self,
         t_ast: &TypedAst,
-        types_arena: &TypesArena,
+        type_ctx: &TypeContext,
         instructions: &mut Vec<Instruction>,
         globals: &mut Globals,
         lhs: &TypedExpression,
@@ -156,8 +184,8 @@ impl BytecodeCodegenBackend
         rhs: &TypedExpression,
     )
     {
-        self.compile_node(t_ast, types_arena, instructions, globals, rhs);
-        self.compile_node(t_ast, types_arena, instructions, globals, lhs);
+        self.compile_node(t_ast, type_ctx, instructions, globals, rhs);
+        self.compile_node(t_ast, type_ctx, instructions, globals, lhs);
 
         match operator {
             BinaryOperatorKind::Add => instructions.push(Instruction::Add),
@@ -209,14 +237,14 @@ impl BytecodeCodegenBackend
     fn compile_assignment(
         &mut self,
         t_ast: &TypedAst,
-        types_arena: &TypesArena,
+        type_ctx: &TypeContext,
         globals: &mut Globals,
         instructions: &mut Vec<Instruction>,
         lhs: &Assignable,
         value: &TypedExpression,
     )
     {
-        self.compile_node(t_ast, types_arena, instructions, globals, value);
+        self.compile_node(t_ast, type_ctx, instructions, globals, value);
 
         match lhs {
             Assignable::Ident(_, Spanned(_, name)) => {
@@ -228,7 +256,7 @@ impl BytecodeCodegenBackend
     fn compile_function_node(
         &mut self,
         t_ast: &TypedAst,
-        types_arena: &TypesArena,
+        type_ctx: &TypeContext,
         globals: &mut Globals,
         instructions: &mut Vec<Instruction>,
         type_key: TypeKey,
@@ -240,7 +268,7 @@ impl BytecodeCodegenBackend
         self.functions.insert(type_key, dummy_function_index);
 
         globals.functions[dummy_function_index] =
-            self.compile_function(t_ast, types_arena, globals, function);
+            self.compile_function(t_ast, type_ctx, globals, function);
 
         instructions.push(Instruction::LoadFunction(dummy_function_index));
 
@@ -252,7 +280,7 @@ impl BytecodeCodegenBackend
     fn compile_function(
         &mut self,
         t_ast: &TypedAst,
-        types_arena: &TypesArena,
+        type_ctx: &TypeContext,
         globals: &mut Globals,
         function: &TypedFunction,
     ) -> frostbite_bytecode::Function
@@ -265,7 +293,7 @@ impl BytecodeCodegenBackend
 
         self.compile_node(
             t_ast,
-            types_arena,
+            type_ctx,
             &mut bytecode_function_body,
             globals,
             &function.body,
@@ -286,7 +314,7 @@ impl BytecodeCodegenBackend
     fn compile_function_call(
         &mut self,
         t_ast: &TypedAst,
-        types_arena: &TypesArena,
+        type_ctx: &TypeContext,
         globals: &mut Globals,
         instructions: &mut Vec<Instruction>,
         callee: &Callable,
@@ -298,13 +326,13 @@ impl BytecodeCodegenBackend
                 let Type::Function(FunctionType {
                     arguments: _,
                     return_type: _,
-                }) = &types_arena[*type_key]
+                }) = type_ctx.get_type(*type_key)
                 else {
                     unreachable!()
                 };
 
                 arguments_exprs.iter().for_each(|argument_expr| {
-                    self.compile_node(t_ast, types_arena, instructions, globals, argument_expr);
+                    self.compile_node(t_ast, type_ctx, instructions, globals, argument_expr);
                 });
 
                 let function_index = self.functions[*type_key];
@@ -314,36 +342,5 @@ impl BytecodeCodegenBackend
                 instructions.push(Instruction::Call);
             }
         }
-    }
-}
-
-impl CodegenBackend for BytecodeCodegenBackend
-{
-    type Output = Module;
-
-    fn codegen(
-        &mut self,
-        source_key: SourceKey,
-        compiler_ctx: &mut CompilerContext,
-    ) -> Self::Output
-    {
-        let mut module = Module {
-            manifest: Manifest {
-                emitted_by_compiler_version: option_env!("PROJECT_VERSION")
-                    .unwrap_or(env!("CARGO_PKG_VERSION"))
-                    .parse()
-                    .unwrap(),
-            },
-            globals: Globals::default(),
-            body: Vec::new(),
-        };
-
-        // self.translate_intrinsics(compiler_ctx, &mut module);
-
-        let t_ast = &compiler_ctx.type_ctx.t_asts[source_key];
-
-        self.compile_program(t_ast, &compiler_ctx.type_ctx.types_arena, &mut module);
-
-        module
     }
 }

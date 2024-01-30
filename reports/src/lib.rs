@@ -28,6 +28,14 @@ pub trait IntoReport
     fn into_report(self) -> Report;
 }
 
+impl IntoReport for Report
+{
+    fn into_report(self) -> Report
+    {
+        self
+    }
+}
+
 impl IntoReport for Infallible
 {
     fn into_report(self) -> Report
