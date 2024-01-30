@@ -17,12 +17,12 @@ mod utils
 
     use crate::sourcemap::{SourceKey, SourceMap};
 
-    pub struct FmtWriteAsIoWrite<'a, W: fmt::Write + ?Sized>
+    pub struct FmtToIoBridge<'a, W: fmt::Write + ?Sized>
     {
         pub destination: &'a mut W,
     }
 
-    impl<'a, W: fmt::Write + ?Sized> io::Write for FmtWriteAsIoWrite<'a, W>
+    impl<'a, W: fmt::Write + ?Sized> io::Write for FmtToIoBridge<'a, W>
     {
         fn write(
             &mut self,
@@ -33,11 +33,12 @@ mod utils
 
             self.destination
                 .write_str(&utf8_string)
-                .map_err(|_| io::Error::new(io::ErrorKind::Other, ""))?;
+                .map_err(|err| io::Error::new(io::ErrorKind::Other, err))?;
 
             Ok(buf.len())
         }
 
+        // Flushing is a no-op since every write is flushed immidiately
         fn flush(&mut self) -> io::Result<()>
         {
             Ok(())
@@ -59,12 +60,7 @@ mod utils
         pub fn new(src_map: &'src_map SourceMap) -> Self
         {
             Self {
-                fn_cache: FnCache::new(Box::new(|id: &_| {
-                    let source_description = &src_map[*id];
-
-                    Ok(source_description.source_code.to_owned())
-                }) as Box<_>),
-
+                fn_cache: FnCache::new(Box::new(|id: &_| Ok(src_map[*id].source_code.to_owned()))),
                 src_map,
             }
         }
@@ -87,7 +83,8 @@ mod utils
         {
             self.src_map
                 .get(*id)
-                .map(|source_description| Box::new(source_description.url.clone()))
+                .map(|source_description| source_description.url.clone())
+                .map(Box::new)
                 .map(|boxed| boxed as Box<_>)
         }
     }
@@ -144,8 +141,8 @@ impl PrintBackend for AriadnePrintBackend
             .write(
                 // Cache that interfaces to SourceMap
                 SourceMapCache::new(source_map),
-                // Adapter for
-                utils::FmtWriteAsIoWrite { destination },
+                // Bridge
+                utils::FmtToIoBridge { destination },
             )
             .unwrap();
 
@@ -160,7 +157,7 @@ impl From<Level> for ariadne::ReportKind<'static>
         match value {
             Level::Error => ariadne::ReportKind::Error,
             Level::Warn => ariadne::ReportKind::Warning,
-            Level::Info => ariadne::ReportKind::Advice,
+            Level::Advice => ariadne::ReportKind::Advice,
         }
     }
 }

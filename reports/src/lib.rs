@@ -119,7 +119,7 @@ pub enum Level
 {
     Error,
     Warn,
-    Info,
+    Advice,
 }
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq, derive_more::From)]
