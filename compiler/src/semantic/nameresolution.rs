@@ -1,10 +1,10 @@
 use alloc::{boxed::Box, format, string::String, vec::Vec};
 use frostbite_ast::{
     tokens::{
-        ArrowToken, FunctionToken, LeftBraceToken, LeftParenthesisToken, ReturnToken,
+        ArrowToken, FunctionToken, LeftBraceToken, LeftParenthesisToken, ModToken, ReturnToken,
         RightBraceToken, RightParenthesisToken, TypeAnnotation,
     },
-    Expr, Span, Spannable, Spanned,
+    Expr, ImportDirectiveKind, ModuleDirectiveKind, Span, Spannable, Spanned,
 };
 use frostbite_reports::{sourcemap::SourceKey, IntoReport, Level, Report};
 
@@ -112,8 +112,12 @@ impl<'compiler> RecursiveNameChecker<'compiler>
             Expr::Ident(identifier) => {
                 self.visit_ident(source_key, identifier.value(), identifier.span())
             }
-            Expr::ImportDirective(_) => todo!(),
-            Expr::ModuleDirective(..) => todo!(),
+            Expr::ImportDirective(import_directive) => {
+                self.visit_import_directive(source_key, import_directive.as_ref())
+            }
+            Expr::ModuleDirective(mod_token, module_directive_kind) => {
+                self.visit_module_directive(source_key, mod_token.clone(), module_directive_kind)
+            }
             Expr::BinaryOperation { lhs, operator, rhs } => Ok(NamedExpr::BinaryOperation {
                 lhs: Box::new(self.visit_expr(source_key, lhs)?),
                 operator: operator.clone(),
@@ -195,6 +199,25 @@ impl<'compiler> RecursiveNameChecker<'compiler>
             local_key,
             identifier: Spanned(span, identifier.into()),
         })
+    }
+
+    fn visit_import_directive(
+        &mut self,
+        source_key: SourceKey,
+        import_directive_kind: Spanned<&ImportDirectiveKind>,
+    ) -> Result<NamedExpr, NameResolutionError>
+    {
+        todo!()
+    }
+
+    fn visit_module_directive(
+        &mut self,
+        source_key: SourceKey,
+        module_token: ModToken,
+        module_directive_kind: &ModuleDirectiveKind,
+    ) -> Result<NamedExpr, NameResolutionError>
+    {
+        todo!()
     }
 
     fn visit_assign(
