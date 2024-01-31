@@ -88,7 +88,7 @@ fn main() -> eyre::Result<()>
             let mut codegen_backend = CodegenBackends::bytecode_backend();
 
             let codegen_output = compiler
-                .compile_module(src_key, &mut codegen_backend)
+                .analyze_module(src_key, &mut codegen_backend)
                 .map_err(|_| bail(compiler.ctx()))
                 .unwrap();
 

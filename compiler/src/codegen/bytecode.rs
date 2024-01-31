@@ -86,7 +86,7 @@ impl BytecodeCodegenBackend
         t_expr: &TypedExpression,
     )
     {
-        match &t_expr.kind {
+        match t_expr.kind {
             TypedExpressionKind::Int(..)
             | TypedExpressionKind::Float(..)
             | TypedExpressionKind::Bool(..)
@@ -94,28 +94,33 @@ impl BytecodeCodegenBackend
                 self.compile_constant(instructions, globals, t_expr)
             }
 
+            TypedExpressionKind::ModuleStatement(..) => {}
+
             TypedExpressionKind::Ident {
-                str_value: Spanned(_, name),
+                str_value: Spanned(_, ref name),
             } => {
                 instructions.push(Instruction::LoadName(name.into()));
             }
 
-            TypedExpressionKind::BinaryOperation { lhs, operator, rhs } => self
-                .compile_binary_operation(
-                    t_ast,
-                    type_ctx,
-                    instructions,
-                    globals,
-                    lhs,
-                    operator.kind,
-                    rhs,
-                ),
+            TypedExpressionKind::BinaryOperation {
+                ref lhs,
+                ref operator,
+                ref rhs,
+            } => self.compile_binary_operation(
+                t_ast,
+                type_ctx,
+                instructions,
+                globals,
+                lhs,
+                operator.kind,
+                rhs,
+            ),
 
-            TypedExpressionKind::Assign { lhs, value } => {
+            TypedExpressionKind::Assign { ref lhs, ref value } => {
                 self.compile_assignment(t_ast, type_ctx, globals, instructions, lhs, value);
             }
 
-            TypedExpressionKind::Function(function_expr) => self.compile_function_node(
+            TypedExpressionKind::Function(ref function_expr) => self.compile_function_node(
                 t_ast,
                 type_ctx,
                 globals,
@@ -125,7 +130,9 @@ impl BytecodeCodegenBackend
             ),
 
             TypedExpressionKind::Call {
-                callee, arguments, ..
+                ref callee,
+                ref arguments,
+                ..
             } => self.compile_function_call(
                 t_ast,
                 type_ctx,
@@ -135,7 +142,7 @@ impl BytecodeCodegenBackend
                 arguments,
             ),
 
-            TypedExpressionKind::Return(_, _, return_value) => {
+            TypedExpressionKind::Return(_, _, ref return_value) => {
                 if let Some(value) = return_value {
                     self.compile_node(t_ast, type_ctx, instructions, globals, value);
                 } else {
@@ -147,7 +154,9 @@ impl BytecodeCodegenBackend
                 instructions.push(Instruction::Return);
             }
 
-            TypedExpressionKind::Block { expressions, .. } => expressions
+            TypedExpressionKind::Block {
+                ref expressions, ..
+            } => expressions
                 .iter()
                 .for_each(|expr| self.compile_node(t_ast, type_ctx, instructions, globals, expr)),
         }

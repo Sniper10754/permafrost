@@ -1,4 +1,4 @@
-use alloc::{boxed::Box, format, string::String, vec::Vec};
+use alloc::{borrow::Cow, boxed::Box, format, string::String, vec::Vec};
 use frostbite_ast::{
     tokens::{
         ArrowToken, FunctionToken, LeftBraceToken, LeftParenthesisToken, ModToken, ReturnToken,
@@ -6,19 +6,25 @@ use frostbite_ast::{
     },
     Expr, ImportDirectiveKind, ModuleDirectiveKind, Span, Spannable, Spanned,
 };
-use frostbite_reports::{sourcemap::SourceKey, IntoReport, Level, Report};
-
-use crate::{
-    ir::named::{Argument, Assignable, LocalKey, NamedAst, NamedExpr},
-    utils::Scopes,
-    Compiler,
+use frostbite_reports::{
+    sourcemap::{SourceKey, SourceUrl},
+    IntoReport, Level, Report,
 };
 
+use crate::{
+    context::names::NamedModuleKey,
+    ir::named::{Argument, Assignable, LocalKey, NamedAst, NamedExpr},
+    utils::Scopes,
+    Compiler, FROSTBITE_FILE_EXTENSION,
+};
+
+#[derive(derive_more::From)]
 enum NameResolutionError
 {
     CannotAssignTo
     {
-        source_key: SourceKey, span: Span
+        source_key: SourceKey,
+        span: Span,
     },
 
     IdentifierNotFound
@@ -26,6 +32,18 @@ enum NameResolutionError
         source_key: SourceKey,
         identifier: Spanned<String>,
     },
+
+    ClashingIdentifier
+    {
+        source_key: SourceKey,
+        identifier: Spanned<String>,
+    },
+
+    ModuleStatementNotSupported(SourceKey, Span),
+
+    #[cfg(feature = "std")]
+    #[from]
+    IoError(std::io::Error, SourceKey, Span),
 }
 
 impl IntoReport for NameResolutionError
@@ -54,6 +72,22 @@ impl IntoReport for NameResolutionError
                 [],
                 [],
             ),
+            NameResolutionError::ClashingIdentifier {
+                source_key,
+                identifier: Spanned(span, identifier),
+            } => Report::new(
+                Level::Error,
+                span,
+                source_key,
+                "Identifier already exists",
+                Some(format!("is already defined elsewhere")),
+                [],
+                [],
+            ),
+            NameResolutionError::ModuleStatementNotSupported(source_key, span) => {
+                Report::new(Level::Error, span, source_key, "Mod statement not supported", Some("The mod statement requires the std file api: youre on a platform which doesnt support std."), [], [])
+            }
+            NameResolutionError::IoError(error, source_key,  span) => Report::new(Level::Error, span, source_key, "Io Error", Some(format!("{error}")), [], [])
         }
     }
 }
@@ -88,10 +122,17 @@ pub fn check_names(
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+enum LocalKind
+{
+    Local(LocalKey),
+    Module(NamedModuleKey),
+}
+
 pub struct RecursiveNameChecker<'compiler>
 {
     compiler: &'compiler mut Compiler,
-    scopes: Scopes<LocalKey>,
+    scopes: Scopes<LocalKind>,
 }
 
 impl<'compiler> RecursiveNameChecker<'compiler>
@@ -188,7 +229,7 @@ impl<'compiler> RecursiveNameChecker<'compiler>
         span: Span,
     ) -> Result<NamedExpr, NameResolutionError>
     {
-        let Some(local_key) = self.scopes.local(identifier).copied() else {
+        let Some(LocalKind::Local(local_key)) = self.scopes.local(identifier).copied() else {
             return Err(NameResolutionError::IdentifierNotFound {
                 source_key,
                 identifier: Spanned(span, identifier.into()),
@@ -217,7 +258,57 @@ impl<'compiler> RecursiveNameChecker<'compiler>
         module_directive_kind: &ModuleDirectiveKind,
     ) -> Result<NamedExpr, NameResolutionError>
     {
-        todo!()
+        #[cfg(feature = "std")]
+        {
+            use std::path::Path;
+
+            let filepath: Cow<'_, Path> = match self.compiler.ctx.src_map[source_key].url {
+                SourceUrl::PathBuf(ref pathbuf) => pathbuf.parent().unwrap().into(),
+                SourceUrl::Sparse(..) | SourceUrl::Anonymous => {
+                    std::env::current_dir().unwrap().into()
+                }
+            };
+
+            match module_directive_kind {
+                ModuleDirectiveKind::ImportLocalModule(local_module_name) => {
+                    let module_path = filepath.join(format!(
+                        "{}.{FROSTBITE_FILE_EXTENSION}",
+                        local_module_name.value()
+                    ));
+
+                    let source_code =
+                        std::fs::read_to_string(module_path.as_path()).map_err(|err| {
+                            NameResolutionError::IoError(err, source_key, module_token.span())
+                        })?;
+
+                    let module_source_key = self
+                        .compiler
+                        .add_source(SourceUrl::PathBuf(module_path), source_code);
+
+                    _ = self.compiler.analyze_module(module_source_key);
+
+                    let module_key =
+                        self.compiler.ctx.named_ctx.modules_by_src_keys[module_source_key];
+
+                    self.scopes
+                        .try_insert(local_module_name.value(), LocalKind::Module(module_key))
+                        .map_err(|_| NameResolutionError::ClashingIdentifier {
+                            source_key,
+                            identifier: local_module_name.clone(),
+                        })?;
+                }
+            }
+        }
+
+        #[cfg(not(feature = "std"))]
+        {
+            return Err(NameResolutionError::ModuleStatementNotSupported(
+                source_key,
+                module_token.span(),
+            ));
+        }
+
+        Ok(NamedExpr::ModuleStatement(module_directive_kind.span()))
     }
 
     fn visit_assign(
@@ -291,7 +382,8 @@ impl<'compiler> RecursiveNameChecker<'compiler>
                  name: spanned_name,
                  type_annotation: _,
              }| {
-                self.scopes.insert_forced(spanned_name.value(), *local_key);
+                self.scopes
+                    .insert_forced(spanned_name.value(), LocalKind::Local(*local_key));
             },
         );
 
@@ -375,7 +467,9 @@ impl<'compiler> RecursiveNameChecker<'compiler>
                 .locals
                 .insert(());
 
-            self.scopes.try_insert(name, local_key).unwrap();
+            self.scopes
+                .try_insert(name, LocalKind::Local(local_key))
+                .unwrap();
 
             Some(local_key)
         } else {
@@ -393,7 +487,7 @@ impl<'compiler> RecursiveNameChecker<'compiler>
             .locals
             .insert(());
 
-        self.scopes.insert_forced(name, local_key);
+        self.scopes.insert_forced(name, LocalKind::Local(local_key));
 
         local_key
     }

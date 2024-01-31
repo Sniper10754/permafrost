@@ -5,7 +5,7 @@ use frostbite_ast::{
         ArrowToken, FunctionToken, LeftBraceToken, LeftParenthesisToken, Operator, ReturnToken,
         RightBraceToken, RightParenthesisToken, TypeAnnotation,
     },
-    Span, Spannable, Spanned,
+    ModuleDirectiveKind, Span, Spannable, Spanned,
 };
 use slotmap::{new_key_type, SlotMap};
 
@@ -74,7 +74,8 @@ impl Spannable for NamedExpr
                 identifier: Spanned(span, _),
             }
             | NamedExpr::String(Spanned(span, _))
-            | NamedExpr::Bool(Spanned(span, _)) => span.clone(),
+            | NamedExpr::Bool(Spanned(span, _))
+            | NamedExpr::ModuleStatement(span) => span.clone(),
 
             NamedExpr::BinaryOperation {
                 lhs,
@@ -119,6 +120,9 @@ pub enum NamedExpr
     Float(Spanned<f32>),
     Bool(Spanned<bool>),
     String(Spanned<String>),
+
+    ModuleStatement(Span),
+
     Ident
     {
         local_key: LocalKey,

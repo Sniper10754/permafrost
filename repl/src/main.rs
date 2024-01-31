@@ -69,7 +69,7 @@ fn compile_code(code: &str) -> Result<frostbite_bytecode::Module, CompilerContex
     let mut codegen_backend = CodegenBackends::bytecode_backend();
 
     let codegen_output = compiler
-        .compile_module(src_key, &mut codegen_backend)
+        .analyze_module(src_key, &mut codegen_backend)
         .map_err(|_| compiler.move_ctx())?;
 
     Ok(codegen_output)

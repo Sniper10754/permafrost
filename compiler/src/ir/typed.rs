@@ -4,8 +4,7 @@ use frostbite_ast::{
     tokens::{
         FunctionToken, LeftBraceToken, LeftParenthesisToken, Operator, ReturnToken,
         RightBraceToken, RightParenthesisToken,
-    },
-    Spannable, Spanned,
+    }, Span, Spannable, Spanned
 };
 use slotmap::{new_key_type, SecondaryMap, SlotMap};
 
@@ -160,6 +159,8 @@ pub enum TypedExpressionKind
     Bool(Spanned<bool>),
     String(Spanned<String>),
 
+    ModuleStatement(Span),
+
     Ident
     {
         str_value: Spanned<String>,
@@ -209,7 +210,8 @@ impl Spannable for TypedExpressionKind
             Int(Spanned(span, _))
             | Float(Spanned(span, _))
             | Bool(Spanned(span, _))
-            | String(Spanned(span, _)) => span.clone(),
+            | String(Spanned(span, _))
+            | ModuleStatement(span) => span.clone(),
 
             Ident {
                 str_value: Spanned(span, _),

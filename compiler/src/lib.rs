@@ -17,6 +17,8 @@ use frostbite_parser::{
 use frostbite_reports::sourcemap::{SourceDescription, SourceKey, SourceUrl};
 use log::{debug, trace};
 
+pub const FROSTBITE_FILE_EXTENSION: &str = "fsb";
+
 pub mod codegen;
 pub mod context;
 pub mod ir;
@@ -51,13 +53,10 @@ impl Compiler
         })
     }
 
-    pub fn compile_module<C>(
+    pub fn analyze_module(
         &mut self,
         src_key: SourceKey,
-        codegen: &mut C,
-    ) -> Result<C::Output, CompilerError>
-    where
-        C: CodegenBackend,
+    ) -> Result<(), CompilerError>
     {
         trace!("Lexing...");
         let token_stream = self.lex(src_key)?;
@@ -69,11 +68,9 @@ impl Compiler
 
         self.run_semantic_checks(src_key)?;
 
-        let codegen_output = self.codegen(src_key, codegen)?;
-
         trace!("Done...");
 
-        Ok(codegen_output)
+        Ok(())
     }
 
     pub fn run_semantic_checks(

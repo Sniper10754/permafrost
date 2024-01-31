@@ -276,6 +276,8 @@ impl<'a> RecursiveTypechecker<'a>
             NamedExpr::String(_) => Ok(self.insert_type(Type::String)),
             NamedExpr::Bool(_) => Ok(self.insert_type(Type::Bool)),
 
+            NamedExpr::ModuleStatement(..) => Ok(self.insert_type(Type::Unit)),
+
             NamedExpr::Ident {
                 local_key,
                 identifier: _,
@@ -474,6 +476,10 @@ impl<'a> RecursiveTypechecker<'a>
             NamedExpr::String(value) => Ok(TypedExpression {
                 type_key: self.infer_type(source_key, expr)?,
                 kind: TypedExpressionKind::String(value.as_ref().map(Clone::clone)),
+            }),
+            NamedExpr::ModuleStatement(span) => Ok(TypedExpression {
+                type_key: self.infer_type(source_key, expr)?,
+                kind: TypedExpressionKind::ModuleStatement(span.clone()),
             }),
             NamedExpr::Ident {
                 local_key,
