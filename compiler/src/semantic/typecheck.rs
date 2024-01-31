@@ -731,9 +731,7 @@ impl<'a> RecursiveTypechecker<'a>
             Return(..) => Ok(()),
 
             Block { expressions, .. } => {
-                let scope_has_return = expressions
-                    .iter()
-                    .any(|expr| matches!(expr.kind, Return(..)));
+                let scope_has_return = expressions.iter().any(|expr| expr.kind.is_return());
 
                 if scope_has_return {
                     expressions
@@ -779,7 +777,7 @@ impl<'a> RecursiveTypechecker<'a>
                 let (call_arguments_len, function_arguments_len) =
                     (call_arguments.len(), function.arguments.len());
 
-                match call_arguments_len.cmp(&function_arguments_len) {
+                match Ord::cmp(&call_arguments_len, &function_arguments_len) {
                     Greater => {
                         return Err(TypecheckError::TooManyArguments {
                             source_key,
@@ -789,7 +787,6 @@ impl<'a> RecursiveTypechecker<'a>
                         }
                         .into())
                     }
-                    Equal => {}
                     Less => {
                         return Err(TypecheckError::NotEnoughArguments {
                             source_key,
@@ -799,6 +796,7 @@ impl<'a> RecursiveTypechecker<'a>
                         }
                         .into())
                     }
+                    Equal => (), // Bro won the lottery!
                 }
 
                 for ((call_arg_span, call_arg), func_arg) in Iterator::zip(
