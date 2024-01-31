@@ -1,0 +1,15 @@
+[package]
+name = "frostbite-vm-core"
+version.workspace = true
+edition.workspace = true
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+frostbite-bytecode = { path = "../bytecode" }
+
+derive_more = { workspace = true }
+dbg-pls = { workspace = true }
+
+[lints]
+workspace = true

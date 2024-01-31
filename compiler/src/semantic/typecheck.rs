@@ -655,6 +655,14 @@ impl<'a> RecursiveTypechecker<'a>
 
         if matches!(function.body.kind, TypedExpressionKind::Block { .. }) {
             self.typecheck_function_body_returns(source_key, &function)?;
+        } else {
+            self.unify(function.body.type_key, function.return_type)
+                .map_err(|_| TypecheckError::TypeMismatch {
+                    source_key,
+                    span: body.span(),
+                    expected: display_type(function.return_type, &self.compiler.ctx.type_ctx),
+                    found: display_type(function.body.type_key, &self.compiler.ctx.type_ctx),
+                })?;
         }
 
         Ok(TypedExpression {
@@ -672,7 +680,10 @@ impl<'a> RecursiveTypechecker<'a>
         function: &TypedFunction,
     ) -> Result<(), Box<TypecheckError>>
     {
-        self.check_fn_body_branches(source_key, &function.body)?;
+        if !matches!(self.compiler.ctx.get_type(function.return_type), Type::Unit) {
+            self.check_fn_body_branches(source_key, &function.body)?;
+        }
+
         self.typecheck_fn_body_returns(source_key, function.return_type, &function.body)?;
 
         Ok(())
