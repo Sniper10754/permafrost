@@ -7,7 +7,7 @@ extern crate std;
 
 use crate::semantic::{nameresolution, typecheck};
 
-use alloc::string::String;
+use alloc::{string::String, vec::Vec};
 use codegen::CodegenBackend;
 use context::CompilerContext;
 use frostbite_parser::{
@@ -16,6 +16,7 @@ use frostbite_parser::{
 };
 use frostbite_reports::sourcemap::{SourceDescription, SourceKey, SourceUrl};
 use log::{debug, trace};
+use slotmap::SecondaryMap;
 
 pub const FROSTBITE_FILE_EXTENSION: &str = "fsb";
 
@@ -127,11 +128,34 @@ impl Compiler
         Ok(token_stream)
     }
 
-    fn codegen<C: CodegenBackend>(
+    pub fn compile<C>(
+        mut self,
+        codegen: &mut C,
+    ) -> Result<SecondaryMap<SourceKey, C::Output>, CompilerContext>
+    where
+        C: CodegenBackend,
+    {
+        let mut secondary_map = SecondaryMap::new();
+
+        for source_key in self.ctx.src_map.keys().collect::<Vec<_>>() {
+            let codegen_output = match self.codegen(source_key, codegen) {
+                Ok(codegen_output) => codegen_output,
+                Err(_) => return Err(self.ctx),
+            };
+
+            secondary_map.insert(source_key, codegen_output);
+        }
+
+        Ok(secondary_map)
+    }
+
+    fn codegen<C>(
         &mut self,
         main_source_key: SourceKey,
         codegen: &mut C,
     ) -> Result<C::Output, CompilerError>
+    where
+        C: CodegenBackend,
     {
         let output = codegen.codegen(main_source_key, &mut self.ctx);
 

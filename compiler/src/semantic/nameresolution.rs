@@ -23,8 +23,7 @@ enum NameResolutionError
 {
     CannotAssignTo
     {
-        source_key: SourceKey,
-        span: Span,
+        source_key: SourceKey, span: Span
     },
 
     IdentifierNotFound
@@ -39,6 +38,7 @@ enum NameResolutionError
         identifier: Spanned<String>,
     },
 
+    #[cfg(not(feature = "std"))]
     ModuleStatementNotSupported(SourceKey, Span),
 
     #[cfg(feature = "std")]
@@ -80,10 +80,11 @@ impl IntoReport for NameResolutionError
                 span,
                 source_key,
                 "Identifier already exists",
-                Some(format!("is already defined elsewhere")),
+                Some(format!("`{identifier}` is already defined elsewhere")),
                 [],
                 [],
             ),
+            #[cfg(not(feature = "std"))]
             NameResolutionError::ModuleStatementNotSupported(source_key, span) => {
                 Report::new(Level::Error, span, source_key, "Mod statement not supported", Some("The mod statement requires the std file api: youre on a platform which doesnt support std."), [], [])
             }
@@ -244,8 +245,8 @@ impl<'compiler> RecursiveNameChecker<'compiler>
 
     fn visit_import_directive(
         &mut self,
-        source_key: SourceKey,
-        import_directive_kind: Spanned<&ImportDirectiveKind>,
+        _source_key: SourceKey,
+        _import_directive_kind: Spanned<&ImportDirectiveKind>,
     ) -> Result<NamedExpr, NameResolutionError>
     {
         todo!()

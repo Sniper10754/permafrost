@@ -85,20 +85,26 @@ fn main() -> eyre::Result<()>
 
             let src_key = compiler.add_source(file.display().to_string(), src);
 
+            if compiler.analyze_module(src_key).is_err() {
+                bail(compiler.move_ctx());
+            }
+
             let mut codegen_backend = CodegenBackends::bytecode_backend();
 
-            let codegen_output = compiler
-                .analyze_module(src_key, &mut codegen_backend)
-                .map_err(|_| bail(compiler.ctx()))
+            let codegen_outputs = compiler
+                .compile(&mut codegen_backend)
+                .map_err(bail)
                 .unwrap();
 
+            let codegen_output = &codegen_outputs[src_key];
+
             if disassemble {
-                disassemble_and_print(&codegen_output)?;
+                disassemble_and_print(codegen_output)?;
             }
 
             let mut buf = vec![];
 
-            frostbite_bytecode::encode(&codegen_output, &mut buf);
+            frostbite_bytecode::encode(codegen_output, &mut buf);
 
             let output_file =
                 output_file.unwrap_or_else(|| env::temp_dir().join("frostbite-compiler-output"));
@@ -117,9 +123,9 @@ fn main() -> eyre::Result<()>
     Ok(())
 }
 
-fn bail(ctx: &CompilerContext) -> !
+fn bail(ctx: CompilerContext) -> !
 {
-    print_reports(ctx);
+    print_reports(&ctx);
 
     process::exit(1);
 }

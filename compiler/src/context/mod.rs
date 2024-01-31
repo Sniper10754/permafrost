@@ -1,3 +1,4 @@
+use alloc::vec::Vec;
 use delegate::delegate;
 use frostbite_ast::Program;
 use frostbite_reports::{
@@ -20,6 +21,8 @@ pub struct CompilerContext
     pub report_ctx: ReportContext,
     pub named_ctx: NamedContext,
     pub type_ctx: TypeContext,
+
+    pub files_to_compile: Vec<SourceKey>,
 
     pub asts: SecondaryMap<SourceKey, Program>,
 }

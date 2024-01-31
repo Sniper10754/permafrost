@@ -4,7 +4,8 @@ use frostbite_ast::{
     tokens::{
         FunctionToken, LeftBraceToken, LeftParenthesisToken, Operator, ReturnToken,
         RightBraceToken, RightParenthesisToken,
-    }, Span, Spannable, Spanned
+    },
+    Span, Spannable, Spanned,
 };
 use slotmap::{new_key_type, SecondaryMap, SlotMap};
 

@@ -170,7 +170,7 @@ pub enum Token
     #[token(",")]
     Comma,
 
-    #[regex(r#"(\+|\-|\*/|==|)"#, helpers::parse_operator)]
+    #[regex(r#"(\+|\-|\*|==|)"#, helpers::parse_operator)]
     BinaryOperator(BinaryOperatorKind),
 
     #[token(":")]

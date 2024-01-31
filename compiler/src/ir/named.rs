@@ -5,7 +5,7 @@ use frostbite_ast::{
         ArrowToken, FunctionToken, LeftBraceToken, LeftParenthesisToken, Operator, ReturnToken,
         RightBraceToken, RightParenthesisToken, TypeAnnotation,
     },
-    ModuleDirectiveKind, Span, Spannable, Spanned,
+    Span, Spannable, Spanned,
 };
 use slotmap::{new_key_type, SlotMap};
 
