@@ -1,4 +1,8 @@
-use alloc::{collections::VecDeque, string::String};
+use alloc::{
+    boxed::Box,
+    collections::{BTreeMap, VecDeque},
+    string::String,
+};
 use dbg_pls::DebugPls;
 use frostbite_bytecode::{ConstantValue, Function};
 
@@ -20,9 +24,18 @@ pub struct Stack(VecDeque<Plate>);
     derive_more::Deref,
     derive_more::DerefMut,
 )]
-pub struct Plate(VecDeque<StackValue>);
+pub struct Plate
+{
+    pub names: BTreeMap<Box<str>, StackValue>,
 
-#[derive(Debug)]
+    #[deref]
+    #[deref_mut]
+    #[index]
+    #[index_mut]
+    pub values: VecDeque<StackValue>,
+}
+
+#[derive(Debug, Clone, derive_more::From)]
 pub enum StackValue
 {
     Int(i32),

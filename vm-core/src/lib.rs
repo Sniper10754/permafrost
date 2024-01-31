@@ -4,7 +4,7 @@ extern crate alloc;
 
 use frostbite_bytecode::{ConstantKey, FunctionKey, Instruction, Module};
 use registers::Registers;
-use stack::Stack;
+use stack::{Stack, StackValue};
 
 pub mod registers;
 pub mod stack;
@@ -12,8 +12,7 @@ pub mod stack;
 pub struct VirtualMachine
 {
     registers: Registers,
-    bytecode: Module,
-    stack: Stack,
+    stack_frames: Stack,
 }
 
 impl VirtualMachine
@@ -23,20 +22,30 @@ impl VirtualMachine
         &self.registers
     }
 
+    pub fn run(
+        mut self,
+        module: &Module,
+    )
+    {
+        self.run_instructions(module, &module.body)
+    }
+
     fn run_instructions(
         &mut self,
+        module: &Module,
         instructions: &[Instruction],
     )
     {
         for (instruction, instruction_index) in instructions.iter().zip(1..) {
             self.registers.pc = instruction_index;
 
-            self.evaluate_instruction(instruction)
+            self.evaluate_instruction(module, instruction)
         }
     }
 
     fn evaluate_instruction(
         &mut self,
+        module: &Module,
         instruction: &Instruction,
     )
     {
@@ -45,11 +54,17 @@ impl VirtualMachine
             Instruction::ImportFromModule { module, symbol } => {
                 self.eval_instruction_import_from_module(module, symbol)
             }
-            Instruction::LoadConstant(constant) => self.eval_instruction_load_constant(*constant),
-            Instruction::LoadFunction(function) => self.eval_instruction_load_function(*function),
+            Instruction::LoadConstant(constant) => {
+                self.eval_instruction_load_constant(module, *constant)
+            }
+            Instruction::LoadFunction(function) => {
+                self.eval_instruction_load_function(module, *function)
+            }
             Instruction::StoreName(name) => self.eval_instruction_store_name(name),
             Instruction::LoadName(name) => self.eval_instruction_load_name(name),
-            Instruction::Pop => self.eval_instruction_pop(),
+            Instruction::Pop => {
+                self.eval_instruction_pop();
+            }
             Instruction::PopAndStoreName(name) => self.eval_instruction_pop_and_store_name(name),
             Instruction::Call => self.eval_instruction_call(),
             Instruction::Return => self.eval_instruction_return(),
@@ -85,23 +100,27 @@ impl VirtualMachine
 
     fn eval_instruction_load_constant(
         &mut self,
+        module: &Module,
         constant_key: ConstantKey,
     )
     {
-        let value = self.bytecode.globals.constants_pool[constant_key]
-            .clone()
-            .into();
+        let value = module.globals.constants_pool[constant_key].clone().into();
 
-        self.stack.front_mut().unwrap().push_front(value)
+        self.stack_frames.front_mut().unwrap().push_front(value)
     }
 
     fn eval_instruction_load_function(
         &mut self,
+        module: &Module,
         function_key: FunctionKey,
     )
     {
-        // Implement the logic for the LoadFunction instruction
-        todo!();
+        let function = module.globals.functions[function_key].clone();
+
+        self.stack_frames
+            .front_mut()
+            .unwrap()
+            .push_front(function.into())
     }
 
     fn eval_instruction_store_name(
@@ -109,8 +128,13 @@ impl VirtualMachine
         name: &str,
     )
     {
-        // Implement the logic for the StoreName instruction
-        todo!();
+        let value_to_bind = self.stack_frames.front_mut().unwrap().pop_front().unwrap();
+
+        self.stack_frames
+            .front_mut()
+            .unwrap()
+            .names
+            .insert(name.into(), value_to_bind);
     }
 
     fn eval_instruction_load_name(
@@ -118,14 +142,25 @@ impl VirtualMachine
         name: &str,
     )
     {
-        // Implement the logic for the LoadName instruction
-        todo!();
+        let value = self
+            .stack_frames
+            .iter()
+            .find_map(|frame| {
+                frame
+                    .names
+                    .contains_key(name)
+                    .then_some(frame.names.get(name).unwrap())
+            })
+            .cloned()
+            .unwrap();
+
+        self.stack_frames.front_mut().unwrap().push_front(value);
     }
 
-    fn eval_instruction_pop(&mut self)
+    fn eval_instruction_pop(&mut self) -> StackValue
     {
         // Implement the logic for the Pop instruction
-        todo!();
+        self.stack_frames.front_mut().unwrap().pop_front().unwrap()
     }
 
     fn eval_instruction_pop_and_store_name(
@@ -133,8 +168,13 @@ impl VirtualMachine
         name: &str,
     )
     {
-        // Implement the logic for the PopAndStoreName instruction
-        todo!();
+        let value = self.eval_instruction_pop();
+
+        self.stack_frames
+            .front_mut()
+            .unwrap()
+            .names
+            .insert(name.into(), value);
     }
 
     fn eval_instruction_call(&mut self)
