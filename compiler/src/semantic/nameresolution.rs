@@ -76,15 +76,13 @@ impl IntoReport for NameResolutionError
                 span,
                 source_key,
                 "Identifier already exists",
-                Some(format!("`{identifier}` is already defined elsewhere")),
-                [],
-                [],
+                Some(format!("`{identifier}` is already defined elsewhere"))
             ),
             #[cfg(not(feature = "std"))]
             NameResolutionError::ModuleStatementNotSupported(source_key, span) => {
                 Report::new(Level::Error, span, source_key, "Mod statement not supported", Some("The mod statement requires the std file api: youre on a platform which doesnt support std."), [], [])
             }
-            NameResolutionError::IoError(error, source_key,  span) => Report::new(Level::Error, span, source_key, "Io Error", Some(format!("{error}")), [], [])
+            NameResolutionError::IoError(error, source_key,  span) => Report::new(Level::Error, span, source_key, "Io Error", Some(format!("{error}")))
         }
     }
 }
