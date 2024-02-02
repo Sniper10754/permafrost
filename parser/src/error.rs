@@ -1,6 +1,3 @@
-use core::ops::Range;
-
-use alloc::format;
 use frostbite_ast::Span;
 use frostbite_reports::{sourcemap::SourceKey, IntoReport, Label, Level, Report};
 
@@ -42,12 +39,12 @@ impl IntoReport for Error
                 source_key,
                 "Token in invalid position",
                 None::<&str>,
-                // [Label::new(
-                //     format!("Expected {expected}"),
-                //     None::<Range<_>>,
-                //     source_key,
-                // )],
-            ),
+            )
+            .with_label(Label::new(
+                format!("Expected {expected}"),
+                None::<Span>,
+                source_key,
+            )),
             ErrorKind::UnrecognizedEof {
                 expected,
                 previous_element_span,
@@ -57,24 +54,24 @@ impl IntoReport for Error
                 source_key,
                 "Unexpected EOF",
                 None::<&str>,
-                // [Label::new(
-                //     format!("Expected one of: {}", expected.join(", ")),
-                //     None::<Range<_>>,
-                //     source_key,
-                // )],
-            ),
+            )
+            .with_label(Label::new(
+                format!("Expected one of: {}", expected.join(", ")),
+                None::<Span>,
+                source_key,
+            )),
             ErrorKind::NumberTooBig { span } => Report::new(
                 Level::Error,
                 span,
                 source_key,
                 "Number is too big",
                 Some("Number is too big to lex"),
-                // [Label::new(
-                //     const_format::formatcp!("Maximum limit is {}", i32::MAX),
-                //     None::<Range<_>>,
-                //     source_key,
-                // )],
-            ),
+            )
+            .with_label(Label::new(
+                const_format::formatcp!("Maximum limit is {}", i32::MAX),
+                None::<Span>,
+                source_key,
+            )),
         }
     }
 }

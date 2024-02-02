@@ -90,15 +90,17 @@ impl IntoReport for TypecheckError
                 "Type mismatch",
                 Some(format!("Expected type {expected:?}, found type {found:?}")),
             ),
-            TypecheckError::IncompatibleOperands { source_key, span, left, right } => Report::new(
-                Level::Error,
-                span.clone(),
-                source_key,
-                "Incompatible operands",
-                None::<&str>,
-                
-            ).with_label(Label::new(format!("Left type is {left}"), span.clone(), source_key),
-        ).with_label(Label::new(format!("Right type is {right}"), span.clone(), source_key)),
+            TypecheckError::IncompatibleOperands { source_key, span, left, right } => {
+                Report::new(
+                    Level::Error,
+                    span.clone(),
+                    source_key,
+                    "Incompatible operands",
+                    None::<&str>,
+                )
+                .with_label(Label::new(format!("Left type is {left}"), span.clone(), source_key))
+                .with_label(Label::new(format!("Right type is {right}"), span.clone(), source_key))
+        },
             TypecheckError::CannotCallNonIdent(source_key, span) => Report::new(
                 Level::Error,
                 span,
