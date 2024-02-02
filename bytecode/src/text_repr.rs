@@ -107,6 +107,7 @@ where
         "{:>INSTRUCTION_PADDING$} ",
         serde_variant::to_variant_name(instruction)
             .unwrap()
+            .to_lowercase()
             .bright_red()
     )?;
 

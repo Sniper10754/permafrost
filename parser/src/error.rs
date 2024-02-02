@@ -1,6 +1,8 @@
 use frostbite_ast::Span;
 use frostbite_reports::{sourcemap::SourceKey, IntoReport, Label, Level, Report};
 
+use alloc::format;
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct Error
 {

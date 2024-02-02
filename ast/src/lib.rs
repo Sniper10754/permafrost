@@ -27,11 +27,11 @@ pub mod tokens
     macro_rules! token {
         ($name:ident) => {
             #[derive(Debug, Clone, PartialEq, Hash, dbg_pls::DebugPls)]
-            pub struct $name(pub crate::Span);
+            pub struct $name(pub $crate::Span);
 
             impl Spannable for $name
             {
-                fn span(&self) -> crate::Span
+                fn span(&self) -> $crate::Span
                 {
                     self.0.clone()
                 }
@@ -39,7 +39,7 @@ pub mod tokens
 
             impl From<Span> for $name
             {
-                fn from(span: Span) -> Self
+                fn from(span: $crate::Span) -> Self
                 {
                     Self(span)
                 }
