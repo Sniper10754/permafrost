@@ -39,8 +39,6 @@ impl IntoReport for NameResolutionError
                 source_key,
                 "Cannot assign to non-ident",
                 Some("You may only assign to identifiers"),
-                [],
-                [],
             ),
             NameResolutionError::IdentifierNotFound {
                 source_key,
@@ -51,8 +49,6 @@ impl IntoReport for NameResolutionError
                 source_key,
                 "Identifier not found",
                 Some(format!("identifier `{identifier}` not found")),
-                [],
-                [],
             ),
         }
     }

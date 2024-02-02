@@ -88,8 +88,6 @@ impl IntoReport for TypecheckError
                 source_key,
                 "Type mismatch",
                 Some(format!("Expected type {expected:?}, found type {found:?}")),
-                [],
-                [],
             ),
             TypecheckError::IncompatibleOperands { source_key, span, left, right } => Report::new(
                 Level::Error,
@@ -97,20 +95,15 @@ impl IntoReport for TypecheckError
                 source_key,
                 "Incompatible operands",
                 None::<&str>,
-                [
-                    Label::new(format!("Left type is {left}"), span.clone(), source_key),
-                    Label::new(format!("Right type is {right}"), span.clone(), source_key),
-                ],
-                [],
-            ),
+                
+            ).with_label(Label::new(format!("Left type is {left}"), span.clone(), source_key),
+        ).with_label(Label::new(format!("Right type is {right}"), span.clone(), source_key)),
             TypecheckError::CannotCallNonIdent(source_key, span) => Report::new(
                 Level::Error,
                 span,
                 source_key,
                 "Cannot call expression",
                 Some("Only identifiers may be called"),
-                [],
-                [],
             ),
             TypecheckError::CannotCallNonFunction(source_key, span) => Report::new(
                 Level::Error,
@@ -118,8 +111,6 @@ impl IntoReport for TypecheckError
                 source_key,
                 "Cannot call non function",
                 Some("Only functions may be called"),
-                [],
-                [],
             ),
             TypecheckError::TooManyArguments {
                 source_key,
@@ -134,8 +125,6 @@ impl IntoReport for TypecheckError
                 Some(format!(
                     "Function expected {function_arguments} arguments, but was called with {call_arguments} arguments"
                 )),
-                [],
-                [],
             ),
             TypecheckError::NotEnoughArguments {
                 source_key,
@@ -150,10 +139,8 @@ impl IntoReport for TypecheckError
                 Some(format!(
                     "Function expected {function_arguments_len} arguments, but was called with {call_arguments_len} arguments"
                 )),
-                [],
-                [],
             ),
-            TypecheckError::FunctionDoesntReturn { source_key, faulty_branch_position } => Report::new(Level::Error, faulty_branch_position, source_key, "One branch of this function doesnt return", Some("This branch of this function doesnt return."), [], []),
+            TypecheckError::FunctionDoesntReturn { source_key, faulty_branch_position } => Report::new(Level::Error, faulty_branch_position, source_key, "One branch of this function doesnt return", Some("This branch of this function doesnt return.")),
         }
     }
 }

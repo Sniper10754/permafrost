@@ -6,7 +6,6 @@ use core::ops::Range;
 
 use alloc::{boxed::Box, vec};
 
-pub mod ast;
 pub mod error;
 pub mod lexer;
 

@@ -53,7 +53,6 @@ pub struct Report
     title: Cow<'static, str>,
     description: Option<Cow<'static, str>>,
     infos: Vec<Label>,
-    helps: Vec<Label>,
 }
 
 impl Report
@@ -64,8 +63,6 @@ impl Report
         source_key: impl Into<SourceKey>,
         title: impl Into<Cow<'static, str>>,
         description: Option<impl Into<Cow<'static, str>>>,
-        infos: impl IntoIterator<Item = Label>,
-        helps: impl IntoIterator<Item = Label>,
     ) -> Self
     {
         Self {
@@ -74,9 +71,18 @@ impl Report
             source_key: source_key.into(),
             title: title.into(),
             description: description.map(Into::into),
-            infos: infos.into_iter().collect(),
-            helps: helps.into_iter().collect(),
+            infos: Vec::new(),
         }
+    }
+
+    pub fn with_label(
+        mut self,
+        label: impl Into<Label>,
+    ) -> Self
+    {
+        self.infos.push(label.into());
+
+        self
     }
 }
 

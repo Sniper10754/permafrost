@@ -108,7 +108,6 @@ impl PrintBackend for AriadnePrintBackend
             title,
             description,
             infos,
-            helps,
         } = report;
 
         let report_source_key = *source_key;
@@ -129,7 +128,7 @@ impl PrintBackend for AriadnePrintBackend
 
         report_builder.add_label(report_description);
 
-        for label in Iterator::chain(infos.iter(), helps.iter()) {
+        for label in infos {
             report_builder.add_label(
                 ariadne::Label::new((
                     report_source_key,

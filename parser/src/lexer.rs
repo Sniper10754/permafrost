@@ -99,15 +99,7 @@ impl IntoReport for LexerError
             LexerErrorKind::GenericLexerError => unreachable!(),
         }
 
-        Report::new(
-            Level::Error,
-            location,
-            source_key,
-            title,
-            Some(description),
-            [],
-            [],
-        )
+        Report::new(Level::Error, location, source_key, title, Some(description))
     }
 }
 
