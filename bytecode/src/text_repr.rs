@@ -1,4 +1,6 @@
-use alloc::fmt;
+use core::mem::size_of;
+
+use alloc::{fmt, format};
 use owo_colors::OwoColorize;
 
 use crate::{Instruction, Module};
@@ -49,10 +51,7 @@ where
                 index.bold().cyan()
             )?;
 
-            function
-                .body
-                .iter()
-                .try_for_each(|instruction| print_instruction(w, instruction, module))?;
+            print_instructions(w, &function.body, module)?;
 
             writeln!(w)?;
 
@@ -61,12 +60,32 @@ where
 
     writeln!(w, "{}", "Program body".bold().underline())?;
 
-    module
-        .body
-        .iter()
-        .try_for_each(|instruction| print_instruction(w, instruction, module))?;
+    print_instructions(w, &module.body, module)?;
 
     Ok(())
+}
+
+fn print_instructions<W>(
+    w: &mut W,
+    instructions: &[Instruction],
+    module: &Module,
+) -> fmt::Result
+where
+    W: fmt::Write,
+{
+    instructions
+        .iter()
+        .enumerate()
+        .try_for_each(|(index, instruction)| {
+            write!(
+                w,
+                "{:<8}: ",
+                format!("{:#x}", index * size_of::<Instruction>())
+            )?;
+            print_instruction(w, instruction, module)?;
+
+            Ok(())
+        })
 }
 
 fn print_instruction<W>(
@@ -109,9 +128,9 @@ where
         Instruction::LoadFunction(index) => {
             write!(w, "{}", index.cyan())?;
         }
-        Instruction::LoadBuiltin(name) => {
-            write!(w, "builtin {}", name.cyan())?;
-        }
+        // Instruction::LoadBuiltin(name) => {
+        //     write!(w, "builtin {}", name.cyan())?;
+        // }
         Instruction::StoreName(name) => write!(w, "{:?}", name.bright_yellow())?,
         Instruction::LoadName(name) => write!(w, "{:?}", name.bright_yellow())?,
         Instruction::PopAndStoreName(name) => {

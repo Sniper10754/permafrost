@@ -82,9 +82,6 @@ pub enum Instruction
     /// Loads a function element into the stack from the functions pool
     LoadFunction(FunctionKey),
 
-    /// Loads a builtin from its name
-    LoadBuiltin(String),
-
     /// Stores the last value onto the stack as name
     StoreName(String),
 
@@ -112,13 +109,13 @@ pub enum Instruction
     /// Perform an `Div` operation on the last top two elements on the stack, overwrites the top element on the stack with the result
     Divide,
 
-    /// Compares the top two elements on the stack, stores the result as a boolean in the `CR` register
+    /// Compares the top two elements on the stack, stores the result as a boolean in the `EQ` register
     Cmp,
 
-    /// Jumps to determinate function if the `CR` register is set to 1 | true
+    /// Jumps to determinate function if the `EQ` register is set to 1 | true
     CallEq,
 
-    /// Jumps to determinate function if the `CR` register is set to 0 | false
+    /// Jumps to determinate function if the `EQ` register is set to 0 | false
     CallNe,
 
     /// Does nothing

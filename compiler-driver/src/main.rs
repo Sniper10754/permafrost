@@ -1,3 +1,5 @@
+#![feature(never_type)]
+
 use std::{env, fs, io::Write, path::PathBuf, process};
 
 use clap::Parser;
@@ -81,30 +83,28 @@ fn main() -> eyre::Result<()>
 
             let mut compiler = Compiler::new();
 
-            let src_id = compiler.add_source(file.display().to_string(), src);
+            let src_key = compiler.add_source(file.display().to_string(), src);
 
-            let Ok(module_key) = compiler.compile_module(src_id) else {
-                bail_on_compiler_err(compiler.ctx());
+            if compiler.analyze_module(src_key).is_err() {
+                bail(compiler.move_ctx());
+            }
 
-                unreachable!();
-            };
+            let mut codegen_backend = CodegenBackends::bytecode_backend();
 
-            let output =
-                compiler.codegen_module(module_key, &mut CodegenBackends::bytecode_backend());
+            let codegen_outputs = compiler
+                .compile(&mut codegen_backend)
+                .map_err(bail)
+                .unwrap();
 
-            let Ok(codegen_output) = output else {
-                bail_on_compiler_err(compiler.ctx());
-
-                unreachable!();
-            };
+            let codegen_output = &codegen_outputs[src_key];
 
             if disassemble {
-                disassemble_and_print(&codegen_output)?;
+                disassemble_and_print(codegen_output)?;
             }
 
             let mut buf = vec![];
 
-            frostbite_bytecode::encode(&codegen_output, &mut buf);
+            frostbite_bytecode::encode(codegen_output, &mut buf);
 
             let output_file =
                 output_file.unwrap_or_else(|| env::temp_dir().join("frostbite-compiler-output"));
@@ -123,13 +123,11 @@ fn main() -> eyre::Result<()>
     Ok(())
 }
 
-fn bail_on_compiler_err(ctx: &CompilerContext)
+fn bail(ctx: CompilerContext) -> !
 {
-    if ctx.report_ctx.has_errors() {
-        print_reports(ctx);
+    print_reports(&ctx);
 
-        process::exit(1);
-    }
+    process::exit(1);
 }
 
 fn print_reports(ctx: &CompilerContext)
@@ -138,11 +136,9 @@ fn print_reports(ctx: &CompilerContext)
 
     let mut report_printer = ReportPrinter::new(&mut buf);
 
-    ctx.report_ctx.iter().for_each(|report| {
-        report_printer
-            .print::<DefaultPrintBackend>(&ctx.src_map, report)
-            .unwrap();
-    });
+    report_printer
+        .print_reports::<DefaultPrintBackend, _>(&ctx.src_map, &*ctx.report_ctx)
+        .unwrap();
 
     println!("{buf}");
 }

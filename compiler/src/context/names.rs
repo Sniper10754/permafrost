@@ -39,7 +39,7 @@ pub struct NamedContext
 #[derive(Debug, Clone)]
 pub struct NamedModule
 {
-    pub src_id: SourceKey,
+    pub src_key: SourceKey,
     pub items: Vec<Export>,
 }
 

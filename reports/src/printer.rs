@@ -32,13 +32,29 @@ impl<'output, O: fmt::Write> ReportPrinter<'output, O>
 
     /// # Errors
     /// May return error if the backend fails writing the report
-    pub fn print<B: PrintBackend>(
+    pub fn print<B>(
         &mut self,
         source_map: &SourceMap,
         report: &Report,
     ) -> Result<(), PrintingError>
+    where
+        B: PrintBackend,
     {
         B::write_report_to(self.0, source_map, report)
+    }
+
+    pub fn print_reports<'a, B, I>(
+        &mut self,
+        source_map: &SourceMap,
+        reports: I,
+    ) -> Result<(), PrintingError>
+    where
+        B: PrintBackend,
+        I: IntoIterator<Item = &'a Report>,
+    {
+        reports
+            .into_iter()
+            .try_for_each(|report| self.print::<B>(source_map, report))
     }
 }
 

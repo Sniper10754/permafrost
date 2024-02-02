@@ -1,25 +1,15 @@
 [package]
-name = "frostbite-compiler"
+name = "frostbite-vm-core"
 version.workspace = true
 edition.workspace = true
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
-
 [dependencies]
 frostbite-bytecode = { path = "../bytecode" }
-frostbite-reports = { path = "../reports" }
-frostbite-parser = { path = "../parser" }
-frostbite-ast = { path = "../ast" }
 
 derive_more = { workspace = true }
-delegate = { workspace = true }
-slotmap = { workspace = true }
 dbg-pls = { workspace = true }
-log = { workspace = true }
-
-[features]
-std = ["frostbite-reports/std"]
 
 [lints]
 workspace = true

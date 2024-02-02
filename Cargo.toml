@@ -10,11 +10,22 @@ members = [
     "compiler",
     "compiler-driver",
     "bytecode",
-    "repl", 
+    "repl",
     "ast",
+    "vm-core",
 ]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[profile.release]
+opt-level = 3
+lto = "fat"
+debug = "none"
+strip = "symbols"
+debug-assertions = false
+overflow-checks = false
+panic = "unwind"
+codegen-units = 1
 
 # Utility crates commonly used
 
@@ -23,6 +34,7 @@ derive_more = "0"
 cfg-if = "1"
 owo-colors = "4"
 enum_dispatch = "0.3"
+delegate = "0.12"
 
 [workspace.dependencies.dbg-pls]
 version = "0.4"

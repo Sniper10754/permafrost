@@ -375,7 +375,7 @@ pub struct Argument
 #[enum_dispatch(Spannable)]
 pub enum ModuleDirectiveKind
 {
-    ImportName(Spanned<String>),
+    ImportLocalModule(Spanned<String>),
 }
 
 #[derive(Debug, Clone, PartialEq, DebugPls)]

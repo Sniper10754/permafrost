@@ -395,6 +395,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "delegate"
+version = "0.12.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4e018fccbeeb50ff26562ece792ed06659b9c2dae79ece77c4456bb10d9bf79b"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.48",
+]
+
+[[package]]
 name = "deranged"
 version = "0.3.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -501,12 +512,9 @@ checksum = "3f9eec918d3f24069decb9af1554cad7c880e2da24a9afd88aca000531ab82c1"
 name = "frostbite-ast"
 version = "0.1.0"
 dependencies = [
- "cfg-if",
- "const_format",
  "dbg-pls",
  "derive_more",
  "enum_dispatch",
- "num-traits",
 ]
 
 [[package]]
@@ -526,6 +534,7 @@ name = "frostbite-compiler"
 version = "0.1.0"
 dependencies = [
  "dbg-pls",
+ "delegate",
  "derive_more",
  "frostbite-ast",
  "frostbite-bytecode",
@@ -584,6 +593,15 @@ dependencies = [
  "frostbite-ast",
  "serde",
  "slotmap",
+]
+
+[[package]]
+name = "frostbite-vm-core"
+version = "0.1.0"
+dependencies = [
+ "dbg-pls",
+ "derive_more",
+ "frostbite-bytecode",
 ]
 
 [[package]]

@@ -17,10 +17,10 @@ fn main() -> Result<(), Box<dyn Error>>
         right_prompt: DefaultPromptSegment::CurrentDateTime,
     };
 
+    let mut code_buffer = String::default();
+
     loop {
         let sig = line_editor.read_line(&prompt)?;
-
-        let mut code_buffer = String::default();
 
         match sig {
             Signal::Success(buffer) => {
@@ -31,11 +31,17 @@ fn main() -> Result<(), Box<dyn Error>>
                         print_bytecode(&mut code_buffer, &module)?;
                     }
                     Err(compiler_ctx) => {
-                        compiler_ctx.report_ctx.iter().for_each(|report| {
-                            ReportPrinter::new(&mut code_buffer)
-                                .print::<DefaultPrintBackend>(&compiler_ctx.src_map, report)
-                                .unwrap()
-                        });
+                        let mut buffer = String::new();
+                        let mut report_printer = ReportPrinter::new(&mut buffer);
+
+                        report_printer
+                            .print_reports::<DefaultPrintBackend, _>(
+                                &compiler_ctx.src_map,
+                                &*compiler_ctx.report_ctx,
+                            )
+                            .unwrap();
+
+                        println!("{buffer}")
                     }
                 }
 
@@ -58,18 +64,16 @@ fn compile_code(code: &str) -> Result<frostbite_bytecode::Module, CompilerContex
 {
     let mut compiler = Compiler::new();
 
-    let src_id = compiler.add_source("REPL", code);
+    let src_key = compiler.add_source("REPL", code);
 
-    let module_key = match compiler.compile_module(src_id) {
-        Ok(module_key) => module_key,
-        Err(_) => {
-            return Err(compiler.move_ctx());
-        }
-    };
+    let mut codegen_backend = CodegenBackends::bytecode_backend();
 
-    let codegen_output = compiler
-        .codegen_module(module_key, &mut CodegenBackends::bytecode_backend())
-        .map_err(|_| compiler.move_ctx())?;
+    if matches!(compiler.analyze_module(src_key), Err(..)) {
+        return Err(compiler.move_ctx());
+    }
 
-    Ok(codegen_output)
+    match compiler.compile(&mut codegen_backend) {
+        Ok(mut codegen_output) => Ok(codegen_output.remove(src_key).unwrap()),
+        Err(ctx) => Err(ctx),
+    }
 }
