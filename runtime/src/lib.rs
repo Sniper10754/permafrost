@@ -41,7 +41,7 @@ impl Runtime
 
         self.vm.execute(body, &bytecode_module);
 
-        Ok(self.vm.stack.pop().unwrap_or(Value::Nil))
+        Ok(self.vm.stack().last().cloned().unwrap_or(Value::Nil))
     }
 
     fn compile_code(

@@ -3,14 +3,16 @@ use alloc::string::String;
 use derive_more::*;
 use frostbite_bytecode::ConstantValue;
 
-#[derive(Debug, Clone, PartialEq, From)]
+#[derive(Debug, Clone, PartialEq, Display, From)]
 pub enum Value
 {
     Int(i32),
     Float(f32),
     String(String),
     Bool(bool),
+    #[display(fmt = "fn")]
     Function(frostbite_bytecode::Function),
+    #[display(fmt = "unit")]
     Nil,
 }
 

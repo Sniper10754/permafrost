@@ -25,8 +25,7 @@ impl Stack
     delegate! {
         to self.plates.first().unwrap().names {
             #[call(get)]
-            #[unwrap]
-            pub fn get_local(&self, name: &str) -> &Value;
+            pub fn get_local(&self, name: &str) -> Option<&Value>;
         }
         to self.plates.first_mut().unwrap().names {
             #[call(insert)]

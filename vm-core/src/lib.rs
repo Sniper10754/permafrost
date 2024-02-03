@@ -6,18 +6,20 @@ use frostbite_bytecode::{Instruction, Module};
 use num_traits::Num;
 
 use math::BinaryOperationKind::{self, *};
+use registers::Registers;
 use stack::Stack;
 use value::Value;
 
 pub mod math;
+pub mod registers;
 pub mod stack;
 pub mod value;
 
 #[derive(Debug, Default)]
 pub struct Vm
 {
-    pub stack: Stack,
-    eq_register: bool,
+    stack: Stack,
+    registers: Registers,
 }
 
 impl Vm
@@ -26,7 +28,7 @@ impl Vm
     {
         Vm {
             stack: Stack::new(),
-            eq_register: false,
+            registers: Registers::default(),
         }
     }
 
@@ -68,9 +70,9 @@ impl Vm
                 }
                 Instruction::LoadName(name) => {
                     // Handle LoadName instruction
-                    let value = self.stack.get_local(name);
+                    let value = self.stack.get_local(name).cloned().unwrap();
 
-                    self.stack.push(value.clone());
+                    self.stack.push(value);
                 }
                 Instruction::Pop => {
                     // Handle Pop instruction
@@ -160,10 +162,10 @@ impl Vm
                 Self::do_binary_operation(bok, *lhs, *rhs).into()
             }
             (Value::Float(lhs), Value::Int(rhs)) => {
-                Self::do_binary_operation(bok, *lhs as _, *rhs).into()
+                Self::do_binary_operation(bok, *lhs, *rhs as f32).into()
             }
             (Value::Int(lhs), Value::Float(rhs)) => {
-                Self::do_binary_operation(bok, *lhs as _, *rhs).into()
+                Self::do_binary_operation(bok, *lhs as f32, *rhs).into()
             }
 
             (..) => unreachable!(),
@@ -195,20 +197,30 @@ impl Vm
             unreachable!()
         };
 
-        self.eq_register = lhs == rhs;
+        self.registers.eq = lhs == rhs;
     }
 
     fn jump_if_eq(&mut self)
     {
-        if self.eq_register {
+        if self.registers.eq {
             // Implement jump logic here
         }
     }
 
     fn jump_if_ne(&mut self)
     {
-        if !self.eq_register {
+        if !self.registers.eq {
             // Implement jump logic here
         }
+    }
+
+    pub fn stack(&self) -> &Stack
+    {
+        &self.stack
+    }
+
+    pub fn registers(&self) -> Registers
+    {
+        self.registers
     }
 }

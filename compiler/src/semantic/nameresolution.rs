@@ -78,7 +78,7 @@ impl IntoReport for NameResolutionError
             ),
             #[cfg(not(feature = "std"))]
             NameResolutionError::ModuleStatementNotSupported(source_key, span) => {
-                Report::new(Level::Error, span, source_key, "Mod statement not supported", Some("The mod statement requires the std file api: youre on a platform which doesnt support std."), [], [])
+                Report::new(Level::Error, span, source_key, "Mod statement not supported", Some("The mod statement requires the std file api: youre on a platform which doesnt support std."))
             }
             NameResolutionError::IoError(error, source_key,  span) => Report::new(Level::Error, span, source_key, "Io Error", Some(format!("{error}")))
         }

@@ -323,6 +323,8 @@ impl<'a> RecursiveTypechecker<'a>
         span: Span,
     ) -> Result<TypeKey, Box<TypecheckError>>
     {
+        use BinaryOperatorKind::*;
+
         let (lhs_type_key, rhs_type_key) = (
             self.infer_type(source_key, lhs)?,
             self.infer_type(source_key, rhs)?,
@@ -335,20 +337,13 @@ impl<'a> RecursiveTypechecker<'a>
                 &self.compiler.ctx.get_type(rhs_type_key),
             ),
         ) {
-            (
-                BinaryOperatorKind::Add | BinaryOperatorKind::Sub | BinaryOperatorKind::Mul,
-                (Type::Int, Type::Int),
-            ) => Ok(self.insert_type(Type::Int)),
+            (Add | Sub | Mul, (Type::Int, Type::Int)) => Ok(self.insert_type(Type::Int)),
 
-            (
-                BinaryOperatorKind::Add
-                | BinaryOperatorKind::Sub
-                | BinaryOperatorKind::Mul
-                | BinaryOperatorKind::Div,
-                (Type::Float, Type::Float) | (Type::Float, Type::Int) | (Type::Int, Type::Float),
-            ) => Ok(self.insert_type(Type::Float)),
+            (Div, (Type::Int, Type::Int)) => Ok(self.insert_type(Type::Float)),
+            (Add | Sub | Mul | Div, (Type::Float, Type::Int)) => Ok(self.insert_type(Type::Float)),
+            (Add | Sub | Mul | Div, (Type::Int, Type::Float)) => Ok(self.insert_type(Type::Float)),
 
-            (BinaryOperatorKind::Equal, (..)) => {
+            (Equal, (..)) => {
                 if self.unify(lhs_type_key, rhs_type_key).is_ok() {
                     Ok(self.insert_type(Type::Bool))
                 } else {

@@ -8,10 +8,10 @@ edition.workspace = true
 [dependencies]
 reedline = "0"
 
-frostbite-compiler = { path = "../compiler" }
+frostbite-compiler = { path = "../compiler", features = ["std"] }
 frostbite-runtime = { path = "../runtime" }
 frostbite-vm-core = { path = "../vm-core" }
-frostbite-reports = { path = "../reports", features = ["std"] }
+frostbite-reports = { path = "../reports", features = ["std", "ariadne"] }
 
 color-eyre = { workspace = true }
 

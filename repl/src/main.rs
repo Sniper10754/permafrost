@@ -45,7 +45,9 @@ fn main() -> eyre::Result<()>
         match sig {
             Signal::Success(buffer) => {
                 match repl.run_code(&buffer) {
-                    Ok(_) => {}
+                    Ok(value) => {
+                        println!("{value}")
+                    }
                     Err(context) => {
                         code_buffer.clear();
 
