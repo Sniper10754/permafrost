@@ -1,16 +1,14 @@
 [package]
-name = "frostbite-vm-core"
+name = "frostbite-runtime"
 version.workspace = true
 edition.workspace = true
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-frostbite-bytecode = { path = "../bytecode" }
-
-derive_more = { workspace = true }
-num-traits = { workspace = true }
-delegate = { workspace = true }
+frostbite-compiler = { path = "../compiler" }
+frostbite-vm-core = { path = "../vm-core" }
+frostbite-reports = { path = "../reports" }
 
 [lints]
 workspace = true

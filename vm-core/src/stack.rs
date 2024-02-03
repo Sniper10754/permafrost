@@ -1,67 +1,120 @@
-use alloc::{
-    boxed::Box,
-    collections::{BTreeMap, VecDeque},
-    string::String,
-};
-use dbg_pls::DebugPls;
-use frostbite_bytecode::{ConstantValue, Function};
+use core::ops::{Deref, DerefMut};
 
-#[derive(
-    Debug,
-    DebugPls,
-    derive_more::Index,
-    derive_more::IndexMut,
-    derive_more::Deref,
-    derive_more::DerefMut,
-)]
-pub struct Stack(VecDeque<Plate>);
+use alloc::{collections::BTreeMap, string::String, vec::Vec};
 
-#[derive(
-    Debug,
-    DebugPls,
-    derive_more::Index,
-    derive_more::IndexMut,
-    derive_more::Deref,
-    derive_more::DerefMut,
-)]
+use delegate::delegate;
+use derive_more::*;
+use frostbite_bytecode::ConstantValue;
+
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct Stack
+{
+    plates: Vec<Plate>,
+}
+
+impl Stack
+{
+    pub fn new() -> Self
+    {
+        Self {
+            plates: [Plate::default()].into(),
+        }
+    }
+
+    delegate! {
+        to self.plates.first().unwrap().names {
+            #[call(get)]
+            #[unwrap]
+            pub fn get_local(&self, name: &str) -> &StackValue;
+        }
+        to self.plates.first_mut().unwrap().names {
+            #[call(insert)]
+            pub fn insert_local(&mut self, name: String, value: StackValue);
+            #[call(get_mut)]
+            #[unwrap]
+            pub fn get_local_mut(&mut self, name: &str) -> &StackValue;
+        }
+        to self.plates.first_mut().unwrap().stack {
+            pub fn push(&mut self, value: StackValue);
+
+            #[unwrap]
+            pub fn pop(&mut self) -> StackValue;
+        }
+    }
+
+    pub fn enter_scope(&mut self)
+    {
+        self.plates.push(Plate::default())
+    }
+
+    pub fn leave_scope(&mut self)
+    {
+        self.plates.pop();
+
+        debug_assert!(
+            !self.plates.is_empty(),
+            "There must be at least one plate in the stack"
+        );
+    }
+}
+
+impl Deref for Stack
+{
+    type Target = [StackValue];
+
+    fn deref(&self) -> &Self::Target
+    {
+        self.plates.first().unwrap()
+    }
+}
+
+impl DerefMut for Stack
+{
+    fn deref_mut(&mut self) -> &mut Self::Target
+    {
+        self.plates.first_mut().unwrap()
+    }
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Deref, DerefMut)]
 pub struct Plate
 {
-    pub names: BTreeMap<Box<str>, StackValue>,
+    names: BTreeMap<String, StackValue>,
 
     #[deref]
     #[deref_mut]
-    #[index]
-    #[index_mut]
-    pub values: VecDeque<StackValue>,
+    stack: Vec<StackValue>,
 }
 
-#[derive(Debug, Clone, derive_more::From)]
+impl Plate
+{
+    delegate! {
+        to self.names {
+            #[call(insert)]
+            pub fn insert_local(&mut self, name: String, value: StackValue);
+            #[call(get)]
+            #[unwrap]
+            pub fn get_local(&self, name: &str) -> &StackValue;
+            #[call(get_mut)]
+            #[unwrap]
+            pub fn get_local_mut(&mut self, name: &str) -> &StackValue;
+        }
+        to self.stack {
+            pub fn push(&mut self, value: StackValue);
+            pub fn pop(&mut self) -> Option<StackValue>;
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, From)]
 pub enum StackValue
 {
     Int(i32),
     Float(f32),
-    Bool(bool),
     String(String),
-    Function(Function),
-    Unit,
-}
-
-impl DebugPls for StackValue
-{
-    fn fmt(
-        &self,
-        f: dbg_pls::Formatter<'_>,
-    )
-    {
-        match self {
-            StackValue::Int(value) => DebugPls::fmt(value, f),
-            StackValue::Float(value) => DebugPls::fmt(value, f),
-            StackValue::Bool(value) => DebugPls::fmt(value, f),
-            StackValue::String(value) => DebugPls::fmt(value, f),
-            StackValue::Function(..) => DebugPls::fmt("first-class function", f),
-            StackValue::Unit => DebugPls::fmt("Unit", f),
-        }
-    }
+    Bool(bool),
+    Function(frostbite_bytecode::Function),
+    Nil,
 }
 
 impl From<ConstantValue> for StackValue
@@ -69,12 +122,12 @@ impl From<ConstantValue> for StackValue
     fn from(value: ConstantValue) -> Self
     {
         match value {
-            ConstantValue::Int(value) => Self::Int(value),
-            ConstantValue::Float(value) => Self::Float(value),
-            ConstantValue::Bool(value) => Self::Bool(value),
-            ConstantValue::String(value) => Self::String(value),
-            ConstantValue::Function(function) => Self::Function(function),
-            ConstantValue::Unit => Self::Unit,
+            ConstantValue::Int(value) => Self::from(value),
+            ConstantValue::Float(value) => Self::from(value),
+            ConstantValue::String(value) => Self::from(value),
+            ConstantValue::Bool(value) => Self::from(value),
+            ConstantValue::Function(value) => Self::from(value),
+            ConstantValue::Unit => Self::Nil,
         }
     }
 }

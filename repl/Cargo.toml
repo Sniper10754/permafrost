@@ -9,11 +9,8 @@ edition.workspace = true
 reedline = "0"
 
 frostbite-compiler = { path = "../compiler" }
-frostbite-bytecode = { path = "../bytecode" }
-frostbite-reports = { path = "../reports", features = [
-    "diagnostic_printer",
-    "ariadne",
-] }
+frostbite-runtime = { path = "../runtime" }
+frostbite-reports = { path = "../reports", features = ["std"] }
 
 [lints]
 workspace = true

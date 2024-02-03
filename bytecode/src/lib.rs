@@ -12,6 +12,8 @@ use slotmap::{new_key_type, SlotMap};
 use ciborium::de::Error;
 use serde::{Deserialize, Serialize};
 
+use derive_more::*;
+
 pub mod text_repr;
 
 new_key_type! {
@@ -122,7 +124,9 @@ pub enum Instruction
     Nop,
 }
 
-#[derive(Debug, Clone, derive_more::Display, Serialize, Deserialize, derive_more::From)]
+#[derive(
+    Debug, Clone, PartialEq, Serialize, Deserialize, derive_more::Display, derive_more::From,
+)]
 pub enum ConstantValue
 {
     Int(i32),
@@ -136,13 +140,13 @@ pub enum ConstantValue
     Unit,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, From)]
 pub struct Function
 {
     pub body: Vec<Instruction>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, From)]
 pub struct Module
 {
     pub manifest: Manifest,
@@ -150,15 +154,15 @@ pub struct Module
     pub body: Vec<Instruction>,
 }
 
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize, From)]
 pub struct Globals
 {
     pub constants_pool: SlotMap<ConstantKey, ConstantValue>,
     pub functions: SlotMap<FunctionKey, Function>,
 }
 
-#[derive(Debug, Clone, Copy, derive_more::Display)]
-#[cfg_attr(feature = "std", derive(derive_more::Error))]
+#[derive(Debug, Clone, Copy, Display)]
+#[cfg_attr(feature = "std", derive(Error))]
 pub struct DeserializationError;
 
 impl<T> From<Error<T>> for DeserializationError

@@ -2,238 +2,209 @@
 
 extern crate alloc;
 
-use frostbite_bytecode::{ConstantKey, FunctionKey, Instruction, Module};
-use registers::Registers;
+use frostbite_bytecode::{Instruction, Module};
+use math::BinaryOperationKind::{self, *};
+use num_traits::Num;
 use stack::{Stack, StackValue};
 
-pub mod registers;
+pub mod math;
 pub mod stack;
 
-pub struct VirtualMachine
+#[derive(Debug, Default)]
+pub struct VM
 {
-    registers: Registers,
-    stack_frames: Stack,
+    stack: Stack,
+    eq_register: bool,
 }
 
-impl VirtualMachine
+impl VM
 {
-    pub fn registers(&self) -> &Registers
+    pub fn new() -> Self
     {
-        &self.registers
+        VM {
+            stack: Stack::new(),
+            eq_register: false,
+        }
     }
 
-    pub fn run(
-        mut self,
-        module: &Module,
-    )
-    {
-        self.run_instructions(module, &module.body)
-    }
-
-    fn run_instructions(
+    pub fn execute(
         &mut self,
-        module: &Module,
         instructions: &[Instruction],
+        module: &Module,
     )
     {
-        for (instruction, instruction_index) in instructions.iter().zip(1..) {
-            self.registers.pc = instruction_index;
+        for instruction in instructions {
+            match instruction {
+                Instruction::Import { module } => {
+                    // Handle Import instruction
+                }
+                Instruction::ImportFromModule { module, symbol } => {
+                    // Handle ImportFromModule instruction
+                }
+                Instruction::LoadConstant(key) => {
+                    // Handle LoadConstant instruction
+                    let constant = module.globals.constants_pool[*key].clone();
 
-            self.evaluate_instruction(module, instruction)
+                    self.stack.push(constant.into());
+                }
+                Instruction::LoadFunction(key) => {
+                    // Handle LoadFunction instruction
+                    let function = module.globals.functions[*key].clone();
+
+                    self.stack.push(function.into());
+                }
+                Instruction::StoreName(name) => {
+                    // Handle StoreName instruction
+
+                    let value = self.stack.pop();
+
+                    self.stack.insert_local(name.into(), value);
+                }
+                Instruction::LoadName(name) => {
+                    // Handle LoadName instruction
+                    let value = self.stack.get_local(name);
+
+                    self.stack.push(value.clone());
+                }
+                Instruction::Pop => {
+                    // Handle Pop instruction
+                    self.stack.pop();
+                }
+                Instruction::PopAndStoreName(name) => {
+                    // Handle PopAndStoreName instruction
+                    let value = self.stack.pop();
+
+                    self.stack.insert_local(name.clone(), value);
+                }
+                Instruction::Call => {
+                    // Handle Call instruction
+                    self.call_function(module);
+                }
+                Instruction::Return => {
+                    // Handle Return instruction
+                    return;
+                }
+                Instruction::Add => {
+                    // Handle Add instruction
+                    self.perform_binary_operation(BinaryOperationKind::Add);
+                }
+                Instruction::Subtract => {
+                    // Handle Subtract instruction
+                    self.perform_binary_operation(BinaryOperationKind::Sub);
+                }
+                Instruction::Multiply => {
+                    // Handle Multiply instruction
+                    self.perform_binary_operation(BinaryOperationKind::Mul);
+                }
+                Instruction::Divide => {
+                    // Handle Divide instruction
+                    self.perform_binary_operation(BinaryOperationKind::Div);
+                }
+                Instruction::Cmp => {
+                    // Handle Cmp instruction
+                    self.compare_top_two_elements();
+                }
+                Instruction::CallEq => {
+                    // Handle CallEq instruction
+                    self.jump_if_eq();
+                }
+                Instruction::CallNe => {
+                    // Handle CallNe instruction
+                    self.jump_if_ne();
+                }
+                Instruction::Nop => {
+                    // Handle Nop instruction (do nothing)
+                }
+            }
         }
     }
 
-    fn evaluate_instruction(
+    // Helper methods for instruction execution
+
+    fn call_function(
         &mut self,
         module: &Module,
-        instruction: &Instruction,
     )
     {
-        match instruction {
-            Instruction::Import { module } => self.eval_instruction_import(module),
-            Instruction::ImportFromModule { module, symbol } => {
-                self.eval_instruction_import_from_module(module, symbol)
+        let function = self.stack.pop();
+
+        let StackValue::Function(function) = function else {
+            unreachable!()
+        };
+
+        self.stack.enter_scope();
+
+        self.execute(&function.body, module);
+
+        self.stack.leave_scope();
+    }
+
+    fn perform_binary_operation(
+        &mut self,
+        bok: BinaryOperationKind,
+    )
+    {
+        let [.., lhs, rhs] = &mut *self.stack else {
+            unreachable!()
+        };
+
+        let value: StackValue = match (lhs, &mut *rhs) {
+            (StackValue::Int(lhs), StackValue::Int(rhs)) => {
+                Self::do_binary_operation(bok, *lhs, *rhs).into()
             }
-            Instruction::LoadConstant(constant) => {
-                self.eval_instruction_load_constant(module, *constant)
+            (StackValue::Float(lhs), StackValue::Float(rhs)) => {
+                Self::do_binary_operation(bok, *lhs, *rhs).into()
             }
-            Instruction::LoadFunction(function) => {
-                self.eval_instruction_load_function(module, *function)
+            (StackValue::Float(lhs), StackValue::Int(rhs)) => {
+                Self::do_binary_operation(bok, *lhs as _, *rhs).into()
             }
-            Instruction::StoreName(name) => self.eval_instruction_store_name(name),
-            Instruction::LoadName(name) => self.eval_instruction_load_name(name),
-            Instruction::Pop => {
-                self.eval_instruction_pop();
+            (StackValue::Int(lhs), StackValue::Float(rhs)) => {
+                Self::do_binary_operation(bok, *lhs as _, *rhs).into()
             }
-            Instruction::PopAndStoreName(name) => self.eval_instruction_pop_and_store_name(name),
-            Instruction::Call => self.eval_instruction_call(),
-            Instruction::Return => self.eval_instruction_return(),
-            Instruction::Add => self.eval_instruction_add(),
-            Instruction::Subtract => self.eval_instruction_subtract(),
-            Instruction::Multiply => self.eval_instruction_multiply(),
-            Instruction::Divide => self.eval_instruction_divide(),
-            Instruction::Cmp => self.eval_instruction_cmp(),
-            Instruction::CallEq => self.eval_instruction_call_eq(),
-            Instruction::CallNe => self.eval_instruction_call_ne(),
-            Instruction::Nop => self.eval_instruction_nop(),
+
+            (..) => unreachable!(),
+        };
+
+        *rhs = value;
+    }
+
+    #[inline]
+    fn do_binary_operation<N>(
+        operator: BinaryOperationKind,
+        lhs: N,
+        rhs: N,
+    ) -> N
+    where
+        N: Num,
+    {
+        match operator {
+            Add => lhs + rhs,
+            Sub => lhs - rhs,
+            Mul => lhs * rhs,
+            Div => lhs / rhs,
         }
     }
 
-    fn eval_instruction_import(
-        &mut self,
-        module: &str,
-    )
+    fn compare_top_two_elements(&mut self)
     {
-        // Implement the logic for the Import instruction
-        unimplemented!();
+        let [.., lhs, rhs] = &*self.stack else {
+            unreachable!()
+        };
+
+        self.eq_register = lhs == rhs;
     }
 
-    fn eval_instruction_import_from_module(
-        &mut self,
-        module: &str,
-        symbol: &str,
-    )
+    fn jump_if_eq(&mut self)
     {
-        // Implement the logic for the ImportFromModule instruction
-        unimplemented!();
+        if self.eq_register {
+            // Implement jump logic here
+        }
     }
 
-    fn eval_instruction_load_constant(
-        &mut self,
-        module: &Module,
-        constant_key: ConstantKey,
-    )
+    fn jump_if_ne(&mut self)
     {
-        let value = module.globals.constants_pool[constant_key].clone().into();
-
-        self.stack_frames.front_mut().unwrap().push_front(value)
-    }
-
-    fn eval_instruction_load_function(
-        &mut self,
-        module: &Module,
-        function_key: FunctionKey,
-    )
-    {
-        let function = module.globals.functions[function_key].clone();
-
-        self.stack_frames
-            .front_mut()
-            .unwrap()
-            .push_front(function.into())
-    }
-
-    fn eval_instruction_store_name(
-        &mut self,
-        name: &str,
-    )
-    {
-        let value_to_bind = self.stack_frames.front_mut().unwrap().pop_front().unwrap();
-
-        self.stack_frames
-            .front_mut()
-            .unwrap()
-            .names
-            .insert(name.into(), value_to_bind);
-    }
-
-    fn eval_instruction_load_name(
-        &mut self,
-        name: &str,
-    )
-    {
-        let value = self
-            .stack_frames
-            .iter()
-            .find_map(|frame| {
-                frame
-                    .names
-                    .contains_key(name)
-                    .then_some(frame.names.get(name).unwrap())
-            })
-            .cloned()
-            .unwrap();
-
-        self.stack_frames.front_mut().unwrap().push_front(value);
-    }
-
-    fn eval_instruction_pop(&mut self) -> StackValue
-    {
-        // Implement the logic for the Pop instruction
-        self.stack_frames.front_mut().unwrap().pop_front().unwrap()
-    }
-
-    fn eval_instruction_pop_and_store_name(
-        &mut self,
-        name: &str,
-    )
-    {
-        let value = self.eval_instruction_pop();
-
-        self.stack_frames
-            .front_mut()
-            .unwrap()
-            .names
-            .insert(name.into(), value);
-    }
-
-    fn eval_instruction_call(&mut self)
-    {
-        // Implement the logic for the Call instruction
-        todo!();
-    }
-
-    fn eval_instruction_return(&mut self)
-    {
-        // Implement the logic for the Return instruction
-        todo!();
-    }
-
-    fn eval_instruction_add(&mut self)
-    {
-        // Implement the logic for the Add instruction
-        todo!();
-    }
-
-    fn eval_instruction_subtract(&mut self)
-    {
-        // Implement the logic for the Subtract instruction
-        todo!();
-    }
-
-    fn eval_instruction_multiply(&mut self)
-    {
-        // Implement the logic for the Multiply instruction
-        todo!();
-    }
-
-    fn eval_instruction_divide(&mut self)
-    {
-        // Implement the logic for the Divide instruction
-        todo!();
-    }
-
-    fn eval_instruction_cmp(&mut self)
-    {
-        // Implement the logic for the Cmp instruction
-        todo!();
-    }
-
-    fn eval_instruction_call_eq(&mut self)
-    {
-        // Implement the logic for the CallEq instruction
-        todo!();
-    }
-
-    fn eval_instruction_call_ne(&mut self)
-    {
-        // Implement the logic for the CallNe instruction
-        todo!();
-    }
-
-    fn eval_instruction_nop(&mut self)
-    {
-        // Implement the logic for the Nop instruction
-        todo!();
+        if !self.eq_register {
+            // Implement jump logic here
+        }
     }
 }

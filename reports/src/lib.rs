@@ -6,6 +6,8 @@ use alloc::{borrow::Cow, vec::Vec};
 use core::convert::Infallible;
 use sourcemap::SourceKey;
 
+use derive_more::*;
+
 cfg_if! {
     if #[cfg(feature = "std")] {
         extern crate std;
@@ -136,7 +138,7 @@ pub enum Position
     Line(usize),
 }
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, Into)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ReportContext
 {

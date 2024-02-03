@@ -1,8 +1,28 @@
-use frostbite_bytecode::text_repr::print_bytecode;
-use frostbite_compiler::{codegen::CodegenBackends, context::CompilerContext, Compiler};
-use frostbite_reports::printer::{DefaultPrintBackend, ReportPrinter};
+use frostbite_compiler::context::CompilerContext;
+use frostbite_reports::{
+    printer::{DefaultPrintBackend, ReportPrinter},
+    Report,
+};
+use frostbite_runtime::Runtime;
 use reedline::{DefaultPrompt, DefaultPromptSegment, Reedline, Signal};
 use std::error::Error;
+
+#[derive(Default)]
+pub struct Repl
+{
+    runtime: Runtime,
+}
+
+impl Repl
+{
+    pub fn run_code(
+        &mut self,
+        code: &str,
+    ) -> Result<(), CompilerContext>
+    {
+        self.runtime.eval_code(code)
+    }
+}
 
 fn main() -> Result<(), Box<dyn Error>>
 {
@@ -17,6 +37,8 @@ fn main() -> Result<(), Box<dyn Error>>
         right_prompt: DefaultPromptSegment::CurrentDateTime,
     };
 
+    let mut repl = Repl::default();
+
     let mut code_buffer = String::default();
 
     loop {
@@ -24,28 +46,18 @@ fn main() -> Result<(), Box<dyn Error>>
 
         match sig {
             Signal::Success(buffer) => {
-                let bytecode = compile_code(&buffer);
+                match repl.run_code(&buffer) {
+                    Ok(_) => {}
+                    Err(context) => {
+                        code_buffer.clear();
 
-                match bytecode {
-                    Ok(module) => {
-                        print_bytecode(&mut code_buffer, &module)?;
-                    }
-                    Err(compiler_ctx) => {
-                        let mut buffer = String::new();
-                        let mut report_printer = ReportPrinter::new(&mut buffer);
-
-                        report_printer
+                        ReportPrinter::new(&mut code_buffer)
                             .print_reports::<DefaultPrintBackend, _>(
-                                &compiler_ctx.src_map,
-                                &*compiler_ctx.report_ctx,
-                            )
-                            .unwrap();
-
-                        println!("{buffer}")
+                                &context.src_map,
+                                &*context.report_ctx,
+                            )?;
                     }
-                }
-
-                println!("{code_buffer}")
+                };
             }
 
             Signal::CtrlD | Signal::CtrlC => {
@@ -58,22 +70,4 @@ fn main() -> Result<(), Box<dyn Error>>
     }
 
     Ok(())
-}
-
-fn compile_code(code: &str) -> Result<frostbite_bytecode::Module, CompilerContext>
-{
-    let mut compiler = Compiler::new();
-
-    let src_key = compiler.add_source("REPL", code);
-
-    let mut codegen_backend = CodegenBackends::bytecode_backend();
-
-    if matches!(compiler.analyze_module(src_key), Err(..)) {
-        return Err(compiler.move_ctx());
-    }
-
-    match compiler.compile(&mut codegen_backend) {
-        Ok(mut codegen_output) => Ok(codegen_output.remove(src_key).unwrap()),
-        Err(ctx) => Err(ctx),
-    }
 }

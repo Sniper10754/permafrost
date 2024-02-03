@@ -14,11 +14,10 @@ pub type DefaultPrintBackend = ariadne::AriadnePrintBackend;
 compile_error!("No backend selected");
 
 #[derive(Debug, Display, From)]
+#[cfg_attr(feature = "std", derive(Error))]
 pub enum PrintingError
 {
     Fmt(core::fmt::Error),
-
-    Other(&'static str),
 }
 
 pub struct ReportPrinter<'output, O: fmt::Write>(&'output mut O);

@@ -577,9 +577,9 @@ dependencies = [
 name = "frostbite-repl"
 version = "0.1.0"
 dependencies = [
- "frostbite-bytecode",
  "frostbite-compiler",
  "frostbite-reports",
+ "frostbite-runtime",
  "reedline",
 ]
 
@@ -596,12 +596,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "frostbite-runtime"
+version = "0.1.0"
+dependencies = [
+ "frostbite-compiler",
+ "frostbite-reports",
+ "frostbite-vm-core",
+]
+
+[[package]]
 name = "frostbite-vm-core"
 version = "0.1.0"
 dependencies = [
- "dbg-pls",
+ "delegate",
  "derive_more",
  "frostbite-bytecode",
+ "num-traits",
 ]
 
 [[package]]
