@@ -138,6 +138,10 @@ impl Compiler
         let mut secondary_map = SecondaryMap::new();
 
         for source_key in self.ctx.src_map.keys().collect::<Vec<_>>() {
+            if self.analyze_module(source_key).is_err() {
+                return Err(self.ctx);
+            }
+
             let codegen_output = match self.codegen(source_key, codegen) {
                 Ok(codegen_output) => codegen_output,
                 Err(_) => return Err(self.ctx),

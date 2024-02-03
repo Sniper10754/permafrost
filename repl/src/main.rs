@@ -1,11 +1,8 @@
+use color_eyre::eyre;
 use frostbite_compiler::context::CompilerContext;
-use frostbite_reports::{
-    printer::{DefaultPrintBackend, ReportPrinter},
-    Report,
-};
+use frostbite_reports::printer::{DefaultPrintBackend, ReportPrinter};
 use frostbite_runtime::Runtime;
 use reedline::{DefaultPrompt, DefaultPromptSegment, Reedline, Signal};
-use std::error::Error;
 
 #[derive(Default)]
 pub struct Repl
@@ -20,13 +17,13 @@ impl Repl
         code: &str,
     ) -> Result<(), CompilerContext>
     {
-        self.runtime.eval_code(code)
+        self.runtime.eval_code("REPL", code)
     }
 }
 
-fn main() -> Result<(), Box<dyn Error>>
+fn main() -> eyre::Result<()>
 {
-    // Create a default reedline object to handle user input
+    color_eyre::install()?;
 
     let mut line_editor = Reedline::create()
         .use_kitty_keyboard_enhancement(true)

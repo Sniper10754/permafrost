@@ -12,5 +12,7 @@ frostbite-compiler = { path = "../compiler" }
 frostbite-runtime = { path = "../runtime" }
 frostbite-reports = { path = "../reports", features = ["std"] }
 
+color-eyre = { workspace = true }
+
 [lints]
 workspace = true

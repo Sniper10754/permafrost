@@ -577,6 +577,7 @@ dependencies = [
 name = "frostbite-repl"
 version = "0.1.0"
 dependencies = [
+ "color-eyre",
  "frostbite-compiler",
  "frostbite-reports",
  "frostbite-runtime",

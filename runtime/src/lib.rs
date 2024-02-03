@@ -1,14 +1,11 @@
 #![no_std]
 
-extern crate alloc;
-
-use alloc::vec::Vec;
 use frostbite_compiler::{
     codegen::{BytecodeCodegenBackend, CodegenBackends},
     context::CompilerContext,
     Compiler,
 };
-use frostbite_reports::{sourcemap::SourceUrl, Report};
+use frostbite_reports::sourcemap::SourceUrl;
 use frostbite_vm_core::VM;
 
 pub struct Runtime
@@ -29,11 +26,13 @@ impl Runtime
 
     pub fn eval_code(
         &mut self,
+        source_url: impl Into<SourceUrl>,
         code: &str,
     ) -> Result<(), CompilerContext>
     {
         let mut compiler = Compiler::new();
-        let source_key = compiler.add_source(SourceUrl::Sparse("()".into()), code);
+
+        let source_key = compiler.add_source(source_url.into(), code);
 
         let result = compiler.compile(&mut self.codegen);
 
