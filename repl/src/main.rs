@@ -2,6 +2,7 @@ use color_eyre::eyre;
 use frostbite_compiler::context::CompilerContext;
 use frostbite_reports::printer::{DefaultPrintBackend, ReportPrinter};
 use frostbite_runtime::Runtime;
+use frostbite_vm_core::value::Value;
 use reedline::{DefaultPrompt, DefaultPromptSegment, Reedline, Signal};
 
 #[derive(Default)]
@@ -15,7 +16,7 @@ impl Repl
     pub fn run_code(
         &mut self,
         code: &str,
-    ) -> Result<(), CompilerContext>
+    ) -> Result<Value, CompilerContext>
     {
         self.runtime.eval_code("REPL", code)
     }
@@ -53,6 +54,8 @@ fn main() -> eyre::Result<()>
                                 &context.src_map,
                                 &*context.report_ctx,
                             )?;
+
+                        println!("{code_buffer}")
                     }
                 };
             }

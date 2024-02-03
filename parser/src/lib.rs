@@ -489,6 +489,9 @@ impl<'report_context> Parser<'report_context>
             Some(Spanned(span, Token::Ident(ident))) if ident == "any" => {
                 Some(Spanned(span, TypeAnnotation::Any))
             }
+            Some(Spanned(span, Token::Ident(ident))) if ident == "unit" => {
+                Some(Spanned(span, TypeAnnotation::Unit))
+            }
             Some(Spanned(span, Token::Ident(other))) => {
                 Some(Spanned(span, TypeAnnotation::Object(other)))
             }

@@ -10,6 +10,7 @@ reedline = "0"
 
 frostbite-compiler = { path = "../compiler" }
 frostbite-runtime = { path = "../runtime" }
+frostbite-vm-core = { path = "../vm-core" }
 frostbite-reports = { path = "../reports", features = ["std"] }
 
 color-eyre = { workspace = true }

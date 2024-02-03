@@ -18,7 +18,6 @@ use crate::{
     Compiler, FROSTBITE_FILE_EXTENSION,
 };
 
-#[derive(derive_more::From)]
 enum NameResolutionError
 {
     CannotAssignTo
@@ -42,7 +41,6 @@ enum NameResolutionError
     ModuleStatementNotSupported(SourceKey, Span),
 
     #[cfg(feature = "std")]
-    #[from]
     IoError(std::io::Error, SourceKey, Span),
 }
 

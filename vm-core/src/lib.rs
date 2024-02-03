@@ -3,25 +3,28 @@
 extern crate alloc;
 
 use frostbite_bytecode::{Instruction, Module};
-use math::BinaryOperationKind::{self, *};
 use num_traits::Num;
-use stack::{Stack, StackValue};
+
+use math::BinaryOperationKind::{self, *};
+use stack::Stack;
+use value::Value;
 
 pub mod math;
 pub mod stack;
+pub mod value;
 
 #[derive(Debug, Default)]
-pub struct VM
+pub struct Vm
 {
-    stack: Stack,
+    pub stack: Stack,
     eq_register: bool,
 }
 
-impl VM
+impl Vm
 {
     pub fn new() -> Self
     {
-        VM {
+        Vm {
             stack: Stack::new(),
             eq_register: false,
         }
@@ -38,7 +41,10 @@ impl VM
                 Instruction::Import { module: _ } => {
                     // Handle Import instruction
                 }
-                Instruction::ImportFromModule { module: _, symbol: _ } => {
+                Instruction::ImportFromModule {
+                    module: _,
+                    symbol: _,
+                } => {
                     // Handle ImportFromModule instruction
                 }
                 Instruction::LoadConstant(key) => {
@@ -56,7 +62,7 @@ impl VM
                 Instruction::StoreName(name) => {
                     // Handle StoreName instruction
 
-                    let value = self.stack.pop();
+                    let value = self.stack.pop().unwrap();
 
                     self.stack.insert_local(name.into(), value);
                 }
@@ -72,7 +78,7 @@ impl VM
                 }
                 Instruction::PopAndStoreName(name) => {
                     // Handle PopAndStoreName instruction
-                    let value = self.stack.pop();
+                    let value = self.stack.pop().unwrap();
 
                     self.stack.insert_local(name.clone(), value);
                 }
@@ -126,9 +132,9 @@ impl VM
         module: &Module,
     )
     {
-        let function = self.stack.pop();
+        let function = self.stack.pop().unwrap();
 
-        let StackValue::Function(function) = function else {
+        let Value::Function(function) = function else {
             unreachable!()
         };
 
@@ -148,17 +154,15 @@ impl VM
             unreachable!()
         };
 
-        let value: StackValue = match (lhs, &mut *rhs) {
-            (StackValue::Int(lhs), StackValue::Int(rhs)) => {
+        let value: Value = match (lhs, &mut *rhs) {
+            (Value::Int(lhs), Value::Int(rhs)) => Self::do_binary_operation(bok, *lhs, *rhs).into(),
+            (Value::Float(lhs), Value::Float(rhs)) => {
                 Self::do_binary_operation(bok, *lhs, *rhs).into()
             }
-            (StackValue::Float(lhs), StackValue::Float(rhs)) => {
-                Self::do_binary_operation(bok, *lhs, *rhs).into()
-            }
-            (StackValue::Float(lhs), StackValue::Int(rhs)) => {
+            (Value::Float(lhs), Value::Int(rhs)) => {
                 Self::do_binary_operation(bok, *lhs as _, *rhs).into()
             }
-            (StackValue::Int(lhs), StackValue::Float(rhs)) => {
+            (Value::Int(lhs), Value::Float(rhs)) => {
                 Self::do_binary_operation(bok, *lhs as _, *rhs).into()
             }
 

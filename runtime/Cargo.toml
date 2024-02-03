@@ -7,6 +7,7 @@ edition.workspace = true
 
 [dependencies]
 frostbite-compiler = { path = "../compiler" }
+frostbite-bytecode = { path = "../bytecode" }
 frostbite-vm-core = { path = "../vm-core" }
 frostbite-reports = { path = "../reports" }
 

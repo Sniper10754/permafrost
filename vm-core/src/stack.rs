@@ -4,7 +4,8 @@ use alloc::{collections::BTreeMap, string::String, vec::Vec};
 
 use delegate::delegate;
 use derive_more::*;
-use frostbite_bytecode::ConstantValue;
+
+use crate::value::Value;
 
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct Stack
@@ -25,20 +26,18 @@ impl Stack
         to self.plates.first().unwrap().names {
             #[call(get)]
             #[unwrap]
-            pub fn get_local(&self, name: &str) -> &StackValue;
+            pub fn get_local(&self, name: &str) -> &Value;
         }
         to self.plates.first_mut().unwrap().names {
             #[call(insert)]
-            pub fn insert_local(&mut self, name: String, value: StackValue);
+            pub fn insert_local(&mut self, name: String, value: Value);
             #[call(get_mut)]
             #[unwrap]
-            pub fn get_local_mut(&mut self, name: &str) -> &StackValue;
+            pub fn get_local_mut(&mut self, name: &str) -> &Value;
         }
         to self.plates.first_mut().unwrap().stack {
-            pub fn push(&mut self, value: StackValue);
-
-            #[unwrap]
-            pub fn pop(&mut self) -> StackValue;
+            pub fn push(&mut self, value: Value);
+            pub fn pop(&mut self) -> Option<Value>;
         }
     }
 
@@ -60,7 +59,7 @@ impl Stack
 
 impl Deref for Stack
 {
-    type Target = [StackValue];
+    type Target = [Value];
 
     fn deref(&self) -> &Self::Target
     {
@@ -79,11 +78,11 @@ impl DerefMut for Stack
 #[derive(Debug, Clone, Default, PartialEq, Deref, DerefMut)]
 pub struct Plate
 {
-    names: BTreeMap<String, StackValue>,
+    names: BTreeMap<String, Value>,
 
     #[deref]
     #[deref_mut]
-    stack: Vec<StackValue>,
+    stack: Vec<Value>,
 }
 
 impl Plate
@@ -91,43 +90,17 @@ impl Plate
     delegate! {
         to self.names {
             #[call(insert)]
-            pub fn insert_local(&mut self, name: String, value: StackValue);
+            pub fn insert_local(&mut self, name: String, value: Value);
             #[call(get)]
             #[unwrap]
-            pub fn get_local(&self, name: &str) -> &StackValue;
+            pub fn get_local(&self, name: &str) -> &Value;
             #[call(get_mut)]
             #[unwrap]
-            pub fn get_local_mut(&mut self, name: &str) -> &StackValue;
+            pub fn get_local_mut(&mut self, name: &str) -> &Value;
         }
         to self.stack {
-            pub fn push(&mut self, value: StackValue);
-            pub fn pop(&mut self) -> Option<StackValue>;
-        }
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, From)]
-pub enum StackValue
-{
-    Int(i32),
-    Float(f32),
-    String(String),
-    Bool(bool),
-    Function(frostbite_bytecode::Function),
-    Nil,
-}
-
-impl From<ConstantValue> for StackValue
-{
-    fn from(value: ConstantValue) -> Self
-    {
-        match value {
-            ConstantValue::Int(value) => Self::from(value),
-            ConstantValue::Float(value) => Self::from(value),
-            ConstantValue::String(value) => Self::from(value),
-            ConstantValue::Bool(value) => Self::from(value),
-            ConstantValue::Function(value) => Self::from(value),
-            ConstantValue::Unit => Self::Nil,
+            pub fn push(&mut self, value: Value);
+            pub fn pop(&mut self) -> Option<Value>;
         }
     }
 }

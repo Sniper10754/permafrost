@@ -1,17 +1,18 @@
 #![no_std]
 
+use frostbite_bytecode::Module;
 use frostbite_compiler::{
     codegen::{BytecodeCodegenBackend, CodegenBackends},
     context::CompilerContext,
     Compiler,
 };
 use frostbite_reports::sourcemap::SourceUrl;
-use frostbite_vm_core::VM;
+use frostbite_vm_core::{value::Value, Vm};
 
 pub struct Runtime
 {
     codegen: BytecodeCodegenBackend,
-    vm: VM,
+    vm: Vm,
 }
 
 impl Runtime
@@ -20,7 +21,7 @@ impl Runtime
     {
         Self {
             codegen: CodegenBackends::bytecode_backend(),
-            vm: VM::new(),
+            vm: Vm::new(),
         }
     }
 
@@ -28,7 +29,26 @@ impl Runtime
         &mut self,
         source_url: impl Into<SourceUrl>,
         code: &str,
-    ) -> Result<(), CompilerContext>
+    ) -> Result<Value, CompilerContext>
+    {
+        let bytecode_module = self.compile_code(source_url, code)?;
+
+        let Module {
+            manifest: _,
+            globals: _,
+            body,
+        } = &bytecode_module;
+
+        self.vm.execute(body, &bytecode_module);
+
+        Ok(self.vm.stack.pop().unwrap_or(Value::Nil))
+    }
+
+    fn compile_code(
+        &mut self,
+        source_url: impl Into<SourceUrl>,
+        code: &str,
+    ) -> Result<Module, CompilerContext>
     {
         let mut compiler = Compiler::new();
 
@@ -36,11 +56,7 @@ impl Runtime
 
         let result = compiler.compile(&mut self.codegen);
 
-        let bytecode_module = result.map(|mut files| files.remove(source_key).unwrap())?;
-
-        self.vm.execute(&bytecode_module.body, &bytecode_module);
-
-        Ok(())
+        result.map(|mut files| files.remove(source_key).unwrap())
     }
 }
 

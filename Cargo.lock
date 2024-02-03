@@ -581,6 +581,7 @@ dependencies = [
  "frostbite-compiler",
  "frostbite-reports",
  "frostbite-runtime",
+ "frostbite-vm-core",
  "reedline",
 ]
 
@@ -600,6 +601,7 @@ dependencies = [
 name = "frostbite-runtime"
 version = "0.1.0"
 dependencies = [
+ "frostbite-bytecode",
  "frostbite-compiler",
  "frostbite-reports",
  "frostbite-vm-core",
