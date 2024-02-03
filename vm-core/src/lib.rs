@@ -35,10 +35,10 @@ impl VM
     {
         for instruction in instructions {
             match instruction {
-                Instruction::Import { module } => {
+                Instruction::Import { module: _ } => {
                     // Handle Import instruction
                 }
-                Instruction::ImportFromModule { module, symbol } => {
+                Instruction::ImportFromModule { module: _, symbol: _ } => {
                     // Handle ImportFromModule instruction
                 }
                 Instruction::LoadConstant(key) => {
