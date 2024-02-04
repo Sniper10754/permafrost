@@ -1,15 +1,15 @@
 [package]
-name = "frostbite-runtime"
+name = "permafrost-runtime"
 version.workspace = true
 edition.workspace = true
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-frostbite-compiler = { path = "../compiler" }
-frostbite-bytecode = { path = "../bytecode" }
-frostbite-vm-core = { path = "../vm-core" }
-frostbite-reports = { path = "../reports" }
+permafrost-compiler = { path = "../compiler" }
+permafrost-bytecode = { path = "../bytecode" }
+permafrost-vm-core = { path = "../vm-core" }
+permafrost-reports = { path = "../reports" }
 
 [lints]
 workspace = true

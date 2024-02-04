@@ -181,7 +181,7 @@ impl<T> Spanned<T>
         Spanned(self.0, f(self.1))
     }
 
-    pub fn into_span(self) -> (Span, T)
+    pub fn into_tuple(self) -> (Span, T)
     {
         (self.0, self.1)
     }
@@ -392,8 +392,8 @@ pub enum ImportDirectiveKind
     },
 }
 
-#[derive(Debug, Clone, PartialEq, DebugPls, derive_more::Display, derive_more::From)]
+#[derive(Debug, Clone, PartialEq, DebugPls, derive_more::From)]
 pub struct ModulePath
 {
-    name: String,
+    pub names: Vec<String>,
 }

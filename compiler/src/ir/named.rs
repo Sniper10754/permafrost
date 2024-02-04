@@ -1,6 +1,6 @@
 use alloc::{boxed::Box, string::String, vec::Vec};
 use dbg_pls::DebugPls;
-use frostbite_ast::{
+use permafrost_ast::{
     tokens::{
         ArrowToken, FunctionToken, LeftBraceToken, LeftParenthesisToken, Operator, ReturnToken,
         RightBraceToken, RightParenthesisToken, TypeAnnotation,
@@ -196,7 +196,7 @@ impl From<Assignable> for NamedExpr
 
 impl Spannable for Assignable
 {
-    fn span(&self) -> frostbite_ast::Span
+    fn span(&self) -> permafrost_ast::Span
     {
         match self {
             Assignable::Ident(_, spanned) => spanned.span(),

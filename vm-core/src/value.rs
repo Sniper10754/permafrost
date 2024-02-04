@@ -1,7 +1,7 @@
 use alloc::string::String;
 
 use derive_more::*;
-use frostbite_bytecode::ConstantValue;
+use permafrost_bytecode::ConstantValue;
 
 #[derive(Debug, Clone, PartialEq, Display, From)]
 pub enum Value
@@ -11,7 +11,7 @@ pub enum Value
     String(String),
     Bool(bool),
     #[display(fmt = "fn")]
-    Function(frostbite_bytecode::Function),
+    Function(permafrost_bytecode::Function),
     #[display(fmt = "unit")]
     Nil,
 }

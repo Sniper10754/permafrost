@@ -1,19 +1,19 @@
 [package]
-name = "frostbite-compiler-driver"
+name = "permafrost-compiler-driver"
 version.workspace = true
 edition.workspace = true
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-frostbite-compiler = { path = "../compiler", features = ["std"] }
-frostbite-bytecode = { path = "../bytecode" }
-frostbite-reports = { path = "../reports", features = [
+permafrost-compiler = { path = "../compiler", features = ["std"] }
+permafrost-bytecode = { path = "../bytecode" }
+permafrost-reports = { path = "../reports", features = [
     "diagnostic_printer",
     "ariadne",
     "std",
 ] }
-frostbite-parser = { path = "../parser" }
+permafrost-parser = { path = "../parser" }
 
 color-eyre = { workspace = true }
 log = { workspace = true }

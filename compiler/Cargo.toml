@@ -1,5 +1,5 @@
 [package]
-name = "frostbite-compiler"
+name = "permafrost-compiler"
 version.workspace = true
 edition.workspace = true
 
@@ -7,10 +7,10 @@ edition.workspace = true
 
 
 [dependencies]
-frostbite-bytecode = { path = "../bytecode" }
-frostbite-reports = { path = "../reports" }
-frostbite-parser = { path = "../parser" }
-frostbite-ast = { path = "../ast" }
+permafrost-bytecode = { path = "../bytecode" }
+permafrost-reports = { path = "../reports" }
+permafrost-parser = { path = "../parser" }
+permafrost-ast = { path = "../ast" }
 
 derive_more = { workspace = true }
 delegate = { workspace = true }
@@ -19,7 +19,7 @@ dbg-pls = { workspace = true }
 log = { workspace = true }
 
 [features]
-std = ["frostbite-reports/std"]
+std = ["permafrost-reports/std"]
 
 [lints]
 workspace = true

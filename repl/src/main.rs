@@ -1,8 +1,8 @@
 use color_eyre::eyre;
-use frostbite_compiler::context::CompilerContext;
-use frostbite_reports::printer::{DefaultPrintBackend, ReportPrinter};
-use frostbite_runtime::Runtime;
-use frostbite_vm_core::value::Value;
+use permafrost_compiler::context::CompilerContext;
+use permafrost_reports::printer::{DefaultPrintBackend, ReportPrinter};
+use permafrost_runtime::Runtime;
+use permafrost_vm_core::value::Value;
 use reedline::{DefaultPrompt, DefaultPromptSegment, Reedline, Signal};
 
 #[derive(Default)]

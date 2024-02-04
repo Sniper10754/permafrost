@@ -1,13 +1,13 @@
 #![no_std]
 
-use frostbite_bytecode::Module;
-use frostbite_compiler::{
+use permafrost_bytecode::Module;
+use permafrost_compiler::{
     codegen::{BytecodeCodegenBackend, CodegenBackends},
     context::CompilerContext,
     Compiler,
 };
-use frostbite_reports::sourcemap::SourceUrl;
-use frostbite_vm_core::{value::Value, Vm};
+use permafrost_reports::sourcemap::SourceUrl;
+use permafrost_vm_core::{value::Value, Vm};
 
 pub struct Runtime
 {

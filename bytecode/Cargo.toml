@@ -1,5 +1,5 @@
 [package]
-name = "frostbite-bytecode"
+name = "permafrost-bytecode"
 version.workspace = true
 edition.workspace = true
 

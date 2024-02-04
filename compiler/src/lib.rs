@@ -10,15 +10,15 @@ use crate::semantic::{nameresolution, typecheck};
 use alloc::{string::String, vec::Vec};
 use codegen::CodegenBackend;
 use context::CompilerContext;
-use frostbite_parser::{
+use log::{debug, trace};
+use permafrost_parser::{
     lexer::{tokenize, TokenStream},
     Parser,
 };
-use frostbite_reports::sourcemap::{SourceDescription, SourceKey, SourceUrl};
-use log::{debug, trace};
+use permafrost_reports::sourcemap::{SourceDescription, SourceKey, SourceUrl};
 use slotmap::SecondaryMap;
 
-pub const FROSTBITE_FILE_EXTENSION: &str = "fsb";
+pub const permafrost_FILE_EXTENSION: &str = "fsb";
 
 pub mod codegen;
 pub mod context;

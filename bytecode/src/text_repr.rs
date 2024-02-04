@@ -17,7 +17,7 @@ where
 {
     writeln!(
         w,
-        "compiled by frostbite-compiler@{}",
+        "compiled by permafrost-compiler@{}",
         module.manifest.emitted_by_compiler_version.yellow()
     )?;
 

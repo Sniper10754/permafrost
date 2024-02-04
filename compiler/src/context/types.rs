@@ -1,4 +1,4 @@
-use frostbite_reports::sourcemap::SourceKey;
+use permafrost_reports::sourcemap::SourceKey;
 use slotmap::SecondaryMap;
 
 use crate::ir::typed::{Type, TypeKey, TypedAst, TypesArena};

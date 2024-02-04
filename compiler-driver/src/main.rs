@@ -5,9 +5,9 @@ use std::{env, fs, io::Write, path::PathBuf, process};
 use clap::Parser;
 use color_eyre::eyre;
 
-use frostbite_bytecode::Module;
-use frostbite_compiler::{codegen::CodegenBackends, context::CompilerContext, Compiler};
-use frostbite_reports::printer::{DefaultPrintBackend, ReportPrinter};
+use permafrost_bytecode::Module;
+use permafrost_compiler::{codegen::CodegenBackends, context::CompilerContext, Compiler};
+use permafrost_reports::printer::{DefaultPrintBackend, ReportPrinter};
 
 mod compile;
 
@@ -104,10 +104,10 @@ fn main() -> eyre::Result<()>
 
             let mut buf = vec![];
 
-            frostbite_bytecode::encode(codegen_output, &mut buf);
+            permafrost_bytecode::encode(codegen_output, &mut buf);
 
             let output_file =
-                output_file.unwrap_or_else(|| env::temp_dir().join("frostbite-compiler-output"));
+                output_file.unwrap_or_else(|| env::temp_dir().join("permafrost-compiler-output"));
 
             let mut fs_writer = fs::OpenOptions::new()
                 .read(true)
@@ -147,7 +147,7 @@ fn disassemble_and_print(module: &Module) -> eyre::Result<()>
 {
     let mut buf = String::new();
 
-    frostbite_bytecode::text_repr::print_bytecode(&mut buf, module)?;
+    permafrost_bytecode::text_repr::print_bytecode(&mut buf, module)?;
 
     println!("{buf}");
 

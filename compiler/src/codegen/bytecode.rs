@@ -1,11 +1,11 @@
 #![allow(unsafe_code)]
 
 use alloc::{vec, vec::Vec};
-use frostbite_ast::{tokens::BinaryOperatorKind, Spanned};
-use frostbite_bytecode::{
+use permafrost_ast::{tokens::BinaryOperatorKind, Spanned};
+use permafrost_bytecode::{
     ConstantValue, Function, FunctionKey, Globals, Instruction, Manifest, Module,
 };
-use frostbite_reports::sourcemap::SourceKey;
+use permafrost_reports::sourcemap::SourceKey;
 use slotmap::SecondaryMap;
 
 use crate::{
@@ -292,7 +292,7 @@ impl BytecodeCodegenBackend
         type_ctx: &TypeContext,
         globals: &mut Globals,
         function: &TypedFunction,
-    ) -> frostbite_bytecode::Function
+    ) -> permafrost_bytecode::Function
     {
         let mut bytecode_function_body = Vec::new();
 
@@ -312,8 +312,9 @@ impl BytecodeCodegenBackend
     }
 
     /// Caller must guarantee that the return type is on the stack before calling this function
-    unsafe fn compile_function_with_body(mut body: Vec<Instruction>)
-        -> frostbite_bytecode::Function
+    unsafe fn compile_function_with_body(
+        mut body: Vec<Instruction>
+    ) -> permafrost_bytecode::Function
     {
         body.push(Instruction::Return);
 

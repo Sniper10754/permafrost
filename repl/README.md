@@ -1,4 +1,4 @@
-# Frostbite Repl
+# permafrost Repl
 
 Will likely be merged into the compiler
 

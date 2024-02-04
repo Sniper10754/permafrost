@@ -509,115 +509,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3f9eec918d3f24069decb9af1554cad7c880e2da24a9afd88aca000531ab82c1"
 
 [[package]]
-name = "frostbite-ast"
-version = "0.1.0"
-dependencies = [
- "dbg-pls",
- "derive_more",
- "enum_dispatch",
-]
-
-[[package]]
-name = "frostbite-bytecode"
-version = "0.1.0"
-dependencies = [
- "ciborium",
- "derive_more",
- "owo-colors 4.0.0",
- "serde",
- "serde_variant",
- "slotmap",
-]
-
-[[package]]
-name = "frostbite-compiler"
-version = "0.1.0"
-dependencies = [
- "dbg-pls",
- "delegate",
- "derive_more",
- "frostbite-ast",
- "frostbite-bytecode",
- "frostbite-parser",
- "frostbite-reports",
- "log",
- "slotmap",
-]
-
-[[package]]
-name = "frostbite-compiler-driver"
-version = "0.1.0"
-dependencies = [
- "clap",
- "color-eyre",
- "fern",
- "frostbite-bytecode",
- "frostbite-compiler",
- "frostbite-parser",
- "frostbite-reports",
- "log",
-]
-
-[[package]]
-name = "frostbite-parser"
-version = "0.1.0"
-dependencies = [
- "cfg-if",
- "const_format",
- "dbg-pls",
- "derive_more",
- "enum_dispatch",
- "frostbite-ast",
- "frostbite-reports",
- "logos",
- "num-traits",
-]
-
-[[package]]
-name = "frostbite-repl"
-version = "0.1.0"
-dependencies = [
- "color-eyre",
- "frostbite-compiler",
- "frostbite-reports",
- "frostbite-runtime",
- "frostbite-vm-core",
- "reedline",
-]
-
-[[package]]
-name = "frostbite-reports"
-version = "0.1.0"
-dependencies = [
- "ariadne",
- "cfg-if",
- "derive_more",
- "frostbite-ast",
- "serde",
- "slotmap",
-]
-
-[[package]]
-name = "frostbite-runtime"
-version = "0.1.0"
-dependencies = [
- "frostbite-bytecode",
- "frostbite-compiler",
- "frostbite-reports",
- "frostbite-vm-core",
-]
-
-[[package]]
-name = "frostbite-vm-core"
-version = "0.1.0"
-dependencies = [
- "delegate",
- "derive_more",
- "frostbite-bytecode",
- "num-traits",
-]
-
-[[package]]
 name = "gimli"
 version = "0.28.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -921,6 +812,115 @@ dependencies = [
  "redox_syscall",
  "smallvec",
  "windows-targets 0.48.5",
+]
+
+[[package]]
+name = "permafrost-ast"
+version = "0.1.0"
+dependencies = [
+ "dbg-pls",
+ "derive_more",
+ "enum_dispatch",
+]
+
+[[package]]
+name = "permafrost-bytecode"
+version = "0.1.0"
+dependencies = [
+ "ciborium",
+ "derive_more",
+ "owo-colors 4.0.0",
+ "serde",
+ "serde_variant",
+ "slotmap",
+]
+
+[[package]]
+name = "permafrost-compiler"
+version = "0.1.0"
+dependencies = [
+ "dbg-pls",
+ "delegate",
+ "derive_more",
+ "log",
+ "permafrost-ast",
+ "permafrost-bytecode",
+ "permafrost-parser",
+ "permafrost-reports",
+ "slotmap",
+]
+
+[[package]]
+name = "permafrost-compiler-driver"
+version = "0.1.0"
+dependencies = [
+ "clap",
+ "color-eyre",
+ "fern",
+ "log",
+ "permafrost-bytecode",
+ "permafrost-compiler",
+ "permafrost-parser",
+ "permafrost-reports",
+]
+
+[[package]]
+name = "permafrost-parser"
+version = "0.1.0"
+dependencies = [
+ "cfg-if",
+ "const_format",
+ "dbg-pls",
+ "derive_more",
+ "enum_dispatch",
+ "logos",
+ "num-traits",
+ "permafrost-ast",
+ "permafrost-reports",
+]
+
+[[package]]
+name = "permafrost-repl"
+version = "0.1.0"
+dependencies = [
+ "color-eyre",
+ "permafrost-compiler",
+ "permafrost-reports",
+ "permafrost-runtime",
+ "permafrost-vm-core",
+ "reedline",
+]
+
+[[package]]
+name = "permafrost-reports"
+version = "0.1.0"
+dependencies = [
+ "ariadne",
+ "cfg-if",
+ "derive_more",
+ "permafrost-ast",
+ "serde",
+ "slotmap",
+]
+
+[[package]]
+name = "permafrost-runtime"
+version = "0.1.0"
+dependencies = [
+ "permafrost-bytecode",
+ "permafrost-compiler",
+ "permafrost-reports",
+ "permafrost-vm-core",
+]
+
+[[package]]
+name = "permafrost-vm-core"
+version = "0.1.0"
+dependencies = [
+ "delegate",
+ "derive_more",
+ "num-traits",
+ "permafrost-bytecode",
 ]
 
 [[package]]

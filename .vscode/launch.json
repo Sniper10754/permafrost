@@ -4,15 +4,15 @@
         {
             "type": "lldb",
             "request": "launch",
-            "name": "Debug executable 'frostbite-compiler-driver'",
+            "name": "Debug executable 'permafrost-compiler-driver'",
             "cargo": {
                 "args": [
                     "build",
-                    "--bin=frostbite-compiler-driver",
-                    "--package=frostbite-compiler-driver"
+                    "--bin=permafrost-compiler-driver",
+                    "--package=permafrost-compiler-driver"
                 ],
                 "filter": {
-                    "name": "frostbite-compiler-driver",
+                    "name": "permafrost-compiler-driver",
                     "kind": "bin"
                 }
             },

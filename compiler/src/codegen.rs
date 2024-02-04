@@ -1,7 +1,7 @@
 mod bytecode;
 
 pub use bytecode::BytecodeCodegenBackend;
-use frostbite_reports::sourcemap::SourceKey;
+use permafrost_reports::sourcemap::SourceKey;
 
 use crate::context::CompilerContext;
 

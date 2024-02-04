@@ -2,8 +2,8 @@
 
 extern crate alloc;
 
-use frostbite_bytecode::{Instruction, Module};
 use num_traits::Num;
+use permafrost_bytecode::{Instruction, Module};
 
 use math::BinaryOperationKind::{self, *};
 use registers::Registers;

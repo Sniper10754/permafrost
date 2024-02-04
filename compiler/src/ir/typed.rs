@@ -1,6 +1,6 @@
 use alloc::{boxed::Box, collections::BTreeMap, string::String, vec::Vec};
 use dbg_pls::DebugPls;
-use frostbite_ast::{
+use permafrost_ast::{
     tokens::{
         FunctionToken, LeftBraceToken, LeftParenthesisToken, Operator, ReturnToken,
         RightBraceToken, RightParenthesisToken,
@@ -203,7 +203,7 @@ pub enum TypedExpressionKind
 
 impl Spannable for TypedExpressionKind
 {
-    fn span(&self) -> frostbite_ast::Span
+    fn span(&self) -> permafrost_ast::Span
     {
         use TypedExpressionKind::*;
 
@@ -258,7 +258,7 @@ pub enum Callable
 
 impl Spannable for Callable
 {
-    fn span(&self) -> frostbite_ast::Span
+    fn span(&self) -> permafrost_ast::Span
     {
         match self {
             Callable::Function(_, Spanned(span, _)) => span.clone(),
@@ -275,7 +275,7 @@ pub enum Assignable
 
 impl Spannable for Assignable
 {
-    fn span(&self) -> frostbite_ast::Span
+    fn span(&self) -> permafrost_ast::Span
     {
         match self {
             Assignable::Ident(_, Spanned(span, _)) => span.clone(),

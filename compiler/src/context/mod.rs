@@ -1,7 +1,7 @@
 use alloc::vec::Vec;
 use delegate::delegate;
-use frostbite_ast::Program;
-use frostbite_reports::{
+use permafrost_ast::Program;
+use permafrost_reports::{
     sourcemap::{SourceKey, SourceMap},
     ReportContext,
 };

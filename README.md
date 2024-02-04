@@ -1,13 +1,13 @@
-# Frostbite Language
-The frostbite is a dynamic, procedural language 
+# permafrost Language
+The permafrost is a dynamic, procedural language 
 
 ```js
 from core::fmt import format;
 from std::fmt import println; 
 
 function main() = {
-    frostbite = "Frostbite!";
-    string = format("Hello, $frostbite");
+    permafrost = "permafrost!";
+    string = format("Hello, $permafrost");
     
     println("Hello world!");
 }

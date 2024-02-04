@@ -1,5 +1,5 @@
 [package]
-name = "frostbite-reports"
+name = "permafrost-reports"
 version = "0.1.0"
 edition = "2021"
 
@@ -13,7 +13,7 @@ slotmap = { workspace = true }
 cfg-if = { workspace = true }
 
 ariadne = { version = "0.3", optional = true }
-frostbite-ast = { path = "../ast" }
+permafrost-ast = { path = "../ast" }
 
 [features]
 ariadne = ["std", "dep:ariadne", "diagnostic_printer"]

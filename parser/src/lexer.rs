@@ -1,9 +1,9 @@
 use alloc::{collections::VecDeque, string::String, vec, vec::Vec};
 
-use frostbite_reports::{sourcemap::SourceKey, IntoReport, Level, Report, ReportContext};
 use logos::{Logos, Span};
+use permafrost_reports::{sourcemap::SourceKey, IntoReport, Level, Report, ReportContext};
 
-use frostbite_ast::{tokens::BinaryOperatorKind, Spanned};
+use permafrost_ast::{tokens::BinaryOperatorKind, Spanned};
 
 mod helpers
 {
@@ -12,7 +12,7 @@ mod helpers
     use logos::Lexer;
     use num_traits::Num;
 
-    use frostbite_ast::tokens::BinaryOperatorKind;
+    use permafrost_ast::tokens::BinaryOperatorKind;
 
     use super::{LexerErrorKind, Token};
 
@@ -73,7 +73,7 @@ pub enum LexerErrorKind
 
 impl IntoReport for LexerError
 {
-    fn into_report(self) -> frostbite_reports::Report
+    fn into_report(self) -> permafrost_reports::Report
     {
         let source_key = self.source_key;
 

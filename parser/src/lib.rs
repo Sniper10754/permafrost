@@ -4,21 +4,22 @@ extern crate alloc;
 
 use core::ops::Range;
 
-use alloc::{boxed::Box, vec};
+use alloc::{boxed::Box, vec, vec::Vec};
 
 pub mod error;
 pub mod lexer;
 
 use error::ErrorKind;
-use frostbite_ast::{
+use lexer::{Token, TokenStream};
+use permafrost_ast::{
     tokens::{
         ArrowToken, Eq, FunctionToken, LeftBraceToken, LeftParenthesisToken, Operator, ReturnToken,
         RightBraceToken, RightParenthesisToken, TypeAnnotation,
     },
-    Argument, Expr, ImportDirectiveKind, ModuleDirectiveKind, ModulePath, Program, Spanned,
+    Argument, Expr, ImportDirectiveKind, ModuleDirectiveKind, ModulePath, Program, Spannable,
+    Spanned,
 };
-use frostbite_reports::{sourcemap::SourceKey, ReportContext};
-use lexer::{Token, TokenStream};
+use permafrost_reports::{sourcemap::SourceKey, ReportContext};
 
 use crate::error::Error;
 
@@ -42,7 +43,7 @@ mod utils
                         parser: $parser,
                         ErrorKind::UnrecognizedEof {
                             expected: &[$token_description],
-                            previous_element_span: $parser.token_stream.previous().unwrap().0.clone(),
+                            previous_element_span: $parser.token_stream.previous().unwrap().span().clone(),
                         }
                     ));
                     None
@@ -55,7 +56,7 @@ mod utils
     #[macro_export]
     macro_rules! report {
         (parser: $parser:expr, $kind:expr) => {{
-            use frostbite_reports::IntoReport as _;
+            use permafrost_reports::IntoReport as _;
 
             Error {
                 kind: $kind,
@@ -168,7 +169,7 @@ impl<'report_context> Parser<'report_context>
                         token: Token::LParen,
                         description: "Left pharentesis"
                     )?
-                    .0
+                    .span()
                     .into();
 
                     let mut arguments = vec![];
@@ -185,7 +186,7 @@ impl<'report_context> Parser<'report_context>
                                     token: Token::RParen,
                                     description: "Right pharentesis"
                                 )?
-                                .0
+                                .span()
                                 .into();
 
                                 break;
@@ -196,7 +197,7 @@ impl<'report_context> Parser<'report_context>
                             None => self.report_ctx.push(
                                 report!(parser: self, ErrorKind::UnrecognizedEof {
                                     expected: &["a comma", "an argument"],
-                                    previous_element_span: self.token_stream.previous().unwrap().0.clone()
+                                    previous_element_span: self.token_stream.previous().unwrap().span().clone()
                                 }),
                             ),
                         }
@@ -329,7 +330,8 @@ impl<'report_context> Parser<'report_context>
                         Some(Spanned(name_span, Token::Ident(name))) => {
                             let name = Spanned(name_span, name);
 
-                            let mut type_annotation = Spanned(name.0.clone(), TypeAnnotation::Any);
+                            let mut type_annotation =
+                                Spanned(name.span().clone(), TypeAnnotation::Any);
 
                             if matches!(self.token_stream.peek(), Some(Spanned(_, Token::Colon))) {
                                 consume_token!(
@@ -365,7 +367,7 @@ impl<'report_context> Parser<'report_context>
                             self.report_ctx
                                 .push(report!(parser: self, ErrorKind::UnrecognizedEof {
                                     expected: &["an identifier"],
-                                    previous_element_span: self.token_stream.previous().unwrap().0.clone()
+                                    previous_element_span: self.token_stream.previous().unwrap().span().clone()
                                 }));
 
                             return None;
@@ -436,7 +438,7 @@ impl<'report_context> Parser<'report_context>
                             parser: self,
                             ErrorKind::UnrecognizedEof {
                                 expected: &["An expression", "`}`"],
-                                previous_element_span: self.token_stream.previous().unwrap().0
+                                previous_element_span: self.token_stream.previous().unwrap().span()
                             }
                         )),
                     }
@@ -478,7 +480,7 @@ impl<'report_context> Parser<'report_context>
                 self.report_ctx
                     .push(report!(parser: self, ErrorKind::UnrecognizedEof {
                         expected: &["an expression"],
-                        previous_element_span: self.token_stream.previous().unwrap().0.clone()
+                        previous_element_span: self.token_stream.previous().unwrap().span().clone()
                     }));
 
                 None
@@ -527,7 +529,7 @@ impl<'report_context> Parser<'report_context>
                     parser: self,
                     ErrorKind::UnrecognizedEof {
                         expected: &["type annotation"],
-                        previous_element_span: self.token_stream.previous().unwrap().0.clone(),
+                        previous_element_span: self.token_stream.previous().unwrap().span().clone(),
                     }
                 ));
 
@@ -538,10 +540,12 @@ impl<'report_context> Parser<'report_context>
 
     fn parse_module_path(&mut self) -> Option<Spanned<ModulePath>>
     {
+        let mut names = Vec::new();
+
         let Spanned(
             Range {
                 start: span_start,
-                end: span_end,
+                end: mut span_end,
             },
             Token::Ident(name),
         ) = consume_token!(
@@ -553,6 +557,32 @@ impl<'report_context> Parser<'report_context>
             unreachable!()
         };
 
-        Some(Spanned(span_start..span_end, name.into()))
+        names.push(name);
+
+        loop {
+            if matches!(
+                self.token_stream.peek(),
+                Some(Spanned(_, Token::DoubleColon))
+            ) {
+                self.token_stream.skip_token();
+
+                let Spanned(Range { start: _, end }, Token::Ident(name)) = consume_token!(
+                    parser: self,
+                    token: Token::Ident(..),
+                    description: "Module name"
+                )?
+                else {
+                    unreachable!()
+                };
+
+                span_end = end;
+
+                names.push(name);
+            } else {
+                break;
+            }
+        }
+
+        Some(Spanned(span_start..span_end, ModulePath { names }))
     }
 }

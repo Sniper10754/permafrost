@@ -1,5 +1,5 @@
 [package]
-name = "frostbite-repl"
+name = "permafrost-repl"
 version.workspace = true
 edition.workspace = true
 
@@ -8,10 +8,10 @@ edition.workspace = true
 [dependencies]
 reedline = "0"
 
-frostbite-compiler = { path = "../compiler", features = ["std"] }
-frostbite-runtime = { path = "../runtime" }
-frostbite-vm-core = { path = "../vm-core" }
-frostbite-reports = { path = "../reports", features = ["std", "ariadne"] }
+permafrost-compiler = { path = "../compiler", features = ["std"] }
+permafrost-runtime = { path = "../runtime" }
+permafrost-vm-core = { path = "../vm-core" }
+permafrost-reports = { path = "../reports", features = ["std", "ariadne"] }
 
 color-eyre = { workspace = true }
 

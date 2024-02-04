@@ -1,12 +1,12 @@
 use alloc::{borrow::Cow, boxed::Box, format, string::String, vec::Vec};
-use frostbite_ast::{
+use permafrost_ast::{
     tokens::{
         ArrowToken, FunctionToken, LeftBraceToken, LeftParenthesisToken, ModToken, ReturnToken,
         RightBraceToken, RightParenthesisToken, TypeAnnotation,
     },
     Expr, ImportDirectiveKind, ModuleDirectiveKind, Span, Spannable, Spanned,
 };
-use frostbite_reports::{
+use permafrost_reports::{
     sourcemap::{SourceKey, SourceUrl},
     IntoReport, Label, Level, Report,
 };
@@ -14,8 +14,9 @@ use frostbite_reports::{
 use crate::{
     context::names::{NamedModule, NamedModuleKey},
     ir::named::{Argument, Assignable, LocalKey, NamedAst, NamedExpr},
+    permafrost_FILE_EXTENSION,
     utils::Scopes,
-    Compiler, FROSTBITE_FILE_EXTENSION,
+    Compiler,
 };
 
 enum NameResolutionError
@@ -283,7 +284,7 @@ impl<'compiler> RecursiveNameChecker<'compiler>
             match module_directive_kind {
                 ModuleDirectiveKind::ImportLocalModule(local_module_name) => {
                     let module_path = parent_dir.join(format!(
-                        "{}.{FROSTBITE_FILE_EXTENSION}",
+                        "{}.{permafrost_FILE_EXTENSION}",
                         local_module_name.value()
                     ));
 
@@ -361,7 +362,7 @@ impl<'compiler> RecursiveNameChecker<'compiler>
         source_key: SourceKey,
         fn_token: FunctionToken,
         name: Option<Spanned<&str>>,
-        arguments: &[frostbite_ast::Argument],
+        arguments: &[permafrost_ast::Argument],
         return_type_token: Option<ArrowToken>,
         return_type_annotation: Option<Spanned<TypeAnnotation>>,
         body: &Expr,
@@ -379,7 +380,7 @@ impl<'compiler> RecursiveNameChecker<'compiler>
             .iter()
             .cloned()
             .map(
-                |frostbite_ast::Argument {
+                |permafrost_ast::Argument {
                      name,
                      type_annotation,
                  }| {

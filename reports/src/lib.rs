@@ -19,7 +19,7 @@ pub mod printer;
 pub mod sourcemap;
 pub mod utils;
 
-pub use frostbite_ast::Span;
+pub use permafrost_ast::Span;
 
 use cfg_if::cfg_if;
 

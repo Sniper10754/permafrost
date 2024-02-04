@@ -1,3 +1,3 @@
-# Frostbite Compiler Driver
+# permafrost Compiler Driver
 
 a std cli driver for the compiler.

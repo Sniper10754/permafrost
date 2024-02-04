@@ -6,7 +6,7 @@ use alloc::{
     borrow::Cow, boxed::Box, collections::BTreeMap, format, string::String, vec, vec::Vec,
 };
 
-use frostbite_ast::{
+use permafrost_ast::{
     tokens::{
         BinaryOperatorKind, FunctionToken, LeftBraceToken, LeftParenthesisToken, Operator,
         ReturnToken, RightBraceToken, RightParenthesisToken, TypeAnnotation,
@@ -14,7 +14,7 @@ use frostbite_ast::{
     Span, Spannable, Spanned,
 };
 
-use frostbite_reports::{sourcemap::SourceKey, IntoReport, Label, Level, Report};
+use permafrost_reports::{sourcemap::SourceKey, IntoReport, Label, Level, Report};
 use slotmap::SecondaryMap;
 
 use crate::{

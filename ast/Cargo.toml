@@ -1,5 +1,5 @@
 [package]
-name = "frostbite-ast"
+name = "permafrost-ast"
 version.workspace = true
 edition.workspace = true
 

@@ -1,5 +1,5 @@
-use frostbite_ast::Span;
-use frostbite_reports::{sourcemap::SourceKey, IntoReport, Label, Level, Report};
+use permafrost_ast::Span;
+use permafrost_reports::{sourcemap::SourceKey, IntoReport, Label, Level, Report};
 
 use alloc::format;
 
@@ -30,7 +30,7 @@ pub enum ErrorKind
 
 impl IntoReport for Error
 {
-    fn into_report(self) -> frostbite_reports::Report
+    fn into_report(self) -> permafrost_reports::Report
     {
         let source_key = self.source_key;
 

@@ -1,3 +1,3 @@
-# Frostbite Bytecode
+# permafrost Bytecode
 
 Contains the bytecode serialized into rust data types.
