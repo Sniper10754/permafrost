@@ -83,7 +83,7 @@ fn main() -> eyre::Result<()>
 
             let mut compiler = Compiler::new();
 
-            let src_key = compiler.add_source(file.display().to_string(), src);
+            let src_key = compiler.add_source(file.clone(), src);
 
             if compiler.analyze_module(src_key).is_err() {
                 bail(compiler.move_ctx());

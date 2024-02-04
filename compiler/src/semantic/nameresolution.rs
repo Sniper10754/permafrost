@@ -8,11 +8,11 @@ use frostbite_ast::{
 };
 use frostbite_reports::{
     sourcemap::{SourceKey, SourceUrl},
-    IntoReport, Level, Report,
+    IntoReport, Label, Level, Report,
 };
 
 use crate::{
-    context::names::NamedModuleKey,
+    context::names::{NamedModule, NamedModuleKey},
     ir::named::{Argument, Assignable, LocalKey, NamedAst, NamedExpr},
     utils::Scopes,
     Compiler, FROSTBITE_FILE_EXTENSION,
@@ -41,7 +41,13 @@ enum NameResolutionError
     ModuleStatementNotSupported(SourceKey, Span),
 
     #[cfg(feature = "std")]
-    IoError(std::io::Error, SourceKey, Span),
+    CouldNotReadModuleFile
+    {
+        error: std::io::Error,
+        module_path: std::path::PathBuf,
+        source_key: SourceKey,
+        span: Span,
+    },
 }
 
 impl IntoReport for NameResolutionError
@@ -80,34 +86,46 @@ impl IntoReport for NameResolutionError
             NameResolutionError::ModuleStatementNotSupported(source_key, span) => {
                 Report::new(Level::Error, span, source_key, "Mod statement not supported", Some("The mod statement requires the std file api: youre on a platform which doesnt support std."))
             }
-            NameResolutionError::IoError(error, source_key,  span) => Report::new(Level::Error, span, source_key, "Io Error", Some(format!("{error}")))
+            #[cfg(feature = "std")]
+            NameResolutionError::CouldNotReadModuleFile { error, source_key,  span, module_path } => Report::new(Level::Error, span, source_key, "Input/Output OS Error", Some(format!("{error}"))).with_label(Label::new(format!("Could not read path `{}`", module_path.display()), None, source_key))
         }
     }
 }
 
 pub fn check_names(
     compiler: &mut Compiler,
-    source_key: SourceKey,
+    src_key: SourceKey,
 )
 {
     compiler
         .ctx
         .named_ctx
         .named_asts
-        .insert(source_key, NamedAst::default());
+        .insert(src_key, NamedAst::default());
+
+    let module_key = compiler.ctx.named_ctx.modules.insert(NamedModule {
+        src_key,
+        items: Vec::new(),
+    });
+
+    compiler
+        .ctx
+        .named_ctx
+        .modules_by_src_keys
+        .insert(src_key, module_key);
 
     let mut rnc = RecursiveNameChecker {
         compiler,
         scopes: Scopes::new(),
     };
 
-    let ast = rnc.compiler.ctx.asts[source_key].exprs.clone().into_iter();
+    let ast = rnc.compiler.ctx.asts[src_key].exprs.clone().into_iter();
 
     for ref expr in ast {
-        let result = rnc.visit_expr(source_key, expr);
+        let result = rnc.visit_expr(src_key, expr);
 
         match result {
-            Ok(named_expr) => rnc.compiler.ctx.named_ctx.named_asts[source_key]
+            Ok(named_expr) => rnc.compiler.ctx.named_ctx.named_asts[src_key]
                 .exprs
                 .push(named_expr),
             Err(error) => rnc.compiler.ctx.report_ctx.push(error.into_report()),
@@ -255,7 +273,7 @@ impl<'compiler> RecursiveNameChecker<'compiler>
         {
             use std::path::Path;
 
-            let filepath: Cow<'_, Path> = match self.compiler.ctx.src_map[source_key].url {
+            let parent_dir: Cow<'_, Path> = match self.compiler.ctx.src_map[source_key].url {
                 SourceUrl::PathBuf(ref pathbuf) => pathbuf.parent().unwrap().into(),
                 SourceUrl::Sparse(..) | SourceUrl::Anonymous => {
                     std::env::current_dir().unwrap().into()
@@ -264,14 +282,19 @@ impl<'compiler> RecursiveNameChecker<'compiler>
 
             match module_directive_kind {
                 ModuleDirectiveKind::ImportLocalModule(local_module_name) => {
-                    let module_path = filepath.join(format!(
+                    let module_path = parent_dir.join(format!(
                         "{}.{FROSTBITE_FILE_EXTENSION}",
                         local_module_name.value()
                     ));
 
                     let source_code =
-                        std::fs::read_to_string(module_path.as_path()).map_err(|err| {
-                            NameResolutionError::IoError(err, source_key, module_token.span())
+                        std::fs::read_to_string(module_path.as_path()).map_err(|error| {
+                            NameResolutionError::CouldNotReadModuleFile {
+                                error,
+                                source_key,
+                                span: module_token.span(),
+                                module_path: module_path.clone(),
+                            }
                         })?;
 
                     let module_source_key = self

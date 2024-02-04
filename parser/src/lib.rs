@@ -15,8 +15,7 @@ use frostbite_ast::{
         ArrowToken, Eq, FunctionToken, LeftBraceToken, LeftParenthesisToken, Operator, ReturnToken,
         RightBraceToken, RightParenthesisToken, TypeAnnotation,
     },
-    Argument, Expr, ImportDirectiveKind, ModuleDirectiveKind, ModulePath, Program, Spannable,
-    Spanned,
+    Argument, Expr, ImportDirectiveKind, ModuleDirectiveKind, ModulePath, Program, Spanned,
 };
 use frostbite_reports::{sourcemap::SourceKey, ReportContext};
 use lexer::{Token, TokenStream};

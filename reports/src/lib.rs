@@ -109,14 +109,14 @@ impl Label
 {
     pub fn new(
         info: impl Into<Cow<'static, str>>,
-        location: impl Into<Option<Span>>,
-        src_key: impl Into<SourceKey>,
+        span: Option<Span>,
+        src_key: SourceKey,
     ) -> Self
     {
         Self {
             info: info.into(),
-            span: location.into(),
-            src_key: src_key.into(),
+            span,
+            src_key,
         }
     }
 }
