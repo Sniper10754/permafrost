@@ -162,6 +162,9 @@ pub enum Token
     #[token(",")]
     Comma,
 
+    #[token("mod")]
+    Module,
+
     #[regex(r#"(\+|-|\*|/|==|)"#, helpers::parse_operator)]
     BinaryOperator(BinaryOperatorKind),
 

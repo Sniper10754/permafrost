@@ -15,7 +15,8 @@ use frostbite_ast::{
         ArrowToken, Eq, FunctionToken, LeftBraceToken, LeftParenthesisToken, Operator, ReturnToken,
         RightBraceToken, RightParenthesisToken, TypeAnnotation,
     },
-    Argument, Expr, ImportDirectiveKind, ModulePath, Program, Spanned,
+    Argument, Expr, ImportDirectiveKind, ModuleDirectiveKind, ModulePath, Program, Spannable,
+    Spanned,
 };
 use frostbite_reports::{sourcemap::SourceKey, ReportContext};
 use lexer::{Token, TokenStream};
@@ -148,7 +149,6 @@ impl<'report_context> Parser<'report_context>
                         rhs: Box::new(rhs),
                     }
                 }
-
                 Some(Spanned(eq_span, Token::Eq)) => {
                     let eq_token = Eq(eq_span.clone());
 
@@ -233,6 +233,22 @@ impl<'report_context> Parser<'report_context>
                     start..end,
                     ImportDirectiveKind::ImportModule { module },
                 )))
+            }
+
+            Some(Spanned(mod_token_span, Token::Module)) => {
+                let Spanned(name_span, Token::Ident(module_name)) = consume_token!(
+                    parser: self,
+                    token: Token::Ident(_),
+                    description: "Identifier"
+                )?
+                else {
+                    unreachable!()
+                };
+
+                Some(Expr::ModuleDirective(
+                    mod_token_span.into(),
+                    ModuleDirectiveKind::ImportLocalModule(Spanned(name_span, module_name)),
+                ))
             }
 
             Some(Spanned(Range { start, end: _ }, Token::From)) => {
