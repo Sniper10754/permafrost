@@ -16,7 +16,7 @@ use crate::{
     },
 };
 
-use super::CodegenBackend;
+use super::{CodegenBackend, CodegenOutput, PrintableCodegenOutput, SerializationError};
 
 impl CodegenBackend for BytecodeCodegenBackend
 {
@@ -55,6 +55,13 @@ pub struct BytecodeCodegenBackend
 
 impl BytecodeCodegenBackend
 {
+    pub fn new() -> Self
+    {
+        Self {
+            functions: SecondaryMap::new(),
+        }
+    }
+
     /// Compile a program
     fn compile_program(
         &mut self,
@@ -352,5 +359,37 @@ impl BytecodeCodegenBackend
                 instructions.push(Instruction::Call);
             }
         }
+    }
+}
+
+impl CodegenOutput for Module
+{
+    fn serialize(
+        &self,
+        buf: &mut Vec<u8>,
+    )
+    {
+        permafrost_bytecode::encode(self, buf);
+    }
+
+    fn deserialize(buf: &[u8]) -> Result<Self, SerializationError>
+    {
+        permafrost_bytecode::decode(buf).map_err(|_| SerializationError)
+    }
+
+    fn as_printable(&self) -> Option<&dyn super::PrintableCodegenOutput>
+    {
+        Some(self)
+    }
+}
+
+impl PrintableCodegenOutput for Module
+{
+    fn print(
+        &self,
+        buf: &mut alloc::string::String,
+    ) -> alloc::fmt::Result
+    {
+        permafrost_bytecode::text_repr::print_bytecode(buf, self)
     }
 }

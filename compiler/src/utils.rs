@@ -168,4 +168,34 @@ mod scopes_abstraction
     }
 }
 
-pub use self::scopes_abstraction::{Scope, Scopes};
+mod compilation_results
+{
+    use delegate::delegate;
+    use permafrost_reports::sourcemap::SourceKey;
+    use slotmap::SecondaryMap;
+
+    use crate::codegen::CodegenBackend;
+
+    pub struct CompilationResults<C>
+    where
+        C: CodegenBackend,
+    {
+        pub(crate) compiled_files: SecondaryMap<SourceKey, C::Output>,
+    }
+
+    impl<C> CompilationResults<C>
+    where
+        C: CodegenBackend,
+    {
+        delegate! {
+            to self.compiled_files {
+                #[call(get)]
+                pub fn get_file(&self, source_key: SourceKey) -> Option<&C::Output>;
+                #[call(remove)]
+                pub fn retrieve(&mut self, source_key: SourceKey) -> Option<C::Output>;
+            }
+        }
+    }
+}
+
+pub use self::{compilation_results::*, scopes_abstraction::*};

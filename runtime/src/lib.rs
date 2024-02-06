@@ -52,11 +52,13 @@ impl Runtime
     {
         let mut compiler = Compiler::new();
 
-        let source_key = compiler.add_source(source_url.into(), code);
+        let Ok(source_key) = compiler.add_source(source_url.into(), code) else {
+            return Err(compiler.move_ctx());
+        };
 
         let result = compiler.compile(&mut self.codegen);
 
-        result.map(|mut files| files.remove(source_key).unwrap())
+        result.map(|mut files| files.retrieve(source_key).unwrap())
     }
 }
 

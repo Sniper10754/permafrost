@@ -5,21 +5,24 @@ use std::{env, fs, io::Write, path::PathBuf, process};
 use clap::Parser;
 use color_eyre::eyre;
 
-use permafrost_bytecode::Module;
-use permafrost_compiler::{codegen::CodegenBackends, context::CompilerContext, Compiler};
+use compile::{call_compiler, CompilingError};
+use permafrost_compiler::{
+    codegen::{CodegenBackend, CodegenBackends, CodegenOutput, PrintableCodegenOutput},
+    context::CompilerContext,
+};
 use permafrost_reports::printer::{DefaultPrintBackend, ReportPrinter};
 
 mod compile;
 
 #[derive(clap::Parser)]
-pub struct CliArgs
+struct CliArgs
 {
     #[clap(subcommand)]
     subcommand: CliSubcommand,
 }
 
 #[derive(clap::Subcommand)]
-pub enum CliSubcommand
+enum CliSubcommand
 {
     #[command(about = "Compile a file")]
     Compile
@@ -32,7 +35,26 @@ pub enum CliSubcommand
 
         #[arg(help = "Disassemble once compilation is done", long = "disassemble")]
         disassemble: bool,
+
+        #[arg(help = "Codegen backend to use", long, short, value_enum, default_value_t=CodegenOptions::Bytecode)]
+        codegen_option: CodegenOptions,
     },
+}
+
+#[derive(clap::ValueEnum, Clone, Debug)]
+enum CodegenOptions
+{
+    Bytecode,
+}
+
+impl CodegenOptions
+{
+    pub fn into_codegen_backend(self) -> impl CodegenBackend
+    {
+        match self {
+            CodegenOptions::Bytecode => CodegenBackends::bytecode_backend(),
+        }
+    }
 }
 
 fn setup_logger() -> eyre::Result<()>
@@ -78,54 +100,45 @@ fn main() -> eyre::Result<()>
             file,
             output_file,
             disassemble,
-        } => {
-            let src = fs::read_to_string(&file)?;
+            codegen_option,
+        } => compile_file(file, output_file, disassemble, codegen_option),
+    }
+}
 
-            let mut compiler = Compiler::new();
+fn compile_file(
+    file: PathBuf,
+    output_file: Option<PathBuf>,
+    disassemble: bool,
+    codegen_option: CodegenOptions,
+) -> eyre::Result<()>
+{
+    let src = fs::read_to_string(&file)?;
 
-            let src_key = compiler.add_source(file.clone(), src);
+    let mut codegen = codegen_option.into_codegen_backend();
 
-            if compiler.analyze_module(src_key).is_err() {
-                bail(compiler.move_ctx());
-            }
+    let (file_src_key, codegen_output) = match call_compiler(file, src, &mut codegen) {
+        Ok(codegen_output) => codegen_output,
+        Err(compiling_err) => bail(compiling_err),
+    };
 
-            let mut codegen_backend = CodegenBackends::bytecode_backend();
+    let file_codegen_output = codegen_output.get_file(file_src_key).unwrap();
 
-            let codegen_outputs = compiler
-                .compile(&mut codegen_backend)
-                .map_err(bail)
-                .unwrap();
-
-            let codegen_output = &codegen_outputs[src_key];
-
-            if disassemble {
-                disassemble_and_print(codegen_output)?;
-            }
-
-            let mut buf = vec![];
-
-            permafrost_bytecode::encode(codegen_output, &mut buf);
-
-            let output_file =
-                output_file.unwrap_or_else(|| env::temp_dir().join("permafrost-compiler-output"));
-
-            let mut fs_writer = fs::OpenOptions::new()
-                .read(true)
-                .write(true)
-                .create(true)
-                .append(false)
-                .open(output_file)?;
-
-            fs_writer.write_all(&buf)?;
+    if disassemble {
+        if let Some(printable) = file_codegen_output.as_printable() {
+            disassemble_and_print(printable)?;
+        } else {
+            log::warn!("Codegen output doesnt support printing");
         }
     }
+
+    write_output_to_file(file_codegen_output, output_file)?;
 
     Ok(())
 }
 
-fn bail(ctx: CompilerContext) -> !
+fn bail(err: CompilingError) -> !
 {
-    print_reports(&ctx);
+    print_reports(&err.context);
 
     process::exit(1);
 }
@@ -143,13 +156,39 @@ fn print_reports(ctx: &CompilerContext)
     println!("{buf}");
 }
 
-fn disassemble_and_print(module: &Module) -> eyre::Result<()>
+fn disassemble_and_print<C>(output: &C) -> eyre::Result<()>
+where
+    C: PrintableCodegenOutput + ?Sized,
 {
     let mut buf = String::new();
 
-    permafrost_bytecode::text_repr::print_bytecode(&mut buf, module)?;
+    output.print(&mut buf)?;
 
     println!("{buf}");
+
+    Ok(())
+}
+
+fn write_output_to_file(
+    output: &impl CodegenOutput,
+    output_file: Option<PathBuf>,
+) -> eyre::Result<()>
+{
+    let mut buf = vec![];
+
+    output.serialize(&mut buf);
+
+    let output_file =
+        output_file.unwrap_or_else(|| env::temp_dir().join("permafrost-compiler-output"));
+
+    let mut fs_writer = fs::OpenOptions::new()
+        .read(true)
+        .write(true)
+        .create(true)
+        .append(false)
+        .open(output_file)?;
+
+    fs_writer.write_all(&buf)?;
 
     Ok(())
 }

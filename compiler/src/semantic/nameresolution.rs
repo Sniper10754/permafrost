@@ -14,9 +14,8 @@ use permafrost_reports::{
 use crate::{
     context::names::{NamedModule, NamedModuleKey},
     ir::named::{Argument, Assignable, LocalKey, NamedAst, NamedExpr},
-    permafrost_FILE_EXTENSION,
     utils::Scopes,
-    Compiler,
+    Compiler, PERMAFROST_FILE_EXTENSION,
 };
 
 enum NameResolutionError
@@ -284,7 +283,7 @@ impl<'compiler> RecursiveNameChecker<'compiler>
             match module_directive_kind {
                 ModuleDirectiveKind::ImportLocalModule(local_module_name) => {
                     let module_path = parent_dir.join(format!(
-                        "{}.{permafrost_FILE_EXTENSION}",
+                        "{}.{PERMAFROST_FILE_EXTENSION}",
                         local_module_name.value()
                     ));
 
@@ -298,21 +297,22 @@ impl<'compiler> RecursiveNameChecker<'compiler>
                             }
                         })?;
 
-                    let module_source_key = self
+                    if let Ok(module_source_key) = self
                         .compiler
-                        .add_source(SourceUrl::PathBuf(module_path), source_code);
+                        .add_source(SourceUrl::PathBuf(module_path), source_code)
+                    {
+                        let module_key =
+                            self.compiler.ctx.named_ctx.modules_by_src_keys[module_source_key];
 
-                    _ = self.compiler.analyze_module(module_source_key);
-
-                    let module_key =
-                        self.compiler.ctx.named_ctx.modules_by_src_keys[module_source_key];
-
-                    self.scopes
-                        .try_insert(local_module_name.value(), LocalKind::Module(module_key))
-                        .map_err(|_| NameResolutionError::ClashingIdentifier {
-                            source_key,
-                            identifier: local_module_name.clone(),
-                        })?;
+                        self.scopes
+                            .try_insert(local_module_name.value(), LocalKind::Module(module_key))
+                            .map_err(|_| NameResolutionError::ClashingIdentifier {
+                                source_key,
+                                identifier: local_module_name.clone(),
+                            })?;
+                    } else {
+                        // Do nothing
+                    }
                 }
             }
         }

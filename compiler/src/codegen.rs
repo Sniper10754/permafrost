@@ -1,5 +1,6 @@
 mod bytecode;
 
+use alloc::{fmt, string::String, vec::Vec};
 pub use bytecode::BytecodeCodegenBackend;
 use permafrost_reports::sourcemap::SourceKey;
 
@@ -7,7 +8,7 @@ use crate::context::CompilerContext;
 
 pub trait CodegenBackend
 {
-    type Output;
+    type Output: CodegenOutput;
 
     fn codegen(
         &mut self,
@@ -36,6 +37,29 @@ impl CodegenBackends
 {
     pub fn bytecode_backend() -> BytecodeCodegenBackend
     {
-        BytecodeCodegenBackend::default()
+        BytecodeCodegenBackend::new()
     }
+}
+
+#[derive(Debug, Clone, Copy, Default, Hash, PartialEq, Eq, PartialOrd, Ord)]
+pub struct SerializationError;
+
+pub trait CodegenOutput: Sized
+{
+    fn serialize(
+        &self,
+        buf: &mut Vec<u8>,
+    );
+
+    fn deserialize(buf: &[u8]) -> Result<Self, SerializationError>;
+
+    fn as_printable(&self) -> Option<&dyn PrintableCodegenOutput>;
+}
+
+pub trait PrintableCodegenOutput
+{
+    fn print(
+        &self,
+        buf: &mut String,
+    ) -> fmt::Result;
 }

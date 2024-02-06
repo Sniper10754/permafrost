@@ -17,8 +17,9 @@ use permafrost_parser::{
 };
 use permafrost_reports::sourcemap::{SourceDescription, SourceKey, SourceUrl};
 use slotmap::SecondaryMap;
+use utils::CompilationResults;
 
-pub const permafrost_FILE_EXTENSION: &str = "fsb";
+pub const PERMAFROST_FILE_EXTENSION: &str = "fsb";
 
 pub mod codegen;
 pub mod context;
@@ -42,7 +43,7 @@ impl Compiler
         Self::default()
     }
 
-    pub fn add_source(
+    pub fn __add_source(
         &mut self,
         url: impl Into<SourceUrl>,
         source: impl Into<String>,
@@ -54,7 +55,20 @@ impl Compiler
         })
     }
 
-    pub fn analyze_module(
+    pub fn add_source(
+        &mut self,
+        url: impl Into<SourceUrl>,
+        source: impl Into<String>,
+    ) -> Result<SourceKey, CompilerError>
+    {
+        let src_key = self.__add_source(url, source);
+
+        self.analyze_module(src_key)?;
+
+        Ok(src_key)
+    }
+
+    fn analyze_module(
         &mut self,
         src_key: SourceKey,
     ) -> Result<(), CompilerError>
@@ -131,26 +145,26 @@ impl Compiler
     pub fn compile<C>(
         mut self,
         codegen: &mut C,
-    ) -> Result<SecondaryMap<SourceKey, C::Output>, CompilerContext>
+    ) -> Result<CompilationResults<C>, CompilerContext>
     where
         C: CodegenBackend,
     {
-        let mut secondary_map = SecondaryMap::new();
+        let mut compiled_files = SecondaryMap::new();
 
         for source_key in self.ctx.src_map.keys().collect::<Vec<_>>() {
             if self.analyze_module(source_key).is_err() {
-                return Err(self.ctx);
+                return Err(self.move_ctx());
             }
 
             let codegen_output = match self.codegen(source_key, codegen) {
                 Ok(codegen_output) => codegen_output,
-                Err(_) => return Err(self.ctx),
+                Err(_) => return Err(self.move_ctx()),
             };
 
-            secondary_map.insert(source_key, codegen_output);
+            compiled_files.insert(source_key, codegen_output);
         }
 
-        Ok(secondary_map)
+        Ok(CompilationResults { compiled_files })
     }
 
     fn codegen<C>(
