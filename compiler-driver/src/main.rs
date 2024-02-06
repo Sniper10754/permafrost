@@ -5,10 +5,11 @@ use std::{env, fs, io::Write, path::PathBuf, process};
 use clap::Parser;
 use color_eyre::eyre;
 
-use compile::{call_compiler, CompilingError};
+use compile::call_compiler;
 use permafrost_compiler::{
     codegen::{CodegenBackend, CodegenBackends, CodegenOutput, PrintableCodegenOutput},
     context::CompilerContext,
+    Compiler, PERMAFROST_FILE_EXTENSION,
 };
 use permafrost_reports::printer::{DefaultPrintBackend, ReportPrinter};
 
@@ -112,13 +113,26 @@ fn compile_file(
     codegen_option: CodegenOptions,
 ) -> eyre::Result<()>
 {
+    match file
+        .extension()
+        .map(|extension| extension.to_string_lossy())
+        .as_deref()
+    {
+        Some("pmf") => (),
+        Some(..) | None => log::warn!(
+            "The reccomended file extension is `{}`",
+            PERMAFROST_FILE_EXTENSION
+        ),
+    }
+
     let src = fs::read_to_string(&file)?;
 
     let mut codegen = codegen_option.into_codegen_backend();
+    let mut compiler = Compiler::new();
 
-    let (file_src_key, codegen_output) = match call_compiler(file, src, &mut codegen) {
-        Ok(codegen_output) => codegen_output,
-        Err(compiling_err) => bail(compiling_err),
+    let Ok((file_src_key, codegen_output)) = call_compiler(&mut compiler, file, src, &mut codegen)
+    else {
+        bail(&compiler)
     };
 
     let file_codegen_output = codegen_output.get_file(file_src_key).unwrap();
@@ -136,9 +150,9 @@ fn compile_file(
     Ok(())
 }
 
-fn bail(err: CompilingError) -> !
+fn bail(compiler: &Compiler) -> !
 {
-    print_reports(&err.context);
+    print_reports(compiler.ctx());
 
     process::exit(1);
 }

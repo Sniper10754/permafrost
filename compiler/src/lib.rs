@@ -8,18 +8,21 @@ extern crate std;
 use crate::semantic::{nameresolution, typecheck};
 
 use alloc::{string::String, vec::Vec};
-use codegen::CodegenBackend;
-use context::CompilerContext;
+use derive_more::*;
 use log::{debug, trace};
+use slotmap::SecondaryMap;
+
 use permafrost_parser::{
     lexer::{tokenize, TokenStream},
     Parser,
 };
 use permafrost_reports::sourcemap::{SourceDescription, SourceKey, SourceUrl};
-use slotmap::SecondaryMap;
+
+use codegen::CodegenBackend;
+use context::CompilerContext;
 use utils::CompilationResults;
 
-pub const PERMAFROST_FILE_EXTENSION: &str = "fsb";
+pub const PERMAFROST_FILE_EXTENSION: &str = "pmf";
 
 pub mod codegen;
 pub mod context;
@@ -27,17 +30,33 @@ pub mod ir;
 pub mod semantic;
 pub mod utils;
 
-#[derive(Debug, Clone, Copy, Default, Hash, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, Default, Copy, Constructor)]
 pub struct CompilerError;
 
 #[derive(Debug, Default)]
 pub struct Compiler
 {
     ctx: CompilerContext,
+    state: CompilerState,
+}
+
+#[derive(Debug, Clone, Copy, Default, IsVariant)]
+pub enum CompilerState
+{
+    #[default]
+    Ready,
+    Exhausted,
 }
 
 impl Compiler
 {
+    pub fn ensure_not_exhausted(&self)
+    {
+        if self.state.is_exhausted() {
+            panic!("Compiler is exhausted (already compiled)")
+        }
+    }
+
     pub fn new() -> Self
     {
         Self::default()
@@ -94,19 +113,19 @@ impl Compiler
     ) -> Result<(), CompilerError>
     {
         nameresolution::check_names(self, source_key);
-        self.ctx.has_errors_fallible_default()?;
+        self.errors_as_result()?;
 
         debug!(
             "Name resoluted & Import resoluted IR:\n{}",
-            dbg_pls::color(&self.ctx.named_ctx.named_asts[source_key])
+            dbg_pls::color(self.ctx.named_ctx.get_ast(source_key))
         );
 
         typecheck::check_types(self, source_key);
-        self.ctx.has_errors_fallible_default()?;
+        self.errors_as_result()?;
 
         debug!(
             "Typed IR:\n{}",
-            dbg_pls::color(&self.ctx.type_ctx.get_ast(source_key)),
+            dbg_pls::color(self.ctx.type_ctx.get_ast(source_key)),
         );
 
         Ok(())
@@ -123,7 +142,7 @@ impl Compiler
 
         self.ctx.asts.insert(source_key, ast);
 
-        self.ctx.has_errors_fallible_default()?;
+        self.errors_as_result()?;
 
         Ok(())
     }
@@ -133,33 +152,34 @@ impl Compiler
         source_key: SourceKey,
     ) -> Result<TokenStream, CompilerError>
     {
-        let source = self.ctx.src_map[source_key].source_code.as_str();
+        let source = self
+            .ctx
+            .src_map
+            .get(source_key)
+            .unwrap()
+            .source_code
+            .as_str();
 
         let token_stream = tokenize(&mut self.ctx.report_ctx, source_key, source);
 
-        self.ctx.has_errors_fallible_default()?;
+        self.errors_as_result()?;
 
         Ok(token_stream)
     }
 
     pub fn compile<C>(
-        mut self,
+        &mut self,
         codegen: &mut C,
-    ) -> Result<CompilationResults<C>, CompilerContext>
+    ) -> Result<CompilationResults<C>, CompilerError>
     where
         C: CodegenBackend,
     {
         let mut compiled_files = SecondaryMap::new();
 
         for source_key in self.ctx.src_map.keys().collect::<Vec<_>>() {
-            if self.analyze_module(source_key).is_err() {
-                return Err(self.move_ctx());
-            }
+            self.analyze_module(source_key)?;
 
-            let codegen_output = match self.codegen(source_key, codegen) {
-                Ok(codegen_output) => codegen_output,
-                Err(_) => return Err(self.move_ctx()),
-            };
+            let codegen_output = self.codegen(source_key, codegen)?;
 
             compiled_files.insert(source_key, codegen_output);
         }
@@ -175,9 +195,9 @@ impl Compiler
     where
         C: CodegenBackend,
     {
-        let output = codegen.codegen(main_source_key, &mut self.ctx);
+        let output = CodegenBackend::codegen(codegen, main_source_key, &mut self.ctx);
 
-        self.ctx.has_errors_fallible_default()?;
+        self.errors_as_result()?;
 
         Ok(output)
     }
@@ -195,8 +215,8 @@ impl Compiler
         &mut self.ctx
     }
 
-    pub fn move_ctx(self) -> CompilerContext
+    fn errors_as_result(&self) -> Result<(), CompilerError>
     {
-        self.ctx
+        self.ctx.has_errors_fallible(CompilerError)
     }
 }

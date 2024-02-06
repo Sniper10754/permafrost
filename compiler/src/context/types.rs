@@ -1,3 +1,4 @@
+use delegate::delegate;
 use permafrost_reports::sourcemap::SourceKey;
 use slotmap::SecondaryMap;
 
@@ -12,52 +13,50 @@ pub struct TypeContext
 
 impl TypeContext
 {
-    pub fn get_ast(
-        &self,
-        source_key: SourceKey,
-    ) -> &TypedAst
-    {
-        &self.t_asts[source_key]
-    }
+    delegate! {
+        to self.t_asts {
+            #[call(get)]
+            #[unwrap]
+            pub fn get_ast(
+                &self,
+                source_key: SourceKey,
+            ) -> &TypedAst;
 
-    pub fn get_ast_mut(
-        &mut self,
-        source_key: SourceKey,
-    ) -> &mut TypedAst
-    {
-        &mut self.t_asts[source_key]
-    }
+            #[call(get_mut)]
+            #[unwrap]
+            pub fn get_ast_mut(
+                &mut self,
+                source_key: SourceKey,
+            ) -> &mut TypedAst;
 
-    pub fn get_type(
-        &self,
-        type_key: TypeKey,
-    ) -> &Type
-    {
-        &self.types_arena[type_key]
-    }
+            #[call(insert)]
+            #[unwrap]
+            pub fn insert_ast(
+                &mut self,
+                source_key: SourceKey,
+                ast: TypedAst,
+            );
+        }
+        to self.types_arena {
+            #[call(get)]
+            #[unwrap]
+            pub fn get_type(
+                &self,
+                type_key: TypeKey,
+            ) -> &Type;
 
-    pub fn get_type_mut(
-        &mut self,
-        type_key: TypeKey,
-    ) -> &mut Type
-    {
-        &mut self.types_arena[type_key]
-    }
+            #[call(get_mut)]
+            #[unwrap]
+            pub fn get_type_mut(
+                &mut self,
+                type_key: TypeKey,
+            ) -> &mut Type;
 
-    pub fn insert_type(
-        &mut self,
-        ty: Type,
-    ) -> TypeKey
-    {
-        self.types_arena.insert(ty)
-    }
-
-    pub fn insert_ast(
-        &mut self,
-        source_key: SourceKey,
-        ast: TypedAst,
-    )
-    {
-        self.t_asts.insert(source_key, ast);
+            #[call(insert)]
+            pub fn insert_type(
+                &mut self,
+                ty: Type,
+            ) -> TypeKey;
+        }
     }
 }
