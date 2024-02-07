@@ -198,7 +198,7 @@ impl<'ctx> Compiler<'ctx>
     where
         C: CodegenBackend,
     {
-        let output = CodegenBackend::codegen(codegen, main_source_key, &mut self.ctx);
+        let output = CodegenBackend::codegen(codegen, main_source_key, self.ctx);
 
         self.errors_as_result()?;
 
@@ -207,15 +207,12 @@ impl<'ctx> Compiler<'ctx>
 
     pub fn ctx(&self) -> &CompilerContext
     {
-        &self.ctx
+        self.ctx
     }
 
-    /// # Safety
-    /// Doesnt cause ub, can break invariants
-    #[allow(unsafe_code)]
-    pub unsafe fn ctx_mut(&mut self) -> &mut CompilerContext
+    pub fn ctx_mut(&mut self) -> &mut CompilerContext
     {
-        &mut self.ctx
+        self.ctx
     }
 
     fn errors_as_result(&self) -> Result<(), CompilerError>

@@ -133,7 +133,7 @@ fn compile_file(
 
     let Ok((file_src_key, codegen_output)) = call_compiler(&mut compiler, file, src, &mut codegen)
     else {
-        bail(&compiler)
+        bail(&ctx)
     };
 
     let file_codegen_output = codegen_output.get_file(file_src_key).unwrap();
@@ -151,9 +151,9 @@ fn compile_file(
     Ok(())
 }
 
-fn bail(compiler: &Compiler) -> !
+fn bail(context: &CompilerContext) -> !
 {
-    print_reports(compiler.ctx());
+    print_reports(context);
 
     process::exit(1);
 }

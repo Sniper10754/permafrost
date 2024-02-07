@@ -5,7 +5,7 @@ use permafrost_compiler::{
 use permafrost_reports::sourcemap::{SourceKey, SourceUrl};
 
 pub fn call_compiler<C>(
-    compiler: &mut Compiler,
+    compiler: &mut Compiler<'_>,
     src_url: impl Into<SourceUrl>,
     src_code: impl Into<String>,
     codegen: &mut C,
