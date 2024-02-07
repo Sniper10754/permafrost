@@ -27,7 +27,7 @@ impl<T: CodegenBackend> CodegenBackend for &mut T
         compiler_ctx: &mut CompilerContext,
     ) -> Self::Output
     {
-        (**self).codegen(source_key, compiler_ctx)
+        T::codegen(&mut **self, source_key, compiler_ctx)
     }
 }
 
