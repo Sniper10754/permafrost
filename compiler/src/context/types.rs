@@ -30,7 +30,6 @@ impl TypeContext
             ) -> &mut TypedAst;
 
             #[call(insert)]
-            #[unwrap]
             pub fn insert_ast(
                 &mut self,
                 source_key: SourceKey,
