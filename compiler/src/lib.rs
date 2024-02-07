@@ -33,10 +33,10 @@ pub mod utils;
 #[derive(Debug, Clone, Default, Copy, Constructor)]
 pub struct CompilerError;
 
-#[derive(Debug, Default)]
-pub struct Compiler
+#[derive(Debug)]
+pub struct Compiler<'ctx>
 {
-    ctx: CompilerContext,
+    ctx: &'ctx mut CompilerContext,
     state: CompilerState,
 }
 
@@ -48,7 +48,7 @@ pub enum CompilerState
     Exhausted,
 }
 
-impl Compiler
+impl<'ctx> Compiler<'ctx>
 {
     pub fn ensure_not_exhausted(&self)
     {
@@ -57,9 +57,12 @@ impl Compiler
         }
     }
 
-    pub fn new() -> Self
+    pub fn new(ctx: &'ctx mut CompilerContext) -> Self
     {
-        Self::default()
+        Self {
+            ctx,
+            state: CompilerState::Ready,
+        }
     }
 
     pub fn __add_source(

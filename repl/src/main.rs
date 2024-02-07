@@ -1,5 +1,5 @@
 use color_eyre::eyre;
-use permafrost_compiler::context::CompilerContext;
+use permafrost_compiler::{context::CompilerContext, Compiler, CompilerError};
 use permafrost_reports::printer::{DefaultPrintBackend, ReportPrinter};
 use permafrost_runtime::Runtime;
 use permafrost_vm_core::value::Value;
@@ -16,7 +16,7 @@ impl Repl
     pub fn run_code(
         &mut self,
         code: &str,
-    ) -> Result<Value, CompilerContext>
+    ) -> Result<Value, CompilerError>
     {
         self.runtime.eval_code("REPL", code)
     }
@@ -44,6 +44,9 @@ fn main() -> eyre::Result<()>
 
         match sig {
             Signal::Success(buffer) => {
+                let mut ctx = CompilerContext::new();
+                let compiler = Compiler::new(&mut ctx);
+
                 match repl.run_code(&buffer) {
                     Ok(value) => {
                         println!("{value}")
@@ -53,8 +56,8 @@ fn main() -> eyre::Result<()>
 
                         ReportPrinter::new(&mut code_buffer)
                             .print_reports::<DefaultPrintBackend, _>(
-                                &context.src_map,
-                                &*context.report_ctx,
+                                &ctx.src_map,
+                                &*ctx.report_ctx,
                             )?;
 
                         println!("{code_buffer}")

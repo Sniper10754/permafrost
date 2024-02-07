@@ -21,9 +21,7 @@ pub struct CompilerContext
     pub report_ctx: ReportContext,
     pub named_ctx: NamedContext,
     pub type_ctx: TypeContext,
-
     pub files_to_compile: Vec<SourceKey>,
-
     pub asts: SecondaryMap<SourceKey, Program>,
 }
 
@@ -63,21 +61,13 @@ impl CompilerContext
             );
         }
         to self.named_ctx {
-            
+
         }
     }
 
-    pub fn new(
-        src_map: SourceMap,
-        report_ctx: ReportContext,
-    ) -> Self
+    pub fn new() -> Self
     {
-        Self {
-            src_map,
-            report_ctx,
-
-            ..Default::default()
-        }
+        Self::default()
     }
 
     // pub fn insert_intrinsic<F>(

@@ -93,7 +93,7 @@ impl IntoReport for NameResolutionError
 }
 
 pub fn check_names(
-    compiler: &mut Compiler,
+    compiler: &mut Compiler<'_>,
     src_key: SourceKey,
 )
 {
@@ -140,13 +140,13 @@ enum LocalKind
     Module(NamedModuleKey),
 }
 
-pub struct RecursiveNameChecker<'compiler>
+pub struct RecursiveNameChecker<'compiler, 'ctx>
 {
-    compiler: &'compiler mut Compiler,
+    compiler: &'compiler mut Compiler<'ctx>,
     scopes: Scopes<LocalKind>,
 }
 
-impl<'compiler> RecursiveNameChecker<'compiler>
+impl<'compiler, 'ctx> RecursiveNameChecker<'compiler, 'ctx>
 {
     fn visit_expr(
         &mut self,

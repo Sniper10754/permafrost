@@ -158,7 +158,7 @@ impl From<Report> for TypecheckError
 }
 
 pub fn check_types(
-    compiler: &mut Compiler,
+    compiler: &mut Compiler<'_>,
     source_key: SourceKey,
 )
 {
@@ -190,13 +190,13 @@ pub fn check_types(
     }
 }
 
-struct RecursiveTypechecker<'compiler>
+struct RecursiveTypechecker<'compiler, 'ctx>
 {
     pub locals_to_types: SecondaryMap<LocalKey, TypeKey>,
-    pub compiler: &'compiler mut Compiler,
+    pub compiler: &'compiler mut Compiler<'ctx>,
 }
 
-impl<'a> RecursiveTypechecker<'a>
+impl<'compiler, 'ctx: 'compiler> RecursiveTypechecker<'compiler, 'ctx>
 {
     fn infer_type_annotation(
         &mut self,

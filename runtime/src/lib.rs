@@ -4,7 +4,7 @@ use permafrost_bytecode::Module;
 use permafrost_compiler::{
     codegen::{BytecodeCodegenBackend, CodegenBackends},
     context::CompilerContext,
-    Compiler,
+    Compiler, CompilerError,
 };
 use permafrost_reports::sourcemap::SourceUrl;
 use permafrost_vm_core::{value::Value, Vm};
@@ -29,32 +29,32 @@ impl Runtime
         &mut self,
         source_url: impl Into<SourceUrl>,
         code: &str,
-    ) -> Result<Value, CompilerContext>
+    ) -> Result<Value, CompilerError>
     {
-        let bytecode_module = self.compile_code(source_url, code)?;
+        let mut ctx = CompilerContext::new();
+        let mut compiler = Compiler::new(&mut ctx);
+
+        let bytecode = self.compile_code(&mut compiler, source_url, code)?;
 
         let Module {
             manifest: _,
             globals: _,
-            body,
-        } = &bytecode_module;
+            ref body,
+        } = bytecode;
 
-        self.vm.execute(body, &bytecode_module);
+        self.vm.execute(body, &bytecode);
 
         Ok(self.vm.stack().last().cloned().unwrap_or(Value::Nil))
     }
 
     fn compile_code(
         &mut self,
+        compiler: &mut Compiler<'_>,
         source_url: impl Into<SourceUrl>,
         code: &str,
-    ) -> Result<Module, CompilerContext>
+    ) -> Result<Module, CompilerError>
     {
-        let mut compiler = Compiler::new();
-
-        let Ok(source_key) = compiler.add_source(source_url.into(), code) else {
-            return Err(compiler.move_ctx());
-        };
+        let source_key = compiler.add_source(source_url.into(), code)?;
 
         let result = compiler.compile(&mut self.codegen);
 
