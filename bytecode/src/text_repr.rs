@@ -13,7 +13,7 @@ pub fn print_bytecode<W>(
     module: &Module,
 ) -> fmt::Result
 where
-    W: fmt::Write,
+    W: fmt::Write + ?Sized,
 {
     writeln!(
         w,
@@ -71,7 +71,7 @@ fn print_instructions<W>(
     module: &Module,
 ) -> fmt::Result
 where
-    W: fmt::Write,
+    W: fmt::Write + ?Sized,
 {
     instructions
         .iter()
@@ -94,7 +94,7 @@ fn print_instruction<W>(
     module: &Module,
 ) -> fmt::Result
 where
-    W: fmt::Write,
+    W: fmt::Write + ?Sized,
 {
     // writeln!(
     //     w,

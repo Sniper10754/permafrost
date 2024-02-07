@@ -387,7 +387,7 @@ impl PrintableCodegenOutput for Module
 {
     fn print(
         &self,
-        buf: &mut alloc::string::String,
+        buf: &mut dyn alloc::fmt::Write,
     ) -> alloc::fmt::Result
     {
         permafrost_bytecode::text_repr::print_bytecode(buf, self)

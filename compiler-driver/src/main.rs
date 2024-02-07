@@ -128,7 +128,9 @@ fn compile_file(
     let src = fs::read_to_string(&file)?;
 
     let mut codegen = codegen_option.into_codegen_backend();
+
     let mut ctx = CompilerContext::new();
+
     let mut compiler = Compiler::new(&mut ctx);
 
     let Ok((file_src_key, codegen_output)) = call_compiler(&mut compiler, file, src, &mut codegen)
