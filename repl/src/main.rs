@@ -45,13 +45,13 @@ fn main() -> eyre::Result<()>
         match sig {
             Signal::Success(buffer) => {
                 let mut ctx = CompilerContext::new();
-                let compiler = Compiler::new(&mut ctx);
+                let _compiler = Compiler::new(&mut ctx);
 
                 match repl.run_code(&buffer) {
                     Ok(value) => {
                         println!("{value}")
                     }
-                    Err(context) => {
+                    Err(_context) => {
                         code_buffer.clear();
 
                         ReportPrinter::new(&mut code_buffer)
