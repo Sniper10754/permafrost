@@ -34,29 +34,11 @@ impl DebugPls for TypeKey
 
 pub mod display
 {
-    use alloc::{borrow::Cow, format, string::String};
-    use core::fmt::{Display, Write as _};
+    use alloc::{borrow::Cow, format};
+    use itertools::Itertools;
 
     use super::{FunctionType, TypeKey};
     use crate::{context::TypeContext, ir::typed::Type::*};
-
-    fn join_map_into_string<K, V>(mut map: impl Iterator<Item = (K, V)>) -> String
-    where
-        K: Display,
-        V: Display,
-    {
-        let mut buffer = String::new();
-
-        if let Some((k, v)) = map.next() {
-            write!(buffer, "{k}: {v}").expect("Unreachable");
-
-            for (k, v) in map {
-                write!(buffer, ", {k}: {v}").expect("Unreachable");
-            }
-        }
-
-        buffer
-    }
 
     pub fn display_type(
         type_key: TypeKey,
@@ -72,11 +54,11 @@ pub mod display
                 return_type,
             }) => format!(
                 "({}) -> {}",
-                join_map_into_string(
-                    arguments
-                        .iter()
-                        .map(|(name, type_idx)| (name.as_str(), display_type(*type_idx, type_ctx)))
-                ),
+                arguments
+                    .iter()
+                    .map(|(name, type_idx)| (name.as_str(), display_type(*type_idx, type_ctx)))
+                    .map(|(name, ty)| format!("{name}: {ty}"))
+                    .join(", "),
                 display_type(*return_type, type_ctx)
             )
             .into(),

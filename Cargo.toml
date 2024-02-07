@@ -12,7 +12,8 @@ members = [
     "bytecode",
     "repl",
     "ast",
-    "vm-core", "runtime",
+    "vm-core",
+    "runtime",
 ]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
@@ -30,43 +31,23 @@ codegen-units = 1
 # Utility crates commonly used
 
 [workspace.dependencies]
-derive_more = "0"
-cfg-if = "1"
-owo-colors = "4"
+slotmap = { default-features = false, features = ["serde"], version = "1" }
+serde = { version = "1", default-features = false, features = ["derive"] }
+dbg-pls = { version = "0.4", features = ["colors", "derive", "pretty"] }
+num-traits = { version = "0", default-features = false }
+log = { version = "0.4", default-features = false }
+clap = { version = "4", features = ["derive"] }
 enum_dispatch = "0.3"
+const_format = "0"
+derive_more = "0"
+color-eyre = "0"
+owo-colors = "4"
 delegate = "0.12"
+cfg-if = "1"
+itertools = { version = "0.12", default-features = false, features = [
+    "use_alloc",
+] }
 
-[workspace.dependencies.dbg-pls]
-version = "0.4"
-features = ["colors", "derive", "pretty"]
-
-[workspace.dependencies.log]
-version = "0.4"
-default-features = false
-
-[workspace.dependencies.serde]
-version = "1"
-default-features = false
-features = ["derive"]
-
-[workspace.dependencies.slotmap]
-default-features = false
-features = ["serde"]
-version = "1"
-
-[workspace.dependencies.const_format]
-version = "0"
-
-[workspace.dependencies.num-traits]
-version = "0"
-default-features = false
-
-[workspace.dependencies.color-eyre]
-version = "0"
-
-[workspace.dependencies.clap]
-version = "4"
-features = ["derive"]
 
 [workspace.lints.clippy]
 too_many_arguments = "allow"

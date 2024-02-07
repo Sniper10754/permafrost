@@ -842,6 +842,7 @@ dependencies = [
  "dbg-pls",
  "delegate",
  "derive_more",
+ "itertools",
  "log",
  "permafrost-ast",
  "permafrost-bytecode",

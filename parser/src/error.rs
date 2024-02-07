@@ -42,11 +42,7 @@ impl IntoReport for Error
                 "Token in invalid position",
                 None::<&str>,
             )
-            .with_label(Label::new(
-                format!("Expected {expected}"),
-                None::<Span>,
-                source_key,
-            )),
+            .with_label(Label::new(format!("Expected {expected}"), None, source_key)),
             ErrorKind::UnrecognizedEof {
                 expected,
                 previous_element_span,
@@ -59,7 +55,7 @@ impl IntoReport for Error
             )
             .with_label(Label::new(
                 format!("Expected one of: {}", expected.join(", ")),
-                None::<Span>,
+                None,
                 source_key,
             )),
             ErrorKind::NumberTooBig { span } => Report::new(
@@ -71,7 +67,7 @@ impl IntoReport for Error
             )
             .with_label(Label::new(
                 const_format::formatcp!("Maximum limit is {}", i32::MAX),
-                None::<Span>,
+                None,
                 source_key,
             )),
         }
