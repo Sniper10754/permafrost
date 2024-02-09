@@ -522,9 +522,7 @@ impl<'compiler, 'ctx: 'compiler> RecursiveTypechecker<'compiler, 'ctx>
 
         Ok(TypedExpression {
             type_key,
-            kind: TypedExpressionKind::Ident {
-                str_value: Spanned(span.clone(), ident.into()),
-            },
+            kind: TypedExpressionKind::Ident(Spanned(span.clone(), ident.into())),
         })
     }
 

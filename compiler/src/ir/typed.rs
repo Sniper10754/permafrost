@@ -144,10 +144,7 @@ pub enum TypedExpressionKind
 
     ModuleStatement(Span),
 
-    Ident
-    {
-        str_value: Spanned<String>,
-    },
+    Ident(Spanned<String>),
 
     BinaryOperation
     {
@@ -196,9 +193,7 @@ impl Spannable for TypedExpressionKind
             | String(Spanned(span, _))
             | ModuleStatement(span) => span.clone(),
 
-            Ident {
-                str_value: Spanned(span, _),
-            } => span.clone(),
+            Ident(Spanned(span, _)) => span.clone(),
             BinaryOperation {
                 lhs,
                 operator: _,
@@ -274,7 +269,7 @@ impl TryFrom<TypedExpression> for Assignable
         use TypedExpressionKind::*;
 
         match value.kind {
-            Ident { str_value: ident } => Ok(Assignable::Ident(value.type_key, ident)),
+            Ident(ident) => Ok(Assignable::Ident(value.type_key, ident)),
 
             _ => Err(()),
         }

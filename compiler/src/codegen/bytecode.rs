@@ -103,9 +103,7 @@ impl BytecodeCodegenBackend
 
             TypedExpressionKind::ModuleStatement(..) => {}
 
-            TypedExpressionKind::Ident {
-                str_value: Spanned(_, ref name),
-            } => {
+            TypedExpressionKind::Ident(Spanned(_, ref name)) => {
                 instructions.push(Instruction::LoadName(name.into()));
             }
 
