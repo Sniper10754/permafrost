@@ -46,7 +46,7 @@ enum NameResolutionError
     CouldNotReadNamespaceFile
     {
         error: std::io::Error,
-        Namespace_path: std::path::PathBuf,
+        file_path: std::path::PathBuf,
         source_key: SourceKey,
         span: Span,
     },
@@ -89,7 +89,7 @@ impl IntoReport for NameResolutionError
                 Report::new(Level::Error, span, source_key, "Mod statement not supported", Some("The mod statement requires the std file api: youre on a platform which doesnt support std."))
             }
             #[cfg(feature = "std")]
-            NameResolutionError::CouldNotReadNamespaceFile { error, source_key,  span, Namespace_path } => Report::new(Level::Error, span, source_key, "Input/Output OS Error", Some(format!("{error}"))).with_label(Label::new(format!("Could not read path `{}`", Namespace_path.display()), None, source_key))
+            NameResolutionError::CouldNotReadNamespaceFile { error, source_key,  span, file_path } => Report::new(Level::Error, span, source_key, "Input/Output OS Error", Some(format!("{error}"))).with_label(Label::new(format!("Could not read path `{}`", file_path.display()), None, source_key))
         }
     }
 }
@@ -149,8 +149,8 @@ impl From<ResolvedSymbol> for LocalSymbol
     fn from(value: ResolvedSymbol) -> Self
     {
         match value {
-            ResolvedSymbol::LocalKey(Local) => Self::from(Local),
-            ResolvedSymbol::NamespaceKey(Namespace) => Self::from(Namespace),
+            ResolvedSymbol::LocalKey(local) => Self::from(local),
+            ResolvedSymbol::NamespaceKey(namespace) => Self::from(namespace),
         }
     }
 }
@@ -275,8 +275,8 @@ impl<'compiler, 'ctx> RecursiveNameChecker<'compiler, 'ctx>
     {
         match import_directive_kind.value() {
             ImportDirectiveKind::FromNamespaceImportSymbol {
-                namespace_path,
-                symbol,
+                namespace_path: _,
+                symbol: _,
             } => {
                 todo!()
             }
@@ -418,7 +418,7 @@ impl<'compiler, 'ctx> RecursiveNameChecker<'compiler, 'ctx>
                 error,
                 source_key,
                 span: module_token.span(),
-                Namespace_path: namespace_path.clone(),
+                file_path: namespace_path.clone(),
             }
         })?;
 
