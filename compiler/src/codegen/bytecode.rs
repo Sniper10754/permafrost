@@ -101,7 +101,7 @@ impl BytecodeCodegenBackend
                 self.compile_constant(instructions, globals, t_expr)
             }
 
-            TypedExpressionKind::ModuleStatement(..) => {}
+            TypedExpressionKind::NamespaceStatement(..) => {}
 
             TypedExpressionKind::Ident(Spanned(_, ref name)) => {
                 instructions.push(Instruction::LoadName(name.into()));

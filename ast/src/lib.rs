@@ -14,6 +14,8 @@ use self::tokens::{
     ReturnToken, RightBraceToken, RightParenthesisToken, TypeAnnotation,
 };
 
+pub type NamespacePath = [Spanned<String>];
+pub type BoxedNamespacePath = Box<NamespacePath>;
 pub type Span = Range<usize>;
 
 pub mod tokens
@@ -263,8 +265,8 @@ impl Spannable for Expr
             | Expr::Bool(Spanned(span, _))
             | Expr::ImportDirective(Spanned(span, _)) => span.clone(),
 
-            Expr::ModuleDirective(mod_token, module_name) => {
-                (mod_token.span().start)..(module_name.span().end)
+            Expr::NamespaceDirective(mod_token, namespace_name) => {
+                (mod_token.span().start)..(namespace_name.span().end)
             }
 
             Expr::BinaryOperation {
@@ -314,7 +316,7 @@ pub enum Expr
     Bool(Spanned<bool>),
     String(Spanned<String>),
 
-    ModuleDirective(ModToken, ModuleDirectiveKind),
+    NamespaceDirective(ModToken, NamespaceDirectiveKind),
     ImportDirective(Spanned<ImportDirectiveKind>),
 
     BinaryOperation
@@ -373,27 +375,21 @@ pub struct Argument
 
 #[derive(Debug, Clone, PartialEq, DebugPls)]
 #[enum_dispatch(Spannable)]
-pub enum ModuleDirectiveKind
+pub enum NamespaceDirectiveKind
 {
-    ImportLocalModule(Spanned<String>),
+    ImportLocalNamespace(Spanned<String>),
 }
 
 #[derive(Debug, Clone, PartialEq, DebugPls)]
 pub enum ImportDirectiveKind
 {
-    FromModuleImportSymbol
+    FromNamespaceImportSymbol
     {
-        module: ModulePath,
+        namespace_path: Box<NamespacePath>,
         symbol: Spanned<String>,
     },
-    ImportModule
+    ImportFromNamespace
     {
-        module: ModulePath
+        namespace_path: Box<NamespacePath>
     },
-}
-
-#[derive(Debug, Clone, PartialEq, DebugPls, derive_more::From)]
-pub struct ModulePath
-{
-    pub names: Vec<String>,
 }

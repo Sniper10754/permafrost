@@ -16,8 +16,8 @@ use permafrost_ast::{
         ArrowToken, Eq, FunctionToken, LeftBraceToken, LeftParenthesisToken, Operator, ReturnToken,
         RightBraceToken, RightParenthesisToken, TypeAnnotation,
     },
-    Argument, Expr, ImportDirectiveKind, ModuleDirectiveKind, ModulePath, Program, Spannable,
-    Spanned,
+    Argument, BoxedNamespacePath, Expr, ImportDirectiveKind, NamespaceDirectiveKind, Program,
+    Spannable, Spanned,
 };
 use permafrost_reports::{sourcemap::SourceKey, ReportContext};
 
@@ -226,12 +226,13 @@ impl<'report_context> Parser<'report_context>
             Some(Spanned(span, Token::Ident(value))) => Some(Expr::Ident(Spanned(span, value))),
             Some(Spanned(span, Token::String(value))) => Some(Expr::String(Spanned(span, value))),
 
-            Some(Spanned(Range { start, end: _ }, Token::Import)) => {
-                let Spanned(Range { start: _, end }, module) = self.parse_module_path()?;
+            Some(Spanned(Range { start, end: _ }, Token::Use)) => {
+                let Spanned(Range { start: _, end }, namespace_path) =
+                    self.parse_namespace_path()?;
 
                 Some(Expr::ImportDirective(Spanned(
                     start..end,
-                    ImportDirectiveKind::ImportModule { module },
+                    ImportDirectiveKind::ImportFromNamespace { namespace_path },
                 )))
             }
 
@@ -245,18 +246,19 @@ impl<'report_context> Parser<'report_context>
                     unreachable!()
                 };
 
-                Some(Expr::ModuleDirective(
+                Some(Expr::NamespaceDirective(
                     mod_token_span.into(),
-                    ModuleDirectiveKind::ImportLocalModule(Spanned(name_span, module_name)),
+                    NamespaceDirectiveKind::ImportLocalNamespace(Spanned(name_span, module_name)),
                 ))
             }
 
             Some(Spanned(Range { start, end: _ }, Token::From)) => {
-                let Spanned(Range { start: _, end }, module) = self.parse_module_path()?;
+                let Spanned(Range { start: _, end }, namespace_path) =
+                    self.parse_namespace_path()?;
 
                 consume_token!(
                     parser: self,
-                    token: Token::Import,
+                    token: Token::Use,
                     description: "import"
                 )?;
 
@@ -271,8 +273,8 @@ impl<'report_context> Parser<'report_context>
 
                 Some(Expr::ImportDirective(Spanned(
                     start..end,
-                    ImportDirectiveKind::FromModuleImportSymbol {
-                        module,
+                    ImportDirectiveKind::FromNamespaceImportSymbol {
+                        namespace_path,
                         symbol: Spanned(span, symbol),
                     },
                 )))
@@ -538,24 +540,20 @@ impl<'report_context> Parser<'report_context>
         }
     }
 
-    fn parse_module_path(&mut self) -> Option<Spanned<ModulePath>>
+    fn parse_namespace_path(&mut self) -> Option<Spanned<BoxedNamespacePath>>
     {
         let mut names = Vec::new();
 
-        let Spanned(
-            Range {
-                start: span_start,
-                end: mut span_end,
-            },
-            Token::Ident(name),
-        ) = consume_token!(
+        let name = consume_token!(
             parser: self,
             token: Token::Ident(..),
             description: "Module name"
-        )?
-        else {
-            unreachable!()
-        };
+        )?;
+
+        let Range {
+            start: span_start,
+            end: mut span_end,
+        } = name.span();
 
         names.push(name);
 
@@ -566,16 +564,13 @@ impl<'report_context> Parser<'report_context>
             ) {
                 self.token_stream.skip_token();
 
-                let Spanned(Range { start: _, end }, Token::Ident(name)) = consume_token!(
+                let name = consume_token!(
                     parser: self,
                     token: Token::Ident(..),
                     description: "Module name"
-                )?
-                else {
-                    unreachable!()
-                };
+                )?;
 
-                span_end = end;
+                span_end = name.span().end;
 
                 names.push(name);
             } else {
@@ -583,6 +578,21 @@ impl<'report_context> Parser<'report_context>
             }
         }
 
-        Some(Spanned(span_start..span_end, ModulePath { names }))
+        Some(Spanned(
+            span_start..span_end,
+            names
+                .into_iter()
+                .map(|spanned_name| {
+                    spanned_name.map(|name| {
+                        let Token::Ident(name) = name else {
+                            unreachable!()
+                        };
+
+                        name
+                    })
+                })
+                .collect::<Vec<_>>()
+                .into_boxed_slice(),
+        ))
     }
 }

@@ -9,6 +9,8 @@ use permafrost_ast::{
 };
 use slotmap::{new_key_type, SlotMap};
 
+use crate::context::names::{Export, NamespaceKey};
+
 new_key_type! {
     #[derive(derive_more::Display)]
     #[display(fmt = "{}", "self.0.as_ffi() as u32")]
@@ -75,7 +77,8 @@ impl Spannable for NamedExpr
             }
             | NamedExpr::String(Spanned(span, _))
             | NamedExpr::Bool(Spanned(span, _))
-            | NamedExpr::ModuleStatement(span) => span.clone(),
+            | NamedExpr::NamespaceDirective(span)
+            | NamedExpr::UseDirective(span) => span.clone(),
 
             NamedExpr::BinaryOperation {
                 lhs,
@@ -121,7 +124,8 @@ pub enum NamedExpr
     Bool(Spanned<bool>),
     String(Spanned<String>),
 
-    ModuleStatement(Span),
+    UseDirective(Span),
+    NamespaceDirective(Span),
 
     Ident
     {
@@ -215,19 +219,37 @@ pub struct Argument
 #[derive(Debug, Clone, PartialEq, DebugPls)]
 pub enum ImportDirectiveKind
 {
-    FromModuleImportSymbol
+    FromNamespaceImportSymbol
     {
-        module: ModulePath,
+        namespace: NamespacePath,
         symbol: Spanned<String>,
     },
-    ImportModule
+    ImportNamespace
     {
-        module: ModulePath
+        namespace: NamespacePath
     },
 }
 
 #[derive(Debug, Clone, PartialEq, DebugPls, derive_more::Display, derive_more::From)]
-pub struct ModulePath
+pub struct NamespacePath
 {
     name: String,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, DebugPls, derive_more::From)]
+pub enum ResolvedSymbol
+{
+    LocalKey(LocalKey),
+    NamespaceKey(NamespaceKey),
+}
+
+impl From<Export> for ResolvedSymbol
+{
+    fn from(value: Export) -> Self
+    {
+        match value {
+            Export::Local(local_key) => Self::from(local_key),
+            Export::Namespace(namespace_key) => Self::from(namespace_key),
+        }
+    }
 }
