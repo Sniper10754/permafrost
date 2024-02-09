@@ -52,6 +52,8 @@ fn main() -> eyre::Result<()>
             }
         };
 
+        ctx.clear();
+
         code_buffer.clear();
     }
 
