@@ -1,5 +1,5 @@
 use color_eyre::eyre;
-use permafrost_compiler::{context::CompilerContext, Compiler, CompilerError};
+use permafrost_compiler::{context::CompilerContext, CompilerError};
 use permafrost_reports::printer::{DefaultPrintBackend, ReportPrinter};
 use permafrost_runtime::Runtime;
 use permafrost_vm_core::value::Value;
