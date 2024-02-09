@@ -147,8 +147,8 @@ pub enum Token
     #[token("from")]
     From,
 
-    #[token("import")]
-    Import,
+    #[token("use")]
+    Use,
 
     #[token("::")]
     DoubleColon,

@@ -226,7 +226,7 @@ impl<'report_context> Parser<'report_context>
             Some(Spanned(span, Token::Ident(value))) => Some(Expr::Ident(Spanned(span, value))),
             Some(Spanned(span, Token::String(value))) => Some(Expr::String(Spanned(span, value))),
 
-            Some(Spanned(Range { start, end: _ }, Token::Import)) => {
+            Some(Spanned(Range { start, end: _ }, Token::Use)) => {
                 let Spanned(Range { start: _, end }, module) = self.parse_module_path()?;
 
                 Some(Expr::ImportDirective(Spanned(
@@ -256,7 +256,7 @@ impl<'report_context> Parser<'report_context>
 
                 consume_token!(
                     parser: self,
-                    token: Token::Import,
+                    token: Token::Use,
                     description: "import"
                 )?;
 
