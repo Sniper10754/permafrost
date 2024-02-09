@@ -34,22 +34,22 @@ $$ A = Int $$
 $$ B = Number $$
 $$ B >: A $$
 
-# Module system sketchs
+# Namespace system sketchs
 
-- Every file is a module
-- Every module has locals
+- Every file is a Namespace
+- Every Namespace has locals
 - These locals have types
 
-A module is just a set of exported symbols from a file
+A Namespace is just a set of exported symbols from a file
 
 in this codebase its represented grossly in this way
 ```rs
-struct Module {
+struct Namespace {
     exports: Vec<Export>
 }
 
 enum Export {
     Local,
-    Module,
+    Namespace,
 }
 ```

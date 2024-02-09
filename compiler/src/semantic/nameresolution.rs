@@ -1,10 +1,12 @@
-use alloc::{borrow::Cow, boxed::Box, format, string::String, vec::Vec};
+use alloc::{borrow::Cow, boxed::Box, collections::BTreeMap, format, string::String, vec::Vec};
+use derive_more::*;
+
 use permafrost_ast::{
     tokens::{
         ArrowToken, FunctionToken, LeftBraceToken, LeftParenthesisToken, ModToken, ReturnToken,
         RightBraceToken, RightParenthesisToken, TypeAnnotation,
     },
-    Expr, ImportDirectiveKind, ModuleDirectiveKind, Span, Spannable, Spanned,
+    Expr, ImportDirectiveKind, NamespaceDirectiveKind, NamespacePath, Span, Spannable, Spanned,
 };
 use permafrost_reports::{
     sourcemap::{SourceKey, SourceUrl},
@@ -12,8 +14,8 @@ use permafrost_reports::{
 };
 
 use crate::{
-    context::names::{NamedModule, NamedModuleKey},
-    ir::named::{Argument, Assignable, LocalKey, NamedAst, NamedExpr},
+    context::names::{Namespace, NamespaceKey},
+    ir::named::{Argument, Assignable, LocalKey, NamedAst, NamedExpr, ResolvedSymbol},
     utils::Scopes,
     Compiler, PERMAFROST_FILE_EXTENSION,
 };
@@ -38,13 +40,13 @@ enum NameResolutionError
     },
 
     #[cfg(not(feature = "std"))]
-    ModuleStatementNotSupported(SourceKey, Span),
+    NamespaceStatementNotSupported(SourceKey, Span),
 
     #[cfg(feature = "std")]
-    CouldNotReadModuleFile
+    CouldNotReadNamespaceFile
     {
         error: std::io::Error,
-        module_path: std::path::PathBuf,
+        Namespace_path: std::path::PathBuf,
         source_key: SourceKey,
         span: Span,
     },
@@ -83,11 +85,11 @@ impl IntoReport for NameResolutionError
                 Some(format!("`{identifier}` is already defined elsewhere"))
             ),
             #[cfg(not(feature = "std"))]
-            NameResolutionError::ModuleStatementNotSupported(source_key, span) => {
+            NameResolutionError::NamespaceStatementNotSupported(source_key, span) => {
                 Report::new(Level::Error, span, source_key, "Mod statement not supported", Some("The mod statement requires the std file api: youre on a platform which doesnt support std."))
             }
             #[cfg(feature = "std")]
-            NameResolutionError::CouldNotReadModuleFile { error, source_key,  span, module_path } => Report::new(Level::Error, span, source_key, "Input/Output OS Error", Some(format!("{error}"))).with_label(Label::new(format!("Could not read path `{}`", module_path.display()), None, source_key))
+            NameResolutionError::CouldNotReadNamespaceFile { error, source_key,  span, Namespace_path } => Report::new(Level::Error, span, source_key, "Input/Output OS Error", Some(format!("{error}"))).with_label(Label::new(format!("Could not read path `{}`", Namespace_path.display()), None, source_key))
         }
     }
 }
@@ -103,16 +105,18 @@ pub fn check_names(
         .named_asts
         .insert(src_key, NamedAst::default());
 
-    let module_key = compiler.ctx.named_ctx.modules.insert(NamedModule {
+    let namespace_key = compiler.ctx.named_ctx.insert_namespace(
         src_key,
-        items: Vec::new(),
-    });
+        Namespace {
+            exports: BTreeMap::new(),
+        },
+    );
 
     compiler
         .ctx
         .named_ctx
-        .modules_by_src_keys
-        .insert(src_key, module_key);
+        .namespaces_by_src_keys
+        .insert(src_key, namespace_key);
 
     let mut rnc = RecursiveNameChecker {
         compiler,
@@ -133,17 +137,28 @@ pub fn check_names(
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-enum LocalKind
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, From)]
+enum LocalSymbol
 {
     Local(LocalKey),
-    Module(NamedModuleKey),
+    Namespace(NamespaceKey),
+}
+
+impl From<ResolvedSymbol> for LocalSymbol
+{
+    fn from(value: ResolvedSymbol) -> Self
+    {
+        match value {
+            ResolvedSymbol::LocalKey(Local) => Self::from(Local),
+            ResolvedSymbol::NamespaceKey(Namespace) => Self::from(Namespace),
+        }
+    }
 }
 
 pub struct RecursiveNameChecker<'compiler, 'ctx>
 {
     compiler: &'compiler mut Compiler<'ctx>,
-    scopes: Scopes<LocalKind>,
+    scopes: Scopes<LocalSymbol>,
 }
 
 impl<'compiler, 'ctx> RecursiveNameChecker<'compiler, 'ctx>
@@ -167,9 +182,8 @@ impl<'compiler, 'ctx> RecursiveNameChecker<'compiler, 'ctx>
             Expr::ImportDirective(import_directive) => {
                 self.visit_import_directive(source_key, import_directive.as_ref())
             }
-            Expr::ModuleDirective(mod_token, module_directive_kind) => {
-                self.visit_module_directive(source_key, mod_token.clone(), module_directive_kind)
-            }
+            Expr::NamespaceDirective(mod_token, namespace_directive_kind) => self
+                .visit_namespace_directive(source_key, mod_token.clone(), namespace_directive_kind),
             Expr::BinaryOperation { lhs, operator, rhs } => Ok(NamedExpr::BinaryOperation {
                 lhs: Box::new(self.visit_expr(source_key, lhs)?),
                 operator: operator.clone(),
@@ -240,7 +254,7 @@ impl<'compiler, 'ctx> RecursiveNameChecker<'compiler, 'ctx>
         span: Span,
     ) -> Result<NamedExpr, NameResolutionError>
     {
-        let Some(LocalKind::Local(local_key)) = self.scopes.local(identifier).copied() else {
+        let Some(LocalSymbol::Local(local_key)) = self.scopes.local(identifier).copied() else {
             return Err(NameResolutionError::IdentifierNotFound {
                 source_key,
                 identifier: Spanned(span, identifier.into()),
@@ -255,77 +269,184 @@ impl<'compiler, 'ctx> RecursiveNameChecker<'compiler, 'ctx>
 
     fn visit_import_directive(
         &mut self,
-        _source_key: SourceKey,
-        _import_directive_kind: Spanned<&ImportDirectiveKind>,
+        source_key: SourceKey,
+        import_directive_kind: Spanned<&ImportDirectiveKind>,
     ) -> Result<NamedExpr, NameResolutionError>
     {
-        todo!()
+        match import_directive_kind.value() {
+            ImportDirectiveKind::FromNamespaceImportSymbol {
+                namespace_path,
+                symbol,
+            } => {
+                todo!()
+            }
+            ImportDirectiveKind::ImportFromNamespace { namespace_path } => {
+                let resolved_symbol = self.resolve_namespace_path(source_key, namespace_path)?;
+
+                let last_path_element = namespace_path.last().unwrap();
+
+                self.scopes
+                    .try_insert(
+                        last_path_element.value(),
+                        LocalSymbol::from(resolved_symbol),
+                    )
+                    .map_err(|_| NameResolutionError::IdentifierNotFound {
+                        source_key,
+                        identifier: last_path_element.clone(),
+                    })?;
+            }
+        }
+
+        Ok(NamedExpr::UseDirective(import_directive_kind.span()))
     }
 
-    fn visit_module_directive(
+    fn resolve_namespace_path(
+        &mut self,
+        importing_file_source_key: SourceKey,
+        namespace_path: &NamespacePath,
+    ) -> Result<ResolvedSymbol, NameResolutionError>
+    {
+        let mut namespace_path_iter = namespace_path.iter();
+
+        let Some(name_to_import) = namespace_path_iter.next() else {
+            unreachable!()
+        };
+
+        // Search the current scope for the module
+        let target_namespace_key = if let Some(LocalSymbol::Namespace(namespace_key)) =
+            self.scopes.local(name_to_import.value())
+        {
+            *namespace_key
+        } else {
+            return Err(NameResolutionError::IdentifierNotFound {
+                source_key: importing_file_source_key,
+                identifier: name_to_import.clone(),
+            });
+        };
+
+        let namespace = self
+            .compiler
+            .ctx
+            .named_ctx
+            .get_namespace(target_namespace_key);
+
+        if let Some(export) = namespace.exports.get(name_to_import.value()) {
+            match namespace_path_iter.next() {
+                Some(_) => {
+                    self.resolve_namespace_path(importing_file_source_key, &namespace_path[1..])
+                }
+                None => Ok(ResolvedSymbol::from(*export)),
+            }
+        } else {
+            Err(NameResolutionError::IdentifierNotFound {
+                source_key: importing_file_source_key,
+                identifier: name_to_import.clone(),
+            })
+        }
+    }
+
+    fn visit_namespace_directive(
         &mut self,
         source_key: SourceKey,
-        module_token: ModToken,
-        module_directive_kind: &ModuleDirectiveKind,
+        namespace_token: ModToken,
+        namespace_directive_kind: &NamespaceDirectiveKind,
     ) -> Result<NamedExpr, NameResolutionError>
     {
         #[cfg(feature = "std")]
         {
-            use std::path::Path;
-
-            let parent_dir: Cow<'_, Path> = match self.compiler.ctx.src_map[source_key].url {
-                SourceUrl::PathBuf(ref pathbuf) => pathbuf.parent().unwrap().into(),
-                SourceUrl::Sparse(..) | SourceUrl::Anonymous => {
-                    std::env::current_dir().unwrap().into()
-                }
-            };
-
-            match module_directive_kind {
-                ModuleDirectiveKind::ImportLocalModule(local_module_name) => {
-                    let module_path = parent_dir.join(format!(
-                        "{}.{PERMAFROST_FILE_EXTENSION}",
-                        local_module_name.value()
-                    ));
-
-                    let source_code =
-                        std::fs::read_to_string(module_path.as_path()).map_err(|error| {
-                            NameResolutionError::CouldNotReadModuleFile {
-                                error,
-                                source_key,
-                                span: module_token.span(),
-                                module_path: module_path.clone(),
-                            }
-                        })?;
-
-                    if let Ok(module_source_key) = self
-                        .compiler
-                        .add_source(SourceUrl::PathBuf(module_path), source_code)
-                    {
-                        let module_key =
-                            self.compiler.ctx.named_ctx.modules_by_src_keys[module_source_key];
-
-                        self.scopes
-                            .try_insert(local_module_name.value(), LocalKind::Module(module_key))
-                            .map_err(|_| NameResolutionError::ClashingIdentifier {
-                                source_key,
-                                identifier: local_module_name.clone(),
-                            })?;
-                    } else {
-                        // Do nothing
-                    }
-                }
-            }
+            self.visit_namespace_directive_std(
+                source_key,
+                namespace_token,
+                namespace_directive_kind,
+            )?;
         }
 
         #[cfg(not(feature = "std"))]
         {
-            return Err(NameResolutionError::ModuleStatementNotSupported(
+            return Err(NameResolutionError::NamespaceStatementNotSupported(
                 source_key,
-                module_token.span(),
+                namespace_token.span(),
             ));
         }
 
-        Ok(NamedExpr::ModuleStatement(module_directive_kind.span()))
+        Ok(NamedExpr::NamespaceDirective(
+            namespace_directive_kind.span(),
+        ))
+    }
+
+    #[cfg(feature = "std")]
+    fn visit_namespace_directive_std(
+        &mut self,
+        source_key: SourceKey,
+        namespace_token: ModToken,
+        namespace_directive_kind: &NamespaceDirectiveKind,
+    ) -> Result<(), NameResolutionError>
+    {
+        match namespace_directive_kind {
+            NamespaceDirectiveKind::ImportLocalNamespace(local_namespace_name) => {
+                self.import_local_namespace(
+                    source_key,
+                    namespace_token.clone(),
+                    local_namespace_name.as_deref(),
+                )?;
+            }
+        }
+
+        Ok(())
+    }
+
+    #[cfg(feature = "std")]
+    fn import_local_namespace(
+        &mut self,
+        source_key: SourceKey,
+        module_token: ModToken,
+        local_namespace_name: Spanned<&str>,
+    ) -> Result<(), NameResolutionError>
+    {
+        let parent_dir: Cow<'_, std::path::Path> = match self.compiler.ctx.src_map[source_key].url {
+            SourceUrl::PathBuf(ref pathbuf) => pathbuf.parent().unwrap().into(),
+            SourceUrl::Sparse(..) | SourceUrl::Anonymous => std::env::current_dir().unwrap().into(),
+        };
+
+        let namespace_path = parent_dir.join(format!(
+            "{}.{PERMAFROST_FILE_EXTENSION}",
+            local_namespace_name.value()
+        ));
+
+        let source_code = std::fs::read_to_string(namespace_path.as_path()).map_err(|error| {
+            NameResolutionError::CouldNotReadNamespaceFile {
+                error,
+                source_key,
+                span: module_token.span(),
+                Namespace_path: namespace_path.clone(),
+            }
+        })?;
+
+        if let Ok(namespace_source_key) = self
+            .compiler
+            .add_source(SourceUrl::PathBuf(namespace_path), source_code)
+        {
+            let &namespace_key = self
+                .compiler
+                .ctx
+                .named_ctx
+                .get_namespace_key_by_source_key(namespace_source_key);
+
+            self.scopes
+                .try_insert(
+                    *local_namespace_name.value(),
+                    LocalSymbol::Namespace(namespace_key),
+                )
+                .map_err(|_| NameResolutionError::ClashingIdentifier {
+                    source_key,
+                    identifier: local_namespace_name.map(Into::into),
+                })?;
+        } else {
+            // Since analyzing the Namespace failed, we cant import it as it may contain false results
+            // We can just avoid putting it into scope.
+        }
+
+        Ok(())
     }
 
     fn visit_assign(
@@ -400,7 +521,7 @@ impl<'compiler, 'ctx> RecursiveNameChecker<'compiler, 'ctx>
                  type_annotation: _,
              }| {
                 self.scopes
-                    .insert_forced(spanned_name.value(), LocalKind::Local(*local_key));
+                    .insert_forced(spanned_name.value(), LocalSymbol::Local(*local_key));
             },
         );
 
@@ -485,7 +606,7 @@ impl<'compiler, 'ctx> RecursiveNameChecker<'compiler, 'ctx>
                 .insert(());
 
             self.scopes
-                .try_insert(name, LocalKind::Local(local_key))
+                .try_insert(name, LocalSymbol::Local(local_key))
                 .unwrap();
 
             Some(local_key)
@@ -504,7 +625,8 @@ impl<'compiler, 'ctx> RecursiveNameChecker<'compiler, 'ctx>
             .locals
             .insert(());
 
-        self.scopes.insert_forced(name, LocalKind::Local(local_key));
+        self.scopes
+            .insert_forced(name, LocalSymbol::Local(local_key));
 
         local_key
     }

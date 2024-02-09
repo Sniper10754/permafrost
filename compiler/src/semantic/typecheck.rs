@@ -263,7 +263,9 @@ impl<'compiler, 'ctx: 'compiler> RecursiveTypechecker<'compiler, 'ctx>
             NamedExpr::String(_) => Ok(self.insert_type(Type::String)),
             NamedExpr::Bool(_) => Ok(self.insert_type(Type::Bool)),
 
-            NamedExpr::ModuleStatement(..) => Ok(self.insert_type(Type::Unit)),
+            NamedExpr::UseDirective(..) | NamedExpr::NamespaceDirective(..) => {
+                Ok(self.insert_type(Type::Unit))
+            }
 
             NamedExpr::Ident {
                 local_key,
@@ -459,10 +461,12 @@ impl<'compiler, 'ctx: 'compiler> RecursiveTypechecker<'compiler, 'ctx>
                 type_key: self.infer_type(source_key, expr)?,
                 kind: TypedExpressionKind::String(value.as_ref().map(Clone::clone)),
             }),
-            NamedExpr::ModuleStatement(span) => Ok(TypedExpression {
-                type_key: self.infer_type(source_key, expr)?,
-                kind: TypedExpressionKind::ModuleStatement(span.clone()),
-            }),
+            NamedExpr::UseDirective(span) | NamedExpr::NamespaceDirective(span) => {
+                Ok(TypedExpression {
+                    type_key: self.infer_type(source_key, expr)?,
+                    kind: TypedExpressionKind::NamespaceStatement(span.clone()),
+                })
+            }
             NamedExpr::Ident {
                 local_key,
                 identifier: Spanned(span, ident),

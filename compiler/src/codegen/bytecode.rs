@@ -101,7 +101,7 @@ impl BytecodeCodegenBackend
                 self.compile_constant(instructions, globals, t_expr)
             }
 
-            TypedExpressionKind::ModuleStatement(..) => {}
+            TypedExpressionKind::NamespaceStatement(..) => {}
 
             TypedExpressionKind::Ident {
                 str_value: Spanned(_, ref name),

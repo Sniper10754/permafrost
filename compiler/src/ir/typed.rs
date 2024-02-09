@@ -142,7 +142,7 @@ pub enum TypedExpressionKind
     Bool(Spanned<bool>),
     String(Spanned<String>),
 
-    ModuleStatement(Span),
+    NamespaceStatement(Span),
 
     Ident
     {
@@ -194,7 +194,7 @@ impl Spannable for TypedExpressionKind
             | Float(Spanned(span, _))
             | Bool(Spanned(span, _))
             | String(Spanned(span, _))
-            | ModuleStatement(span) => span.clone(),
+            | NamespaceStatement(span) => span.clone(),
 
             Ident {
                 str_value: Spanned(span, _),
