@@ -41,6 +41,13 @@ pub struct NamedContext
 
 impl NamedContext
 {
+    pub fn clear(&mut self)
+    {
+        self.namespaces.clear();
+        self.namespaces_by_src_keys.clear();
+        self.named_asts.clear();
+    }
+
     pub fn insert_namespace(
         &mut self,
         source_key: SourceKey,

@@ -17,7 +17,7 @@ cfg-if = { workspace = true }
 permafrost-reports = { path = "../reports" }
 permafrost-ast = { path = "../ast" }
 
-logos = { version = "0.13.0", default-features = false, features = [
+logos = { version = "0.14", default-features = false, features = [
     "export_derive",
 ] }
 

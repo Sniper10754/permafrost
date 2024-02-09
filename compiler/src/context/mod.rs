@@ -113,4 +113,14 @@ impl CompilerContext
             Ok(())
         }
     }
+
+    pub fn clear(&mut self)
+    {
+        self.asts.clear();
+        self.files_to_compile.clear();
+        self.named_ctx.clear();
+        self.report_ctx.clear();
+        self.src_map.clear();
+        self.type_ctx.clear();
+    }
 }

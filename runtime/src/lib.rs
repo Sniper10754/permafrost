@@ -27,12 +27,12 @@ impl Runtime
 
     pub fn eval_code(
         &mut self,
+        ctx: &mut CompilerContext,
         source_url: impl Into<SourceUrl>,
         code: &str,
     ) -> Result<Value, CompilerError>
     {
-        let mut ctx = CompilerContext::new();
-        let mut compiler = Compiler::new(&mut ctx);
+        let mut compiler = Compiler::new(ctx);
 
         let bytecode = self.compile_code(&mut compiler, source_url, code)?;
 

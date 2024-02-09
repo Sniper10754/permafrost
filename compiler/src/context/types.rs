@@ -13,6 +13,12 @@ pub struct TypeContext
 
 impl TypeContext
 {
+    pub fn clear(&mut self)
+    {
+        self.t_asts.clear();
+        self.types_arena.clear();
+    }
+
     delegate! {
         to self.t_asts {
             #[call(get)]
