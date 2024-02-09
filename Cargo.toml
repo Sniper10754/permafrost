@@ -36,11 +36,11 @@ serde = { version = "1", default-features = false, features = ["derive"] }
 dbg-pls = { version = "0.4", features = ["colors", "derive", "pretty"] }
 num-traits = { version = "0", default-features = false }
 log = { version = "0.4", default-features = false }
-clap = { version = "4", features = ["derive"] }
+clap = { version = "4", features = ["derive", "color"] }
 enum_dispatch = "0.3"
 const_format = "0"
 derive_more = "0"
-color-eyre = "0"
+color-eyre = { version = "0", default-features = false }
 owo-colors = "4"
 delegate = "0.12"
 cfg-if = "1"

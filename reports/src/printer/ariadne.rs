@@ -13,7 +13,7 @@ mod utils
 
     use std::{borrow::ToOwned, boxed::Box, fmt, fmt::Debug, io, string::String};
 
-    use ariadne::{Cache, FnCache};
+    use ariadne::{Cache, FnCache, Source};
 
     use crate::sourcemap::{SourceKey, SourceMap};
 
@@ -51,6 +51,7 @@ mod utils
         fn_cache: FnCache<
             SourceKey,
             Box<dyn Fn(&SourceKey) -> Result<String, Box<dyn Debug>> + 'src_map>,
+            String,
         >,
         src_map: &'src_map SourceMap,
     }
@@ -68,10 +69,12 @@ mod utils
 
     impl<'src_map> Cache<SourceKey> for SourceMapCache<'src_map>
     {
+        type Storage = String;
+
         fn fetch(
             &mut self,
             id: &SourceKey,
-        ) -> Result<&ariadne::Source, Box<dyn fmt::Debug + '_>>
+        ) -> Result<&Source<Self::Storage>, Box<dyn fmt::Debug + '_>>
         {
             self.fn_cache.fetch(id)
         }

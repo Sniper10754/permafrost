@@ -12,7 +12,7 @@ derive_more = { workspace = true }
 slotmap = { workspace = true }
 cfg-if = { workspace = true }
 
-ariadne = { version = "0.3", optional = true }
+ariadne = { version = "0.4", optional = true }
 permafrost-ast = { path = "../ast" }
 
 [features]

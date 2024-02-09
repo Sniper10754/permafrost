@@ -202,7 +202,7 @@ fn write_output_to_file(
         .read(true)
         .write(true)
         .create(true)
-        .append(false)
+        .truncate(true)
         .open(output_file)?;
 
     fs_writer.write_all(&buf)?;
