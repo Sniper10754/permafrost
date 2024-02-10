@@ -47,7 +47,7 @@ enum CliSubcommand
     },
 }
 
-#[derive(clap::ValueEnum, Clone, Debug)]
+#[derive(clap::ValueEnum, Clone, Copy, Debug)]
 enum CodegenOptions
 {
     Bytecode,
@@ -79,13 +79,16 @@ fn setup_logger() -> eyre::Result<()>
         fern::Dispatch::new()
             .format(move |out, message, record| {
                 out.finish(format_args!(
-                    "[{} {}] {}",
+                    "[{} @ {}] {}",
                     colors.color(record.level()),
-                    record.target(),
+                    record
+                        .file()
+                        .map(|file| format!("{file}:{}", record.line().unwrap()))
+                        .unwrap_or_else(|| record.target().into()),
                     message,
                 ))
             })
-            .level(LevelFilter::Info)
+            .level(LevelFilter::Trace)
             .chain(std::io::stdout())
             .apply()?;
     }
@@ -95,11 +98,11 @@ fn setup_logger() -> eyre::Result<()>
 
 fn main() -> eyre::Result<()>
 {
-    setup_logger()?;
-
     let args = CliArgs::try_parse()?;
 
     color_eyre::install()?;
+
+    setup_logger()?;
 
     if env::var("DEBUG").is_ok() {
         println!("PID: {}", process::id());

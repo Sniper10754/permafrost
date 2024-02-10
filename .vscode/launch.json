@@ -3,19 +3,11 @@
     "configurations": [
         {
             "type": "lldb",
-            "request": "attach",
-            "name": "Attach to process",
-            "pid": "${command:pickMyProcess}"
-        },
-        {
-            "type": "lldb",
             "request": "launch",
             "name": "Debug executable 'permafrost-compiler-driver'",
             "cargo": {
                 "args": [
-                    "build",
-                    "--bin=permafrost-compiler-driver",
-                    "--package=permafrost-compiler-driver"
+                    "${command:SpecifyProgramArgs"
                 ],
                 "filter": {
                     "name": "permafrost-compiler-driver",

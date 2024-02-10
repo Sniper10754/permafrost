@@ -66,11 +66,11 @@ impl NamedContext
             #[call(get)]
             #[unwrap]
             #[inline]
-            pub fn get_namespace(&self, source_key: NamespaceKey) -> &Namespace;
+            pub fn get_namespace(&self, namespace_key: NamespaceKey) -> &Namespace;
             #[call(get_mut)]
             #[unwrap]
             #[inline]
-            pub fn get_namespace_mut(&mut self, source_key: NamespaceKey) -> &mut Namespace;
+            pub fn get_namespace_mut(&mut self, namespace_key: NamespaceKey) -> &mut Namespace;
         }
         to self.named_asts {
             #[call(insert)]

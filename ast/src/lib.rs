@@ -223,6 +223,14 @@ impl<T> Spanned<&mut T>
     }
 }
 
+impl<T: Copy> Spanned<T>
+{
+    pub fn value_copied(&self) -> T
+    {
+        self.1
+    }
+}
+
 impl<T> Spannable for Spanned<T>
 {
     fn span(&self) -> Span
@@ -262,8 +270,9 @@ impl Spannable for Expr
             | Expr::Float(Spanned(span, _))
             | Expr::Ident(Spanned(span, _))
             | Expr::String(Spanned(span, _))
-            | Expr::Bool(Spanned(span, _))
-            | Expr::ImportDirective(Spanned(span, _)) => span.clone(),
+            | Expr::Bool(Spanned(span, _)) => span.clone(),
+
+            Expr::ImportDirective { namespace_path } => namespace_path.span(),
 
             Expr::NamespaceDirective(mod_token, namespace_name) => {
                 (mod_token.span().start)..(namespace_name.span().end)
@@ -317,7 +326,11 @@ pub enum Expr
     String(Spanned<String>),
 
     NamespaceDirective(ModToken, NamespaceDirectiveKind),
-    ImportDirective(Spanned<ImportDirectiveKind>),
+
+    ImportDirective
+    {
+        namespace_path: Spanned<Box<NamespacePath>>,
+    },
 
     BinaryOperation
     {
@@ -378,18 +391,4 @@ pub struct Argument
 pub enum NamespaceDirectiveKind
 {
     ImportLocalNamespace(Spanned<String>),
-}
-
-#[derive(Debug, Clone, PartialEq, DebugPls)]
-pub enum ImportDirectiveKind
-{
-    FromNamespaceImportSymbol
-    {
-        namespace_path: Box<NamespacePath>,
-        symbol: Spanned<String>,
-    },
-    ImportFromNamespace
-    {
-        namespace_path: Box<NamespacePath>
-    },
 }

@@ -6,7 +6,7 @@ use permafrost_ast::{
         ArrowToken, FunctionToken, LeftBraceToken, LeftParenthesisToken, ModToken, ReturnToken,
         RightBraceToken, RightParenthesisToken, TypeAnnotation,
     },
-    Expr, ImportDirectiveKind, NamespaceDirectiveKind, NamespacePath, Span, Spannable, Spanned,
+    Expr, NamespaceDirectiveKind, NamespacePath, Span, Spannable, Spanned,
 };
 use permafrost_reports::{
     sourcemap::{SourceKey, SourceUrl},
@@ -155,6 +155,7 @@ impl From<ResolvedSymbol> for LocalSymbol
     }
 }
 
+#[derive(Debug)]
 pub struct RecursiveNameChecker<'compiler, 'ctx>
 {
     compiler: &'compiler mut Compiler<'ctx>,
@@ -179,8 +180,8 @@ impl<'compiler, 'ctx> RecursiveNameChecker<'compiler, 'ctx>
             Expr::Ident(identifier) => {
                 self.visit_ident(source_key, identifier.value(), identifier.span())
             }
-            Expr::ImportDirective(import_directive) => {
-                self.visit_import_directive(source_key, import_directive.as_ref())
+            Expr::ImportDirective { namespace_path } => {
+                self.visit_import_directive(source_key, namespace_path.as_deref())
             }
             Expr::NamespaceDirective(mod_token, namespace_directive_kind) => self
                 .visit_namespace_directive(source_key, mod_token.clone(), namespace_directive_kind),
@@ -270,34 +271,24 @@ impl<'compiler, 'ctx> RecursiveNameChecker<'compiler, 'ctx>
     fn visit_import_directive(
         &mut self,
         source_key: SourceKey,
-        import_directive_kind: Spanned<&ImportDirectiveKind>,
+        namespace_path: Spanned<&NamespacePath>,
     ) -> Result<NamedExpr, NameResolutionError>
     {
-        match import_directive_kind.value() {
-            ImportDirectiveKind::FromNamespaceImportSymbol {
-                namespace_path: _,
-                symbol: _,
-            } => {
-                todo!()
-            }
-            ImportDirectiveKind::ImportFromNamespace { namespace_path } => {
-                let resolved_symbol = self.resolve_namespace_path(source_key, namespace_path)?;
+        let resolved_symbol = self.resolve_namespace_path(source_key, namespace_path.value())?;
 
-                let last_path_element = namespace_path.last().unwrap();
+        let last_path_element = namespace_path.last().unwrap();
 
-                self.scopes
-                    .try_insert(
-                        last_path_element.value(),
-                        LocalSymbol::from(resolved_symbol),
-                    )
-                    .map_err(|_| NameResolutionError::IdentifierNotFound {
-                        source_key,
-                        identifier: last_path_element.clone(),
-                    })?;
-            }
-        }
+        self.scopes
+            .try_insert(
+                last_path_element.value(),
+                LocalSymbol::from(resolved_symbol),
+            )
+            .map_err(|_| NameResolutionError::ClashingIdentifier {
+                source_key,
+                identifier: last_path_element.clone(),
+            })?;
 
-        Ok(NamedExpr::UseDirective(import_directive_kind.span()))
+        Ok(NamedExpr::UseDirective(namespace_path.span()))
     }
 
     fn resolve_namespace_path(
@@ -306,42 +297,71 @@ impl<'compiler, 'ctx> RecursiveNameChecker<'compiler, 'ctx>
         namespace_path: &NamespacePath,
     ) -> Result<ResolvedSymbol, NameResolutionError>
     {
-        let mut namespace_path_iter = namespace_path.iter();
-
-        let Some(name_to_import) = namespace_path_iter.next() else {
-            unreachable!()
-        };
+        let namespace_to_import_from = &namespace_path[0];
 
         // Search the current scope for the module
-        let target_namespace_key = if let Some(LocalSymbol::Namespace(namespace_key)) =
-            self.scopes.local(name_to_import.value())
+        let namespace_key_to_import_from = if let Some(LocalSymbol::Namespace(namespace_key)) =
+            self.scopes.local(namespace_to_import_from.value())
         {
             *namespace_key
         } else {
             return Err(NameResolutionError::IdentifierNotFound {
                 source_key: importing_file_source_key,
-                identifier: name_to_import.clone(),
+                identifier: namespace_to_import_from.clone(),
             });
         };
 
-        let namespace = self
-            .compiler
-            .ctx
-            .named_ctx
-            .get_namespace(target_namespace_key);
-
-        if let Some(export) = namespace.exports.get(name_to_import.value()) {
-            match namespace_path_iter.next() {
-                Some(_) => {
-                    self.resolve_namespace_path(importing_file_source_key, &namespace_path[1..])
-                }
-                None => Ok(ResolvedSymbol::from(*export)),
-            }
+        if namespace_path.len() > 1 {
+            self.resolve_namespace_path_import(
+                importing_file_source_key,
+                namespace_key_to_import_from,
+                &namespace_path[1..],
+            )
         } else {
-            Err(NameResolutionError::IdentifierNotFound {
-                source_key: importing_file_source_key,
-                identifier: name_to_import.clone(),
-            })
+            Ok(ResolvedSymbol::NamespaceKey(namespace_key_to_import_from))
+        }
+    }
+
+    fn resolve_namespace_path_import(
+        &mut self,
+        source_key: SourceKey,
+        namespace_key: NamespaceKey,
+        namespace_path: &NamespacePath,
+    ) -> Result<ResolvedSymbol, NameResolutionError>
+    {
+        let mut namespace_path_iter = namespace_path.iter().peekable();
+
+        let segment = namespace_path_iter.next().unwrap();
+
+        let resolved_symbol =
+            self.resolve_namespace_path_segment(source_key, namespace_key, segment.as_deref())?;
+
+        match (resolved_symbol, namespace_path_iter.peek()) {
+            (ResolvedSymbol::LocalKey(..), Some(..)) => todo!("error"),
+            (ResolvedSymbol::LocalKey(..) | ResolvedSymbol::NamespaceKey(..), None) => {
+                Ok(resolved_symbol)
+            }
+            (ResolvedSymbol::NamespaceKey(new_namespace_key), Some(..)) => self
+                .resolve_namespace_path_import(source_key, new_namespace_key, &namespace_path[1..]),
+        }
+    }
+
+    fn resolve_namespace_path_segment(
+        &mut self,
+        source_key: SourceKey,
+        namespace_key: NamespaceKey,
+        identifier: Spanned<&str>,
+    ) -> Result<ResolvedSymbol, NameResolutionError>
+    {
+        let namespace = self.compiler.ctx.named_ctx.get_namespace(namespace_key);
+
+        match namespace.exports.get(identifier.value_copied()) {
+            Some(export) => Ok(ResolvedSymbol::from(*export)),
+            None => Err(NameResolutionError::IdentifierNotFound {
+                source_key,
+                // Spanned<&str> -> Spanned<String>
+                identifier: identifier.map(Into::into),
+            }),
         }
     }
 
@@ -434,7 +454,7 @@ impl<'compiler, 'ctx> RecursiveNameChecker<'compiler, 'ctx>
 
             self.scopes
                 .try_insert(
-                    *local_namespace_name.value(),
+                    local_namespace_name.value_copied(),
                     LocalSymbol::Namespace(namespace_key),
                 )
                 .map_err(|_| NameResolutionError::ClashingIdentifier {

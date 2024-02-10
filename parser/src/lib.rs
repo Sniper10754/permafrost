@@ -16,8 +16,7 @@ use permafrost_ast::{
         ArrowToken, Eq, FunctionToken, LeftBraceToken, LeftParenthesisToken, Operator, ReturnToken,
         RightBraceToken, RightParenthesisToken, TypeAnnotation,
     },
-    Argument, BoxedNamespacePath, Expr, ImportDirectiveKind, NamespaceDirectiveKind, Program,
-    Spannable, Spanned,
+    Argument, BoxedNamespacePath, Expr, NamespaceDirectiveKind, Program, Spannable, Spanned,
 };
 use permafrost_reports::{sourcemap::SourceKey, ReportContext};
 
@@ -230,10 +229,9 @@ impl<'report_context> Parser<'report_context>
                 let Spanned(Range { start: _, end }, namespace_path) =
                     self.parse_namespace_path()?;
 
-                Some(Expr::ImportDirective(Spanned(
-                    start..end,
-                    ImportDirectiveKind::ImportFromNamespace { namespace_path },
-                )))
+                Some(Expr::ImportDirective {
+                    namespace_path: Spanned(start..end, namespace_path),
+                })
             }
 
             Some(Spanned(mod_token_span, Token::Module)) => {
@@ -250,34 +248,6 @@ impl<'report_context> Parser<'report_context>
                     mod_token_span.into(),
                     NamespaceDirectiveKind::ImportLocalNamespace(Spanned(name_span, module_name)),
                 ))
-            }
-
-            Some(Spanned(Range { start, end: _ }, Token::From)) => {
-                let Spanned(Range { start: _, end }, namespace_path) =
-                    self.parse_namespace_path()?;
-
-                consume_token!(
-                    parser: self,
-                    token: Token::Use,
-                    description: "import"
-                )?;
-
-                let Spanned(span, Token::Ident(symbol)) = consume_token!(
-                    parser: self,
-                    token: Token::Ident(..),
-                    description: "A name"
-                )?
-                else {
-                    unreachable!()
-                };
-
-                Some(Expr::ImportDirective(Spanned(
-                    start..end,
-                    ImportDirectiveKind::FromNamespaceImportSymbol {
-                        namespace_path,
-                        symbol: Spanned(span, symbol),
-                    },
-                )))
             }
 
             Some(Spanned(span, Token::True)) => Some(Expr::Bool(Spanned(span, true))),
