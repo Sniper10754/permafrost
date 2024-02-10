@@ -1,6 +1,11 @@
 #![feature(never_type)]
 
-use std::{env, fs, io::Write, path::PathBuf, process};
+use std::{
+    env, fs,
+    io::{self, Read, Write},
+    path::PathBuf,
+    process,
+};
 
 use clap::Parser;
 use color_eyre::eyre;
@@ -96,6 +101,13 @@ fn main() -> eyre::Result<()>
 
     color_eyre::install()?;
 
+    if env::var("DEBUG").is_ok() {
+        println!("PID: {}", process::id());
+        println!("Press any key to continue");
+
+        _ = io::stdin().read(&mut [])?;
+    }
+
     match args.subcommand {
         CliSubcommand::Compile {
             file,
@@ -118,7 +130,7 @@ fn compile_file(
         .map(|extension| extension.to_string_lossy())
         .as_deref()
     {
-        Some("pmf") => (),
+        Some(extension) if extension == PERMAFROST_FILE_EXTENSION => (),
         Some(..) | None => log::warn!(
             "The reccomended file extension is `{}`",
             PERMAFROST_FILE_EXTENSION

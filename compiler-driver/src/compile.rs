@@ -1,5 +1,5 @@
 use permafrost_compiler::{
-    codegen::CodegenBackend, utils::CompilationResults, Compiler, CompilerError,
+    codegen::CodegenBackend, utils::CompilationResult, Compiler, CompilerError,
 };
 
 use permafrost_reports::sourcemap::{SourceKey, SourceUrl};
@@ -9,7 +9,7 @@ pub fn call_compiler<C>(
     src_url: impl Into<SourceUrl>,
     src_code: impl Into<String>,
     codegen: &mut C,
-) -> Result<(SourceKey, CompilationResults<C>), CompilerError>
+) -> Result<(SourceKey, CompilationResult<C>), CompilerError>
 where
     C: CodegenBackend,
 {

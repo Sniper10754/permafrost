@@ -176,14 +176,14 @@ mod compilation_results
 
     use crate::codegen::CodegenBackend;
 
-    pub struct CompilationResults<C>
+    pub struct CompilationResult<C>
     where
         C: CodegenBackend,
     {
         pub(crate) compiled_files: SecondaryMap<SourceKey, C::Output>,
     }
 
-    impl<C> CompilationResults<C>
+    impl<C> CompilationResult<C>
     where
         C: CodegenBackend,
     {
@@ -193,6 +193,18 @@ mod compilation_results
                 pub fn get_file(&self, source_key: SourceKey) -> Option<&C::Output>;
                 #[call(remove)]
                 pub fn retrieve(&mut self, source_key: SourceKey) -> Option<C::Output>;
+            }
+        }
+    }
+
+    impl<C> FromIterator<(SourceKey, C::Output)> for CompilationResult<C>
+    where
+        C: CodegenBackend,
+    {
+        fn from_iter<T: IntoIterator<Item = (SourceKey, C::Output)>>(iter: T) -> Self
+        {
+            Self {
+                compiled_files: iter.into_iter().collect(),
             }
         }
     }

@@ -3,6 +3,12 @@
     "configurations": [
         {
             "type": "lldb",
+            "request": "attach",
+            "name": "Attach to process",
+            "pid": "${command:pickMyProcess}"
+        },
+        {
+            "type": "lldb",
             "request": "launch",
             "name": "Debug executable 'permafrost-compiler-driver'",
             "cargo": {

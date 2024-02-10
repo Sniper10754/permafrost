@@ -20,7 +20,7 @@ use permafrost_reports::sourcemap::{SourceDescription, SourceKey, SourceUrl};
 
 use codegen::CodegenBackend;
 use context::CompilerContext;
-use utils::CompilationResults;
+use utils::CompilationResult;
 
 pub const PERMAFROST_FILE_EXTENSION: &str = "pmf";
 
@@ -173,7 +173,7 @@ impl<'ctx> Compiler<'ctx>
     pub fn compile<C>(
         &mut self,
         codegen: &mut C,
-    ) -> Result<CompilationResults<C>, CompilerError>
+    ) -> Result<CompilationResult<C>, CompilerError>
     where
         C: CodegenBackend,
     {
@@ -187,7 +187,7 @@ impl<'ctx> Compiler<'ctx>
             compiled_files.insert(source_key, codegen_output);
         }
 
-        Ok(CompilationResults { compiled_files })
+        Ok(CompilationResult { compiled_files })
     }
 
     fn codegen<C>(
