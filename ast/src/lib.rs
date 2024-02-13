@@ -6,6 +6,7 @@ use alloc::{boxed::Box, string::String, vec::Vec};
 use core::ops::{Deref, DerefMut, Range};
 use dbg_pls::DebugPls;
 use enum_dispatch::enum_dispatch;
+use tokens::PublicToken;
 
 use derive_more::{Deref, DerefMut, From};
 
@@ -14,8 +15,10 @@ use self::tokens::{
     ReturnToken, RightBraceToken, RightParenthesisToken, TypeAnnotation,
 };
 
-pub type NamespacePath = [Spanned<String>];
-pub type BoxedNamespacePath = Box<NamespacePath>;
+pub type NamespacePathSegment = Spanned<String>;
+pub type NamespacePath = [NamespacePathSegment];
+pub type OwnedNamespacePath = Box<NamespacePath>;
+
 pub type Span = Range<usize>;
 
 pub mod tokens
@@ -28,7 +31,7 @@ pub mod tokens
 
     macro_rules! token {
         ($name:ident) => {
-            #[derive(Debug, Clone, PartialEq, Hash, dbg_pls::DebugPls)]
+            #[derive(Debug, Clone, PartialEq, Eq, Hash, dbg_pls::DebugPls)]
             pub struct $name(pub $crate::Span);
 
             impl Spannable for $name
@@ -46,6 +49,14 @@ pub mod tokens
                     Self(span)
                 }
             }
+        };
+    }
+
+    macro_rules! tokens {
+        ($($name:ident),+) => {
+            $(
+                token!($name);
+            )+
         };
     }
 
@@ -102,15 +113,18 @@ pub mod tokens
         Object(String),
     }
 
-    token!(Eq);
-    token!(FunctionToken);
-    token!(LeftParenthesisToken);
-    token!(RightParenthesisToken);
-    token!(LeftBraceToken);
-    token!(RightBraceToken);
-    token!(ArrowToken);
-    token!(ReturnToken);
-    token!(ModToken);
+    tokens![
+        Eq,
+        FunctionToken,
+        LeftParenthesisToken,
+        RightParenthesisToken,
+        LeftBraceToken,
+        RightBraceToken,
+        ArrowToken,
+        ReturnToken,
+        ModToken,
+        PublicToken
+    ];
 }
 
 #[enum_dispatch]
@@ -348,14 +362,20 @@ pub enum Expr
 
     Function
     {
+        visibility: ItemVisibility,
+
         fn_token: FunctionToken,
         name: Option<Spanned<String>>,
+
         lpt: LeftParenthesisToken,
         arguments: Vec<Argument>,
         rpt: RightParenthesisToken,
+
         return_type_token: Option<ArrowToken>,
         return_type_annotation: Option<Spanned<TypeAnnotation>>,
+
         equals: Eq,
+
         body: Box<Self>,
     },
 
@@ -377,6 +397,27 @@ pub enum Expr
     Return(ReturnToken, Option<Box<Self>>),
 
     Poisoned,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, From, DebugPls)]
+pub enum ItemVisibility
+{
+    Public(PublicToken),
+
+    Unspecified,
+}
+
+impl ItemVisibility
+{
+    pub fn span(&self) -> Option<Span>
+    {
+        use ItemVisibility::*;
+
+        match self {
+            Public(token) => Some(token.span()),
+            Unspecified => None,
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, DebugPls, derive_more::From)]

@@ -41,7 +41,10 @@ mod helpers
     {
         let input = lexer.slice();
 
-        input[1..(input.len() - 1)].into()
+        let start = 1;
+        let end = input.len() - 1;
+
+        (input[start..end]).into()
     }
 }
 
@@ -143,6 +146,9 @@ pub enum Token
 
     #[token("function")]
     Fn,
+
+    #[token("pub")]
+    Public,
 
     #[token("from")]
     From,

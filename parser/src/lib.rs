@@ -16,7 +16,8 @@ use permafrost_ast::{
         ArrowToken, Eq, FunctionToken, LeftBraceToken, LeftParenthesisToken, Operator, ReturnToken,
         RightBraceToken, RightParenthesisToken, TypeAnnotation,
     },
-    Argument, BoxedNamespacePath, Expr, NamespaceDirectiveKind, Program, Spannable, Spanned,
+    Argument, Expr, ItemVisibility, NamespaceDirectiveKind, OwnedNamespacePath, Program, Spannable,
+    Spanned,
 };
 use permafrost_reports::{sourcemap::SourceKey, ReportContext};
 
@@ -266,6 +267,8 @@ impl<'report_context> Parser<'report_context>
             }
 
             Some(Spanned(fn_token_span, Token::Fn)) => {
+                let visibility = self.parse_visibility()?;
+
                 let fn_token = FunctionToken(fn_token_span);
 
                 let mut name = None;
@@ -367,13 +370,18 @@ impl<'report_context> Parser<'report_context>
                 let body = self.parse_expr()?;
 
                 Some(Expr::Function {
+                    visibility,
+
                     fn_token,
                     name,
+
                     lpt: LeftParenthesisToken(left_paren_span),
                     arguments,
                     rpt: RightParenthesisToken(right_paren_span),
+
                     return_type_token,
                     return_type_annotation,
+
                     equals: Eq(equals_span),
                     body: Box::new(body),
                 })
@@ -510,7 +518,7 @@ impl<'report_context> Parser<'report_context>
         }
     }
 
-    fn parse_namespace_path(&mut self) -> Option<Spanned<BoxedNamespacePath>>
+    fn parse_namespace_path(&mut self) -> Option<Spanned<OwnedNamespacePath>>
     {
         let mut names = Vec::new();
 
@@ -564,5 +572,17 @@ impl<'report_context> Parser<'report_context>
                 .collect::<Vec<_>>()
                 .into_boxed_slice(),
         ))
+    }
+
+    fn parse_visibility(&mut self) -> Option<ItemVisibility>
+    {
+        match self.token_stream.peek() {
+            Some(Spanned(_, Token::Public)) => {
+                let Spanned(span, _) = self.token_stream.skip_token()?;
+
+                Some(ItemVisibility::Public(span.into()))
+            }
+            Some(_) | None => Some(ItemVisibility::Unspecified),
+        }
     }
 }

@@ -1,1 +1,1 @@
-function my_function() = {};
+pub function my_function() = {};

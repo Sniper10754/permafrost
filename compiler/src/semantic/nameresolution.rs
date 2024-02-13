@@ -196,6 +196,7 @@ impl<'compiler, 'ctx> RecursiveNameChecker<'compiler, 'ctx>
                 value,
             } => self.visit_assign(source_key, lhs, value),
             Expr::Function {
+                visibility: _,
                 fn_token,
                 name,
                 lpt: _,
@@ -356,7 +357,7 @@ impl<'compiler, 'ctx> RecursiveNameChecker<'compiler, 'ctx>
         let namespace = self.compiler.ctx.named_ctx.get_namespace(namespace_key);
 
         match namespace.exports.get(identifier.value_copied()) {
-            Some(export) => Ok(ResolvedSymbol::from(*export)),
+            Some(&export) => Ok(ResolvedSymbol::from(export)),
             None => Err(NameResolutionError::IdentifierNotFound {
                 source_key,
                 // Spanned<&str> -> Spanned<String>
