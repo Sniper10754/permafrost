@@ -1,9 +1,13 @@
-use alloc::{collections::VecDeque, string::String, vec, vec::Vec};
-
-use logos::{Logos, Span};
-use permafrost_reports::{sourcemap::SourceKey, IntoReport, Level, Report, ReportContext};
+use alloc::{collections::VecDeque, string::String, vec::Vec};
 
 use permafrost_ast::{tokens::BinaryOperatorKind, Spanned};
+use permafrost_reports::{sourcemap::SourceKey, IntoReport, ReportContext};
+
+use crate::error::{LexicalError, LexicalErrorKind};
+
+use logos::Logos;
+
+use derive_more::*;
 
 mod helpers
 {
@@ -14,14 +18,16 @@ mod helpers
 
     use permafrost_ast::tokens::BinaryOperatorKind;
 
-    use super::{LexerErrorKind, Token};
+    use crate::error::LexicalErrorKind;
 
-    pub fn parse_number<N: Num>(lexer: &Lexer<'_, Token>) -> Result<N, LexerErrorKind>
+    use super::Token;
+
+    pub fn parse_number<N: Num>(lexer: &Lexer<'_, Token>) -> Result<N, LexicalErrorKind>
     {
         let slice = lexer.slice();
 
         N::from_str_radix(slice, 10)
-            .map_err(|_| LexerErrorKind::NumberTooBig { span: lexer.span() })
+            .map_err(|_| LexicalErrorKind::NumberTooBig { span: lexer.span() })
     }
 
     pub fn parse_operator(lexer: &Lexer<'_, Token>) -> BinaryOperatorKind
@@ -50,64 +56,8 @@ mod helpers
 
 pub type SpannedToken = Spanned<Token>;
 
-#[derive(Debug, PartialEq, Clone)]
-pub struct LexerError
-{
-    source_key: SourceKey,
-    kind: LexerErrorKind,
-}
-
-#[derive(Debug, PartialEq, Clone, Default)]
-pub enum LexerErrorKind
-{
-    NumberTooBig
-    {
-        span: Span
-    },
-
-    UnknownToken
-    {
-        span: Span
-    },
-
-    #[default]
-    GenericLexerError,
-}
-
-impl IntoReport for LexerError
-{
-    fn into_report(self) -> permafrost_reports::Report
-    {
-        let source_key = self.source_key;
-
-        let location;
-        let title;
-        let description;
-
-        match self.kind {
-            LexerErrorKind::NumberTooBig { span } => {
-                location = span;
-
-                title = "Number too big";
-
-                description = "Number can't be lexed because is too big";
-            }
-            LexerErrorKind::UnknownToken { span } => {
-                location = span;
-
-                title = "Unknown token";
-
-                description = "Token was not recognized";
-            }
-            LexerErrorKind::GenericLexerError => unreachable!(),
-        }
-
-        Report::new(Level::Error, location, source_key, title, Some(description))
-    }
-}
-
 #[derive(Logos, Debug, Clone, PartialEq)]
-#[logos(error = LexerErrorKind)]
+#[logos(error = LexicalErrorKind)]
 #[logos(skip r"[\t\n\r ]+")]
 pub enum Token
 {
@@ -181,100 +131,49 @@ pub enum Token
     Semicolon,
 }
 
-#[derive(Debug, Clone)]
-pub struct TokenStream
+impl Token
 {
-    tokens: VecDeque<SpannedToken>,
-    index: usize,
+    pub const fn description(&self) -> &'static str
+    {
+        match self {
+            Token::Int(_) => "Integer literal",
+            Token::Float(_) => "Floating-point literal",
+            Token::Ident(_) => "Identifier",
+            Token::String(_) => "String literal",
+            Token::True => "Boolean true",
+            Token::False => "Boolean false",
+            Token::LParen => "Left parenthesis",
+            Token::RParen => "Right parenthesis",
+            Token::LBrace => "Left brace",
+            Token::RBrace => "Right brace",
+            Token::Eq => "Equality operator",
+            Token::Fn => "Function keyword",
+            Token::Public => "Public keyword",
+            Token::From => "From keyword",
+            Token::Use => "Use keyword",
+            Token::DoubleColon => "Double colon",
+            Token::Return => "Return keyword",
+            Token::Arrow => "Arrow symbol",
+            Token::Comma => "Comma",
+            Token::Module => "Module keyword",
+            Token::BinaryOperator(op) => op.description(),
+            Token::Colon => "Colon",
+            Token::Semicolon => "Semicolon",
+        }
+    }
 }
 
-impl TokenStream
+#[derive(Debug, Clone, Constructor)]
+pub struct TokenStream(VecDeque<SpannedToken>);
+
+impl IntoIterator for TokenStream
 {
-    pub fn with_vec_deque(tokens: impl Into<VecDeque<SpannedToken>>) -> Self
+    type IntoIter = <VecDeque<SpannedToken> as IntoIterator>::IntoIter;
+    type Item = SpannedToken;
+
+    fn into_iter(self) -> Self::IntoIter
     {
-        let tokens = tokens.into();
-        Self { tokens, index: 0 }
-    }
-
-    pub fn with_iter(tokens: impl IntoIterator<Item = SpannedToken>) -> Self
-    {
-        let tokens = tokens.into_iter().collect::<VecDeque<_>>();
-        Self { tokens, index: 0 }
-    }
-
-    pub fn skip_token(&mut self) -> Option<SpannedToken>
-    {
-        self.next()
-    }
-
-    pub fn skip_tokens(
-        stream: &mut TokenStream,
-        count: usize,
-    ) -> Vec<SpannedToken>
-    {
-        let mut taken_tokens = vec![];
-
-        for _ in 0..count {
-            if let Some(token) = stream.next() {
-                taken_tokens.push(token);
-            } else {
-                break;
-            }
-        }
-
-        taken_tokens
-    }
-
-    #[allow(clippy::should_implement_trait)]
-    pub fn next(&mut self) -> Option<SpannedToken>
-    {
-        if self.index < self.tokens.len() {
-            let token = self.tokens[self.index].clone();
-
-            self.index += 1;
-
-            Some(token)
-        } else {
-            None
-        }
-    }
-
-    #[must_use]
-    pub fn peek(&self) -> Option<&SpannedToken>
-    {
-        self.tokens.get(self.index)
-    }
-
-    pub fn take_while<P>(
-        stream: &mut TokenStream,
-        predicate: P,
-    ) -> Vec<SpannedToken>
-    where
-        P: Fn(&SpannedToken) -> bool,
-    {
-        let mut taken_tokens = vec![];
-
-        while let Some(token) = stream.peek() {
-            if predicate(token) {
-                if let Some(token) = stream.next() {
-                    taken_tokens.push(token);
-                }
-            } else {
-                break;
-            }
-        }
-
-        taken_tokens
-    }
-
-    #[must_use]
-    pub fn previous(&self) -> Option<SpannedToken>
-    {
-        if self.index > 0 {
-            Some(self.tokens[self.index - 1].clone())
-        } else {
-            None
-        }
+        self.0.into_iter()
     }
 }
 
@@ -291,21 +190,18 @@ pub fn tokenize(
         match token {
             Ok(t) => tokens.push((span, t).into()),
             Err(e) => {
-                let error_kind = match e {
-                    LexerErrorKind::GenericLexerError => LexerErrorKind::UnknownToken { span },
+                let kind = match e {
+                    LexicalErrorKind::GenericLexerError => LexicalErrorKind::UnknownToken { span },
 
                     error => error,
                 };
 
-                let error = LexerError {
-                    source_key,
-                    kind: error_kind,
-                };
+                let error = LexicalError { source_key, kind };
 
                 report_ctx.push(error.into_report());
             }
         }
     }
 
-    TokenStream::with_vec_deque(tokens)
+    TokenStream::new(tokens.into())
 }

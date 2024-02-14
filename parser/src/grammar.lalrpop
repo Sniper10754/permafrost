@@ -1,0 +1,123 @@
+use crate::{
+    lexer::{Token}, 
+    error::LexicalError
+};
+
+use permafrost_ast::{tokens::*, *};
+
+grammar;
+
+extern {
+    type Location = usize;
+    type Error = LexicalError;
+
+    enum Token {
+        "int" => Token::Int(<i32>),
+        "float" => Token::Float(<f32>),
+        "ident" => Token::String(<String>),
+        "true" => Token::True,
+        "false" => Token::False,
+        "(" => Token::LParen,
+        ")" => Token::RParen,
+        "{" => Token::LBrace,
+        "}" => Token::RBrace,
+        "=" => Token::Eq,
+        "function" => Token::Fn,
+        "pub" => Token::Public,
+        "from" => Token::From,
+        "use" => Token::Use,
+        "::" => Token::DoubleColon,
+        "->" => Token::Arrow,
+        "," => Token::Comma,
+        "mod" => Token::Module,
+        "operator" => Token::BinaryOperator(<BinaryOperatorKind>),
+        ":" => Token::Colon,
+        ";" => Token::Semicolon,
+    }
+}
+
+pub Expr: Expr = {
+    <ae:AtomExpr> => ae,
+}
+
+AtomExpr: Expr = {
+    Spanned<"int"> => Expr::Int(<>),
+    Spanned<"float"> => Expr::Float(<>),
+    Spanned<"true"> => Expr::Bool(<>.map(|_| true)),
+    Spanned<"false"> => Expr::Bool(<>.map(|_| false)),
+    Function,
+}
+
+Comma<T>: Vec<T> = {
+    <mut v:(<T> ",")*> <e:T?> => match e {
+        None => v,
+        Some(e) => {
+            v.push(e);
+            v
+        }
+    }
+};
+
+Spanned<T>: Spanned<T> = <left:@L> <element:T> <right:@R>
+    => Spanned(left..right, element);
+
+Function: Expr = 
+    <visibility:ItemVisibility>
+
+    <fn_token:Spanned<"function">>
+
+    <name:Spanned<"ident">?>
+    <lpt:Spanned<"(">>
+    <arguments:Comma<Argument>>
+    <rpt:Spanned<")">>
+
+    <return_type:FunctionReturnType?>
+
+    <equals:Spanned<"=">>
+
+    <body:Expr>
+
+    => Expr::Function {
+        visibility,
+        fn_token: fn_token.span().into(),
+        name,
+        lpt: lpt.span().into(),
+        arguments,
+        rpt: lpt.span().into(),
+        return_type_token: return_type
+            .as_ref()
+            .map(|(token, _)| token.span().into()),
+        return_type_annotation: return_type
+            .map(|(_, annot)| annot.clone()),
+        equals: equals.span().into(),
+        body: Box::new(body),
+    };
+
+Argument: Argument =
+    <name:Spanned<"ident">>
+    <type_annotation:Spanned<TypeAnnotation>>
+    => Argument {
+        name,
+        type_annotation
+    };
+
+FunctionReturnType: (ArrowToken, Spanned<TypeAnnotation>) =
+    <arrow:Spanned<"->">>
+    <type_annotation:Spanned<TypeAnnotation>>
+    => (arrow.span().into(), type_annotation);
+
+TypeAnnotation: TypeAnnotation = "ident" 
+    => match (<>).as_str() {
+        "int" => TypeAnnotation::Int,
+        "float" => TypeAnnotation::Float,
+        "str" => TypeAnnotation::String,
+        "bool" => TypeAnnotation::Bool,
+        "any" => TypeAnnotation::Any,
+        "()" => TypeAnnotation::Unit,
+
+        _ => TypeAnnotation::Object(<>)
+    };
+
+ItemVisibility: ItemVisibility = {
+    Spanned<"pub"> => ItemVisibility::Public(<>.span().into())
+};

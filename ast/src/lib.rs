@@ -23,6 +23,8 @@ pub type Span = Range<usize>;
 
 pub mod tokens
 {
+    use core::fmt::Display;
+
     use derive_more::Display;
 
     use super::{Span, Spannable};
@@ -76,19 +78,39 @@ pub mod tokens
         }
     }
 
-    #[derive(Debug, Clone, Copy, PartialEq, Hash, Display, dbg_pls::DebugPls)]
+    #[derive(Debug, Clone, Copy, PartialEq, Hash, dbg_pls::DebugPls)]
     pub enum BinaryOperatorKind
     {
-        #[display(fmt = "+")]
         Add,
-        #[display(fmt = "-")]
         Sub,
-        #[display(fmt = "*")]
         Mul,
-        #[display(fmt = "/")]
         Div,
-        #[display(fmt = "==")]
         Equal,
+    }
+
+    impl Display for BinaryOperatorKind
+    {
+        fn fmt(
+            &self,
+            f: &mut core::fmt::Formatter<'_>,
+        ) -> core::fmt::Result
+        {
+            f.write_str(self.description())
+        }
+    }
+
+    impl BinaryOperatorKind
+    {
+        pub fn description(self) -> &'static str
+        {
+            match self {
+                BinaryOperatorKind::Add => "+",
+                BinaryOperatorKind::Sub => "-",
+                BinaryOperatorKind::Mul => "*",
+                BinaryOperatorKind::Div => "/",
+                BinaryOperatorKind::Equal => "==",
+            }
+        }
     }
 
     #[derive(Debug, Clone, PartialEq, Display, dbg_pls::DebugPls)]
@@ -417,6 +439,14 @@ impl ItemVisibility
             Public(token) => Some(token.span()),
             Unspecified => None,
         }
+    }
+}
+
+impl From<Option<ItemVisibility>> for ItemVisibility
+{
+    fn from(value: Option<ItemVisibility>) -> Self
+    {
+        value.unwrap_or(ItemVisibility::Unspecified)
     }
 }
 

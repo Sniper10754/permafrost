@@ -103,7 +103,7 @@ impl PrintBackend for AriadnePrintBackend
     {
         let Report {
             level,
-            span,
+            location,
             source_key,
             title,
             description,
@@ -113,8 +113,15 @@ impl PrintBackend for AriadnePrintBackend
         let report_source_key = *source_key;
 
         let report_kind = (*level).into();
+
         let mut report_builder =
-            ariadne::Report::build(report_kind, report_source_key, span.start).with_message(title);
+            ariadne::Report::build(report_kind, report_source_key, location.start())
+                .with_message(title);
+
+        let span = (location.start())
+            ..(location
+                .end()
+                .unwrap_or_else(|| source_map[report_source_key].source_code.len()));
 
         let mut report_description =
             ariadne::Label::new((report_source_key, span.clone())).with_order(1);
@@ -132,7 +139,7 @@ impl PrintBackend for AriadnePrintBackend
             report_builder.add_label(
                 ariadne::Label::new((
                     report_source_key,
-                    label.span.clone().unwrap_or_else(|| span.clone()),
+                    label.span.clone().unwrap_or(span.clone()),
                 ))
                 .with_message(&label.info),
             );

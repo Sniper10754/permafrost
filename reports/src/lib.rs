@@ -3,7 +3,7 @@
 extern crate alloc;
 
 use alloc::{borrow::Cow, vec::Vec};
-use core::convert::Infallible;
+use core::{convert::Infallible, ops::Range};
 use sourcemap::SourceKey;
 
 use derive_more::*;
@@ -46,11 +46,31 @@ impl IntoReport for Infallible
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
-pub struct Location
+#[derive(Debug, Clone, PartialEq, From)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub enum Location
 {
-    span: Span,
-    source_key: SourceKey,
+    Span(Span),
+    Column(usize),
+}
+
+impl Location
+{
+    pub fn start(&self) -> usize
+    {
+        match self {
+            Location::Span(Range { start, end: _ }) => *start,
+            Location::Column(start) => *start,
+        }
+    }
+
+    pub fn end(&self) -> Option<usize>
+    {
+        match self {
+            Location::Span(Range { start: _, end }) => Some(*end),
+            Location::Column(_) => None,
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -58,7 +78,7 @@ pub struct Location
 pub struct Report
 {
     level: Level,
-    span: Span,
+    location: Location,
     source_key: SourceKey,
     title: Cow<'static, str>,
     description: Option<Cow<'static, str>>,
@@ -69,7 +89,7 @@ impl Report
 {
     pub fn new(
         level: Level,
-        location: Span,
+        location: impl Into<Location>,
         source_key: impl Into<SourceKey>,
         title: impl Into<Cow<'static, str>>,
         description: Option<impl Into<Cow<'static, str>>>,
@@ -77,7 +97,7 @@ impl Report
     {
         Self {
             level,
-            span: location,
+            location: location.into(),
             source_key: source_key.into(),
             title: title.into(),
             description: description.map(Into::into),

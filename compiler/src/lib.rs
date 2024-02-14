@@ -140,8 +140,7 @@ impl<'ctx> Compiler<'ctx>
         source_key: SourceKey,
     ) -> Result<(), CompilerError>
     {
-        let ast =
-            Parser::with_tokenstream(&mut self.ctx.report_ctx, token_stream, source_key).parse();
+        let ast = Parser::parse(&mut self.ctx.report_ctx, token_stream, source_key).parse();
 
         self.ctx.asts.insert(source_key, ast);
 
