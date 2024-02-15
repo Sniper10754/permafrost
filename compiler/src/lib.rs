@@ -7,16 +7,20 @@ extern crate std;
 
 use crate::semantic::{nameresolution, typecheck};
 
-use alloc::{string::String, vec::Vec};
+use alloc::{string::String, vec, vec::Vec};
 use derive_more::*;
 use log::{debug, trace};
+use permafrost_ast::Program;
 use slotmap::SecondaryMap;
 
 use permafrost_parser::{
     lexer::{tokenize, TokenStream},
     Parser,
 };
-use permafrost_reports::sourcemap::{SourceDescription, SourceKey, SourceUrl};
+use permafrost_reports::{
+    sourcemap::{SourceDescription, SourceKey, SourceUrl},
+    IntoReport,
+};
 
 use codegen::CodegenBackend;
 use context::CompilerContext;
@@ -140,9 +144,19 @@ impl<'ctx> Compiler<'ctx>
         source_key: SourceKey,
     ) -> Result<(), CompilerError>
     {
-        let ast = Parser::parse(&mut self.ctx.report_ctx, token_stream, source_key).parse();
+        let parse_result = Parser::parse(source_key, token_stream);
 
-        self.ctx.asts.insert(source_key, ast);
+        let Ok(ast) = parse_result else {
+            self.ctx
+                .report_ctx
+                .push(parse_result.unwrap_err().into_report());
+
+            return Err(CompilerError);
+        };
+
+        self.ctx
+            .asts
+            .insert(source_key, Program { exprs: vec![ast] });
 
         self.errors_as_result()?;
 

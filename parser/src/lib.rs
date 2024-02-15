@@ -1,22 +1,23 @@
-use error::LexicalError;
+extern crate alloc;
+
 use lalrpop_util::lalrpop_mod;
-use lexer::TokenStream;
+
 use permafrost_ast::{Expr, Spanned};
 use permafrost_reports::{sourcemap::SourceKey, ReportContext};
 
-extern crate alloc;
+use error::LexicalError;
+use lexer::TokenStream;
 
 pub mod error;
 pub mod lexer;
 
-lalrpop_mod!(grammar);
+lalrpop_mod! { grammar }
 
 pub struct Parser;
 
 impl Parser
 {
     pub fn parse(
-        report_ctx: &mut ReportContext,
         source_key: SourceKey,
         token_stream: TokenStream,
     ) -> Result<Expr, LexicalError>
@@ -27,12 +28,9 @@ impl Parser
                     .into_iter()
                     .map(|Spanned(span, token)| (span.start, token, span.end)),
             )
-            .map_err(|error| match error {
-                lalrpop_util::ParseError::InvalidToken { location } => todo!(),
-                lalrpop_util::ParseError::UnrecognizedEof { location, expected } => todo!(),
-                lalrpop_util::ParseError::UnrecognizedToken { token, expected } => todo!(),
-                lalrpop_util::ParseError::ExtraToken { token } => todo!(),
-                lalrpop_util::ParseError::User { error } => todo!(),
+            .map_err(|error| LexicalError {
+                source_key,
+                kind: error.into(),
             })
     }
 }

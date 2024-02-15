@@ -1,6 +1,6 @@
 use crate::{
     lexer::{Token}, 
-    error::LexicalError
+    error::LexicalErrorKind
 };
 
 use permafrost_ast::{tokens::*, *};
@@ -9,12 +9,13 @@ grammar;
 
 extern {
     type Location = usize;
-    type Error = LexicalError;
+    type Error = LexicalErrorKind;
 
     enum Token {
         "int" => Token::Int(<i32>),
         "float" => Token::Float(<f32>),
-        "ident" => Token::String(<String>),
+        "ident" => Token::Ident(<String>),
+        "string" => Token::String(<String>),
         "true" => Token::True,
         "false" => Token::False,
         "(" => Token::LParen,
@@ -37,15 +38,21 @@ extern {
 }
 
 pub Expr: Expr = {
-    <ae:AtomExpr> => ae,
+    AtomExpr,
 }
 
 AtomExpr: Expr = {
+    #[precedence(level = "1")]
     Spanned<"int"> => Expr::Int(<>),
     Spanned<"float"> => Expr::Float(<>),
     Spanned<"true"> => Expr::Bool(<>.map(|_| true)),
     Spanned<"false"> => Expr::Bool(<>.map(|_| false)),
+    Spanned<"ident"> => Expr::Ident(<>),
+    Spanned<"string"> => Expr::String(<>),
+    #[precedence(level = "2")]
     Function,
+    #[precedence(level = "1")]
+    Call,
 }
 
 Comma<T>: Vec<T> = {
@@ -61,8 +68,8 @@ Comma<T>: Vec<T> = {
 Spanned<T>: Spanned<T> = <left:@L> <element:T> <right:@R>
     => Spanned(left..right, element);
 
-Function: Expr = 
-    <visibility:ItemVisibility>
+Function: Expr =
+    <visibility:ItemVisibility?>
 
     <fn_token:Spanned<"function">>
 
@@ -78,7 +85,7 @@ Function: Expr =
     <body:Expr>
 
     => Expr::Function {
-        visibility,
+        visibility: visibility.into(),
         fn_token: fn_token.span().into(),
         name,
         lpt: lpt.span().into(),
@@ -94,8 +101,7 @@ Function: Expr =
     };
 
 Argument: Argument =
-    <name:Spanned<"ident">>
-    <type_annotation:Spanned<TypeAnnotation>>
+    <name:Spanned<"ident">> ":" <type_annotation:Spanned<TypeAnnotation>>
     => Argument {
         name,
         type_annotation
@@ -121,3 +127,12 @@ TypeAnnotation: TypeAnnotation = "ident"
 ItemVisibility: ItemVisibility = {
     Spanned<"pub"> => ItemVisibility::Public(<>.span().into())
 };
+
+Call: Expr = 
+    <callee:Expr>
+    <left_paren:Spanned<"(">>
+    <arguments:Comma<Expr>>
+    <right_paren:Spanned<")">>
+    => Expr::Call {
+        callee: Box::new(callee)
+    };

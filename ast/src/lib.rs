@@ -101,7 +101,7 @@ pub mod tokens
 
     impl BinaryOperatorKind
     {
-        pub fn description(self) -> &'static str
+        pub const fn description(self) -> &'static str
         {
             match self {
                 BinaryOperatorKind::Add => "+",
@@ -405,7 +405,7 @@ pub enum Expr
     {
         callee: Box<Self>,
         left_paren: LeftParenthesisToken,
-        arguments: Vec<Expr>,
+        arguments: Vec<Self>,
         right_paren: RightParenthesisToken,
     },
 

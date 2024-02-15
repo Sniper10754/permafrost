@@ -1,6 +1,5 @@
 use std::borrow::Cow;
 
-use const_format::formatcp;
 use itertools::Itertools;
 use lalrpop_util::ParseError;
 use permafrost_ast::Span;
@@ -61,32 +60,36 @@ impl IntoReport for LexicalError
 {
     fn into_report(self) -> permafrost_reports::Report
     {
-        let source_key = self.source_key;
-
         let location;
         let title;
         let description: Cow<'static, _>;
-        let mut expected_outer = None;
+        let mut expected = Vec::new();
 
         match self.kind {
             LexicalErrorKind::UnrecognizedEof {
                 location: column,
-                expected,
+                expected: inner,
             } => {
+                title = "Unrecognized EOF";
+                description = "Encountered the end of file".into();
                 location = Location::Column(column);
-                expected_outer = Some(expected);
+                expected = inner;
             }
             LexicalErrorKind::UnrecognizedToken {
                 token,
                 span,
-                expected,
+                expected: inner,
             } => {
                 title = "Unrecognized Token";
                 description = format!("Found token {}", token.description()).into();
                 location = Location::Span(span);
-                expected_outer = Some(expected);
+                expected = inner;
             }
-            LexicalErrorKind::ExtraToken { token, span } => {}
+            LexicalErrorKind::ExtraToken { token, span } => {
+                title = "Extra token";
+                description = format!("Found an extra token (`{}`)", token.description()).into();
+                location = Location::Span(span);
+            }
             LexicalErrorKind::InvalidToken { location: column } => {
                 location = Location::Column(column);
                 title = "Invalid token";
@@ -105,13 +108,19 @@ impl IntoReport for LexicalError
             LexicalErrorKind::GenericLexerError => unreachable!(),
         }
 
-        let mut report = Report::new(Level::Error, location, source_key, title, Some(description));
+        let mut report = Report::new(
+            Level::Error,
+            location,
+            self.source_key,
+            title,
+            description.into(),
+        );
 
-        if let Some(expected) = expected_outer {
+        if !expected.is_empty() {
             report = report.with_label(Label::new(
                 Itertools::intersperse(expected.into_iter(), ", ".into()).collect::<String>(),
                 None,
-                source_key,
+                self.source_key,
             ));
         }
 
@@ -119,9 +128,9 @@ impl IntoReport for LexicalError
     }
 }
 
-impl From<ParseError<usize, Token, LexicalErrorKind>> for LexicalErrorKind
+impl From<ParseError<usize, Token, Self>> for LexicalErrorKind
 {
-    fn from(value: ParseError<usize, Token, LexicalErrorKind>) -> Self
+    fn from(value: ParseError<usize, Token, Self>) -> Self
     {
         match value {
             ParseError::UnrecognizedEof { location, expected } => {
