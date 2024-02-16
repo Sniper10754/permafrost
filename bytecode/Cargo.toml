@@ -1,0 +1,21 @@
+[package]
+name = "permafrost-bytecode"
+version.workspace = true
+edition.workspace = true
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[features]
+std = []
+
+[dependencies]
+serde = { workspace = true }
+serde_variant = "0"
+ciborium = { version = "0", default-features = false }
+
+derive_more = { workspace = true }
+owo-colors = { workspace = true }
+slotmap = { workspace = true }
+
+[lints]
+workspace = true

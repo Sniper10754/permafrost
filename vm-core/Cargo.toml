@@ -1,0 +1,17 @@
+[package]
+name = "permafrost-vm-core"
+version.workspace = true
+edition.workspace = true
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+permafrost-bytecode = { path = "../bytecode" }
+
+
+derive_more = { workspace = true }
+num-traits = { workspace = true }
+delegate = { workspace = true }
+
+[lints]
+workspace = true

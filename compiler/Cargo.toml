@@ -1,0 +1,26 @@
+[package]
+name = "permafrost-compiler"
+version.workspace = true
+edition.workspace = true
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+
+[dependencies]
+permafrost-bytecode = { path = "../bytecode" }
+permafrost-reports = { path = "../reports" }
+permafrost-parser = { path = "../parser" }
+permafrost-ast = { path = "../ast" }
+
+derive_more = { workspace = true }
+itertools = { workspace = true }
+delegate = { workspace = true }
+slotmap = { workspace = true }
+dbg-pls = { workspace = true }
+log = { workspace = true }
+
+[features]
+std = ["permafrost-reports/std"]
+
+[lints]
+workspace = true

@@ -1,0 +1,30 @@
+[package]
+name = "permafrost-compiler-driver"
+version.workspace = true
+edition.workspace = true
+
+[[bin]]
+name = "permafrostc"
+path = "src/main.rs"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+permafrost-compiler = { path = "../compiler", features = ["std"] }
+permafrost-bytecode = { path = "../bytecode" }
+permafrost-reports = { path = "../reports", features = [
+    "diagnostic_printer",
+    "ariadne",
+    "std",
+] }
+permafrost-parser = { path = "../parser" }
+
+derive_more = { workspace = true }
+color-eyre = { workspace = true }
+log = { workspace = true }
+
+clap = { version = "4", features = ["derive", "color"] }
+fern = { version = "0.6", features = ["colored"] }
+
+[lints]
+workspace = true

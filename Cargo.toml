@@ -1,0 +1,57 @@
+[workspace]
+package.version = "0.1.0"
+package.edition = "2021"
+
+resolver = "2"
+
+members = [
+    "parser",
+    "reports",
+    "compiler",
+    "compiler-driver",
+    "bytecode",
+    "repl",
+    "ast",
+    "vm-core",
+    "runtime",
+]
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[profile.release]
+opt-level = 3
+lto = "fat"
+debug = "none"
+strip = "symbols"
+debug-assertions = false
+overflow-checks = false
+panic = "unwind"
+codegen-units = 1
+
+# Utility crates commonly used
+
+[workspace.dependencies]
+slotmap = { default-features = false, features = ["serde"], version = "1" }
+serde = { version = "1", default-features = false, features = ["derive"] }
+dbg-pls = { version = "0.4", features = ["colors", "derive", "pretty"] }
+num-traits = { version = "0", default-features = false }
+log = { version = "0.4", default-features = false }
+clap = { version = "4", features = ["derive", "color"] }
+enum_dispatch = "0.3"
+const_format = "0"
+derive_more = "0"
+color-eyre = { version = "0", default-features = false }
+owo-colors = "4.*"
+delegate = "0.12"
+cfg-if = "1"
+itertools = { version = "0.12", default-features = false, features = [
+    "use_alloc",
+] }
+
+
+[workspace.lints.clippy]
+too_many_arguments = "allow"
+
+[workspace.lints.rust]
+rust_2018_idioms = "warn"
+unsafe_code = "deny"
