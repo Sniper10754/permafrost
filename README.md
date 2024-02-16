@@ -1,5 +1,5 @@
 # permafrost Language
-The permafrost is a dynamic, procedural language 
+The permafrost language is a dynamic, procedural language 
 
 ```js
 from core::fmt import format;
