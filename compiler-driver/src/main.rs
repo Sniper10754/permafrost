@@ -135,7 +135,7 @@ fn compile_file(
     {
         Some(extension) if extension == PERMAFROST_FILE_EXTENSION => (),
         Some(..) | None => log::warn!(
-            "The reccomended file extension is `{}`",
+            "The recommended file extension is `{}`",
             PERMAFROST_FILE_EXTENSION
         ),
     }

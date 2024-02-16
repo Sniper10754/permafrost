@@ -38,7 +38,7 @@ mod utils
             Ok(buf.len())
         }
 
-        // Flushing is a no-op since every write is flushed immidiately
+        // Flushing is a no-op since every write is flushed immediately
         fn flush(&mut self) -> io::Result<()>
         {
             Ok(())

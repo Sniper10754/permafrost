@@ -11,7 +11,7 @@ a = a
 
 a = 1
 
-// Valid (altought noop)
+// Valid (although noop)
 a = a
 ```
 
@@ -34,7 +34,7 @@ $$ A = Int $$
 $$ B = Number $$
 $$ B >: A $$
 
-# Namespace system sketchs
+# Namespace system sketches
 
 - Every file is a Namespace
 - Every Namespace has locals

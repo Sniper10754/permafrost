@@ -86,7 +86,7 @@ impl IntoReport for NameResolutionError
             ),
             #[cfg(not(feature = "std"))]
             NameResolutionError::NamespaceStatementNotSupported(source_key, span) => {
-                Report::new(Level::Error, span, source_key, "Mod statement not supported", Some("The mod statement requires the std file api: youre on a platform which doesnt support std."))
+                Report::new(Level::Error, span, source_key, "Mod statement not supported", Some("The mod statement requires the std file api: your on a platform which doesnt support std."))
             }
             #[cfg(feature = "std")]
             NameResolutionError::CouldNotReadNamespaceFile { error, source_key,  span, file_path } => Report::new(Level::Error, span, source_key, "Input/Output OS Error", Some(format!("{error}"))).with_label(Label::new(format!("Could not read path `{}`", file_path.display()), None, source_key))
