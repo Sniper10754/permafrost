@@ -8,7 +8,7 @@ extern crate std;
 use alloc::{string::String, vec::Vec};
 
 use derive_more::*;
-use log::{debug, trace};
+use log::trace;
 use slotmap::SecondaryMap;
 
 use permafrost_parser::{
@@ -118,18 +118,8 @@ impl<'ctx> Compiler<'ctx>
         nameresolution::check_names(self, source_key);
         self.errors_as_result()?;
 
-        debug!(
-            "Name resoluted & Import resoluted IR:\n{}",
-            dbg_pls::color(self.ctx.named_ctx.get_ast(source_key))
-        );
-
         typecheck::check_types(self, source_key);
         self.errors_as_result()?;
-
-        debug!(
-            "Typed IR:\n{}",
-            dbg_pls::color(self.ctx.type_ctx.get_ast(source_key)),
-        );
 
         Ok(())
     }

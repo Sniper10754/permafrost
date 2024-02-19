@@ -1,5 +1,4 @@
 use alloc::{boxed::Box, string::String, vec::Vec};
-use dbg_pls::DebugPls;
 use permafrost_ast::{
     tokens::{
         ArrowToken, FunctionToken, LeftBraceToken, LeftParenthesisToken, Operator, ReturnToken,
@@ -17,51 +16,11 @@ new_key_type! {
     pub struct LocalKey;
 }
 
-impl DebugPls for LocalKey
-{
-    fn fmt(
-        &self,
-        f: dbg_pls::Formatter<'_>,
-    )
-    {
-        f.debug_tuple_struct("LocalKey")
-            .field(&(self.0.as_ffi() as u32))
-            .finish()
-    }
-}
-
 #[derive(Debug, Clone, Default)]
 pub struct NamedAst
 {
     pub exprs: Vec<NamedExpr>,
     pub locals: SlotMap<LocalKey, ()>,
-}
-
-impl DebugPls for NamedAst
-{
-    fn fmt(
-        &self,
-        f: dbg_pls::Formatter<'_>,
-    )
-    {
-        struct LocalsDebugPls<'a>(&'a SlotMap<LocalKey, ()>);
-
-        impl<'a> DebugPls for LocalsDebugPls<'a>
-        {
-            fn fmt(
-                &self,
-                f: dbg_pls::Formatter<'_>,
-            )
-            {
-                f.debug_map().entries(self.0.iter()).finish()
-            }
-        }
-
-        f.debug_struct("TypedAst")
-            .field("nodes", &self.exprs)
-            .field("locals", &LocalsDebugPls(&self.locals))
-            .finish()
-    }
 }
 
 impl Spannable for NamedExpr
@@ -116,7 +75,7 @@ impl Spannable for NamedExpr
     }
 }
 
-#[derive(Debug, Clone, PartialEq, DebugPls)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum NamedExpr
 {
     Int(Spanned<i32>),
@@ -179,7 +138,7 @@ pub enum NamedExpr
     Poisoned,
 }
 
-#[derive(Debug, Clone, PartialEq, DebugPls)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Assignable
 {
     Ident(LocalKey, Spanned<String>),
@@ -208,7 +167,7 @@ impl Spannable for Assignable
     }
 }
 
-#[derive(Debug, Clone, PartialEq, DebugPls)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Argument
 {
     pub local_key: LocalKey,
@@ -216,7 +175,7 @@ pub struct Argument
     pub type_annotation: Spanned<TypeAnnotation>,
 }
 
-#[derive(Debug, Clone, PartialEq, DebugPls)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum ImportDirectiveKind
 {
     FromNamespaceImportSymbol
@@ -230,13 +189,13 @@ pub enum ImportDirectiveKind
     },
 }
 
-#[derive(Debug, Clone, PartialEq, DebugPls, derive_more::Display, derive_more::From)]
+#[derive(Debug, Clone, PartialEq, derive_more::Display, derive_more::From)]
 pub struct NamespacePath
 {
     name: String,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, DebugPls, derive_more::From)]
+#[derive(Debug, Clone, Copy, PartialEq, derive_more::From)]
 pub enum ResolvedSymbol
 {
     LocalKey(LocalKey),

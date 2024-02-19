@@ -1,5 +1,4 @@
 use alloc::{boxed::Box, collections::BTreeMap, string::String, vec::Vec};
-use dbg_pls::DebugPls;
 use permafrost_ast::{
     tokens::{
         FunctionToken, LeftBraceToken, LeftParenthesisToken, Operator, ReturnToken,
@@ -17,19 +16,6 @@ new_key_type! {
     #[derive(derive_more::Display)]
     #[display(fmt = "{}", "self.0.as_ffi() as u32")]
     pub struct TypeKey;
-}
-
-impl DebugPls for TypeKey
-{
-    fn fmt(
-        &self,
-        f: dbg_pls::Formatter<'_>,
-    )
-    {
-        f.debug_tuple_struct("TypeKey")
-            .field(&(self.0.as_ffi() as u32))
-            .finish()
-    }
 }
 
 pub mod display
@@ -82,34 +68,7 @@ pub struct TypedAst
     pub locals: SecondaryMap<LocalKey, TypeKey>,
 }
 
-impl DebugPls for TypedAst
-{
-    fn fmt(
-        &self,
-        f: dbg_pls::Formatter<'_>,
-    )
-    {
-        struct LocalsDebugPls<'a>(&'a SecondaryMap<LocalKey, TypeKey>);
-
-        impl<'a> DebugPls for LocalsDebugPls<'a>
-        {
-            fn fmt(
-                &self,
-                f: dbg_pls::Formatter<'_>,
-            )
-            {
-                f.debug_map().entries(self.0.iter()).finish()
-            }
-        }
-
-        f.debug_struct("TypedAst")
-            .field("nodes", &self.nodes)
-            .field("locals", &LocalsDebugPls(&self.locals))
-            .finish()
-    }
-}
-
-#[derive(Debug, Clone, DebugPls)]
+#[derive(Debug, Clone)]
 pub struct TypedFunction
 {
     pub fn_token: FunctionToken,
@@ -119,7 +78,7 @@ pub struct TypedFunction
     pub body: Box<TypedExpression>,
 }
 
-#[derive(Debug, Clone, DebugPls)]
+#[derive(Debug, Clone)]
 pub struct TypedExpression
 {
     pub type_key: TypeKey,
@@ -134,7 +93,7 @@ impl TypedFunction
     }
 }
 
-#[derive(Debug, Clone, DebugPls, derive_more::IsVariant)]
+#[derive(Debug, Clone, derive_more::IsVariant)]
 pub enum TypedExpressionKind
 {
     Int(Spanned<i32>),
@@ -227,7 +186,7 @@ impl Spannable for TypedExpressionKind
     }
 }
 
-#[derive(Debug, Clone, DebugPls)]
+#[derive(Debug, Clone)]
 pub enum Callable
 {
     Function(TypeKey, Spanned<String>),
@@ -244,7 +203,7 @@ impl Spannable for Callable
 }
 
 #[non_exhaustive]
-#[derive(Debug, Clone, DebugPls)]
+#[derive(Debug, Clone)]
 pub enum Assignable
 {
     Ident(TypeKey, Spanned<String>),

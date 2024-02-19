@@ -8,7 +8,6 @@ edition.workspace = true
 [dependencies]
 enum_dispatch = { workspace = true }
 derive_more = { workspace = true }
-dbg-pls = { workspace = true }
 
 [lints]
 workspace = true

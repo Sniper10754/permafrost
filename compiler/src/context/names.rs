@@ -1,5 +1,4 @@
 use alloc::{collections::BTreeMap, string::String};
-use dbg_pls::DebugPls;
 use delegate::delegate;
 use derive_more::*;
 use slotmap::{new_key_type, SecondaryMap, SlotMap};
@@ -12,19 +11,6 @@ new_key_type! {
     #[derive(derive_more::Display)]
     #[display(fmt = "{}", "self.0.as_ffi() as u32")]
     pub struct NamespaceKey;
-}
-
-impl DebugPls for NamespaceKey
-{
-    fn fmt(
-        &self,
-        f: dbg_pls::Formatter<'_>,
-    )
-    {
-        f.debug_tuple_struct("NamespaceKey")
-            .field(&(self.0.as_ffi() as u32))
-            .finish()
-    }
 }
 
 #[derive(Debug, Clone, Copy, Default)]
