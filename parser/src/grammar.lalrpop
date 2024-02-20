@@ -42,16 +42,13 @@ pub Expr: Expr = {
 }
 
 AtomExpr: Expr = {
-    #[precedence(level = "1")]
     Spanned<"int"> => Expr::Int(<>),
     Spanned<"float"> => Expr::Float(<>),
     Spanned<"true"> => Expr::Bool(<>.map(|_| true)),
     Spanned<"false"> => Expr::Bool(<>.map(|_| false)),
     Spanned<"ident"> => Expr::Ident(<>),
     Spanned<"string"> => Expr::String(<>),
-    #[precedence(level = "2")]
     Function,
-    #[precedence(level = "1")]
     Call,
 }
 
@@ -87,7 +84,7 @@ Function: Expr =
     => Expr::Function {
         visibility: visibility.into(),
         fn_token: fn_token.span().into(),
-        name,
+        name: name.map(Into::into),
         lpt: lpt.span().into(),
         arguments,
         rpt: lpt.span().into(),
