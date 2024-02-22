@@ -333,7 +333,7 @@ impl<'compiler, 'ctx> NameResolver<'compiler, 'ctx>
         Ok(NamedExpr::UseDirective {
             span: namespace_path.span(),
             local_key,
-            imports_from: imported_from_namespace_key,
+            imports_from: todo!(),
             imported_name: last_path_element.clone(),
             symbol_imported: resolved_symbol,
         })

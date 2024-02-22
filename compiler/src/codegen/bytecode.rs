@@ -101,6 +101,7 @@ impl BytecodeCodegenBackend
                 self.compile_constant(instructions, globals, t_expr)
             }
 
+            TypedExpressionKind::UseDirective { .. } => {}
             TypedExpressionKind::NamespaceStatement(..) => {}
 
             TypedExpressionKind::Ident(Spanned(_, ref name)) => {

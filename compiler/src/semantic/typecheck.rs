@@ -18,7 +18,6 @@ use permafrost_reports::{sourcemap::SourceKey, IntoReport, Label, Level, Report}
 use slotmap::SecondaryMap;
 
 use crate::{
-    context::names::NamespaceKey,
     ir::{
         named::{Argument, Assignable as NamedAssignable, LocalKey, NamedExpr, ResolvedSymbol},
         typed::{

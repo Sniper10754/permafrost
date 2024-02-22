@@ -1,10 +1,10 @@
 [package]
-name = "permafrost-compiler-driver"
+name = "permafrost-main-executable"
 version.workspace = true
 edition.workspace = true
 
 [[bin]]
-name = "permafrostc"
+name = "permafrost"
 path = "src/main.rs"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
