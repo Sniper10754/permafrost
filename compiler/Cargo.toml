@@ -16,7 +16,6 @@ derive_more = { workspace = true }
 itertools = { workspace = true }
 delegate = { workspace = true }
 slotmap = { workspace = true }
-dbg-pls = { workspace = true }
 log = { workspace = true }
 
 [features]

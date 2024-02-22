@@ -4,7 +4,6 @@ extern crate alloc;
 
 use alloc::{boxed::Box, string::String, vec::Vec};
 use core::ops::{Deref, DerefMut, Range};
-use dbg_pls::DebugPls;
 use enum_dispatch::enum_dispatch;
 use tokens::PublicToken;
 
@@ -31,7 +30,7 @@ pub mod tokens
 
     macro_rules! token {
         ($name:ident) => {
-            #[derive(Debug, Clone, PartialEq, Eq, Hash, dbg_pls::DebugPls)]
+            #[derive(Debug, Clone, PartialEq, Eq, Hash)]
             pub struct $name(pub $crate::Span);
 
             impl Spannable for $name
@@ -60,7 +59,7 @@ pub mod tokens
         };
     }
 
-    #[derive(Debug, Clone, Hash, PartialEq, Display, dbg_pls::DebugPls)]
+    #[derive(Debug, Clone, Hash, PartialEq, Display)]
     #[display(fmt = "{kind}")]
     pub struct Operator
     {
@@ -76,7 +75,7 @@ pub mod tokens
         }
     }
 
-    #[derive(Debug, Clone, Copy, PartialEq, Hash, Display, dbg_pls::DebugPls)]
+    #[derive(Debug, Clone, Copy, PartialEq, Hash, Display)]
     pub enum BinaryOperatorKind
     {
         #[display(fmt = "+")]
@@ -91,7 +90,7 @@ pub mod tokens
         Equal,
     }
 
-    #[derive(Debug, Clone, PartialEq, Display, dbg_pls::DebugPls)]
+    #[derive(Debug, Clone, PartialEq, Display)]
     pub enum TypeAnnotation
     {
         #[display(fmt = "int")]
@@ -133,7 +132,7 @@ pub trait Spannable
     fn span(&self) -> Span;
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash, From, Deref, DerefMut, DebugPls)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, From, Deref, DerefMut)]
 pub struct Spanned<T>(
     pub Span,
     #[deref]
@@ -330,7 +329,7 @@ impl Spannable for Expr
     }
 }
 
-#[derive(Debug, Clone, PartialEq, DebugPls)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Expr
 {
     Int(Spanned<i32>),
@@ -399,7 +398,7 @@ pub enum Expr
     Poisoned,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, From, DebugPls)]
+#[derive(Debug, Clone, PartialEq, Eq, From)]
 pub enum ItemVisibility
 {
     Public(PublicToken),
@@ -420,14 +419,14 @@ impl ItemVisibility
     }
 }
 
-#[derive(Debug, Clone, PartialEq, DebugPls, derive_more::From)]
+#[derive(Debug, Clone, PartialEq, derive_more::From)]
 pub struct Argument
 {
     pub name: Spanned<String>,
     pub type_annotation: Spanned<TypeAnnotation>,
 }
 
-#[derive(Debug, Clone, PartialEq, DebugPls)]
+#[derive(Debug, Clone, PartialEq)]
 #[enum_dispatch(Spannable)]
 pub enum NamespaceDirectiveKind
 {
