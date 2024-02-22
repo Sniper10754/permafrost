@@ -1,6 +1,5 @@
-use alloc::{collections::BTreeMap, string::String};
+use alloc::{collections::BTreeMap, string::String, vec::Vec};
 use delegate::delegate;
-use derive_more::*;
 use slotmap::{new_key_type, SecondaryMap, SlotMap};
 
 use permafrost_reports::sourcemap::SourceKey;
@@ -19,11 +18,8 @@ pub struct NamespaceImportError;
 #[derive(Debug, Clone, Default)]
 pub struct NamedContext
 {
-    pub namespaces: SlotMap<NamespaceKey, Namespace>,
-    pub namespaces_by_src_keys: SecondaryMap<SourceKey, NamespaceKey>,
-    pub src_keys_by_namespaces: SecondaryMap<NamespaceKey, SourceKey>,
-
-    pub named_asts: SecondaryMap<SourceKey, NamedAst>,
+    namespaces: SlotMap<NamespaceKey, Namespace>,
+    named_asts: SecondaryMap<SourceKey, NamedAst>,
 }
 
 impl NamedContext
@@ -31,21 +27,59 @@ impl NamedContext
     pub fn clear(&mut self)
     {
         self.namespaces.clear();
-        self.namespaces_by_src_keys.clear();
         self.named_asts.clear();
+    }
+
+    pub fn new_ast(&mut self) -> NamedAst
+    {
+        NamedAst {
+            exprs: Vec::new(),
+            root_namespace: self.new_namespace(),
+        }
+    }
+
+    pub fn new_namespace(&mut self) -> NamespaceKey
+    {
+        self.insert_namespace(Namespace::default())
     }
 
     pub fn insert_namespace(
         &mut self,
-        source_key: SourceKey,
         namespace: Namespace,
     ) -> NamespaceKey
     {
-        let nk = self.namespaces.insert(namespace);
+        self.namespaces.insert(namespace)
+    }
 
-        self.namespaces_by_src_keys.insert(source_key, nk);
+    pub fn root_namespace_of_ast(
+        &self,
+        ast_source_key: SourceKey,
+    ) -> &Namespace
+    {
+        let namespace_key = self.get_ast(ast_source_key).root_namespace;
 
-        nk
+        self.get_namespace(namespace_key)
+    }
+
+    pub fn root_namespace_of_ast_mut(
+        &mut self,
+        ast_source_key: SourceKey,
+    ) -> &mut Namespace
+    {
+        let namespace_key = self.get_ast(ast_source_key).root_namespace;
+
+        self.get_namespace_mut(namespace_key)
+    }
+
+    pub fn source_key_by_ast_root_namespace_key(
+        &self,
+        namespace_key: NamespaceKey,
+    ) -> Option<SourceKey>
+    {
+        self.named_asts
+            .iter()
+            .find(|(_, ir)| ir.root_namespace == namespace_key)
+            .map(|(source_key, _)| source_key)
     }
 
     delegate! {
@@ -72,23 +106,18 @@ impl NamedContext
             #[inline]
             pub fn get_ast_mut(&mut self, source_key: SourceKey) -> &mut NamedAst;
         }
-        to self.namespaces_by_src_keys {
-            #[call(get)]
-            #[unwrap]
-            #[inline]
-            pub fn get_namespace_key_by_source_key(&mut self, source_key: SourceKey) -> &NamespaceKey;
-        }
     }
 }
 
-#[derive(Debug, Clone, Constructor)]
+#[derive(Debug, Clone, Default)]
 pub struct Namespace
 {
-    pub exports: BTreeMap<String, Export>,
+    pub locals: SlotMap<LocalKey, ()>,
+    pub exported_locals: BTreeMap<String, Item>,
 }
 
 #[derive(Debug, Clone, Copy, derive_more::IsVariant)]
-pub enum Export
+pub enum Item
 {
     Local(LocalKey),
     Namespace(NamespaceKey),

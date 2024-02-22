@@ -60,9 +60,6 @@ impl CompilerContext
                 ast: TypedAst,
             );
         }
-        to self.named_ctx {
-
-        }
     }
 
     pub fn new() -> Self

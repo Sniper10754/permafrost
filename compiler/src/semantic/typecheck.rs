@@ -18,6 +18,7 @@ use permafrost_reports::{sourcemap::SourceKey, IntoReport, Label, Level, Report}
 use slotmap::SecondaryMap;
 
 use crate::{
+    context::names::NamespaceKey,
     ir::{
         named::{Argument, Assignable as NamedAssignable, LocalKey, NamedExpr, ResolvedSymbol},
         typed::{
@@ -176,10 +177,14 @@ pub fn check_types(
         compiler,
     };
 
-    for ref expr in rts.compiler.ctx.named_ctx.named_asts[source_key]
+    for expr in rts
+        .compiler
+        .ctx
+        .named_ctx
+        .get_ast(source_key)
         .exprs
         .clone()
-        .into_iter()
+        .iter()
     {
         let result = rts.visit_expr(source_key, expr);
 
@@ -463,17 +468,11 @@ impl<'compiler, 'ctx: 'compiler> Typechecker<'compiler, 'ctx>
             }),
             NamedExpr::UseDirective {
                 span,
-                imported_name,
-                symbol_imported,
-                imports_from,
                 local_key,
-            } => self.visit_use_directive(
-                span.clone(),
-                *local_key,
-                imported_name.value(),
-                *symbol_imported,
-                *imports_from,
-            ),
+                imported_name: _,
+                symbol_imported: _,
+                imported_from,
+            } => self.visit_use_directive(span.clone(), *local_key, *imported_from),
             NamedExpr::NamespaceDirective { span, .. } => Ok(TypedExpression {
                 type_key: self.infer_type(source_key, expr)?,
                 kind: TypedExpressionKind::NamespaceStatement(span.clone()),
@@ -521,7 +520,10 @@ impl<'compiler, 'ctx: 'compiler> Typechecker<'compiler, 'ctx>
             NamedExpr::Poisoned => unreachable!(),
         };
 
-        let typed_expression = typed_expression?;
+        let typed_expression = match typed_expression {
+            Ok(expr) => expr,
+            Err(err) => return Err(err),
+        };
 
         Ok(typed_expression)
     }
@@ -530,14 +532,23 @@ impl<'compiler, 'ctx: 'compiler> Typechecker<'compiler, 'ctx>
         &mut self,
         span: Span,
         local_key: LocalKey,
-        imported_name: &str,
-        symbol_imported: ResolvedSymbol,
-        imports_from: SourceKey,
+        imported_from: NamespaceKey,
     ) -> Result<TypedExpression, Box<TypecheckError>>
     {
-        let type_key_of_imported_symbol = self.compiler.ctx.named_ctx.get_ast(imports_from);
+        // Source key of the namespace?
+        // I should write something like an here
+        let source_key = self
+            .compiler
+            .ctx
+            .named_ctx
+            .source_key_by_ast_root_namespace_key(imported_from)
+            .expect("");
 
-        self.locals_to_types.insert(local_key, todo!());
+        let type_key_of_imported_symbol: TypeKey =
+            self.compiler.ctx.type_ctx.get_ast(source_key).locals[local_key];
+
+        self.locals_to_types
+            .insert(local_key, type_key_of_imported_symbol);
 
         Ok(TypedExpression {
             type_key: self.insert_type(Type::Unit),

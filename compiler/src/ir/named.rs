@@ -6,10 +6,9 @@ use permafrost_ast::{
     },
     Span, Spannable, Spanned,
 };
-use permafrost_reports::sourcemap::SourceKey;
-use slotmap::{new_key_type, SlotMap};
+use slotmap::new_key_type;
 
-use crate::context::names::{Export, NamespaceKey};
+use crate::context::names::{Item, NamespaceKey};
 
 new_key_type! {
     #[derive(derive_more::Display)]
@@ -17,11 +16,11 @@ new_key_type! {
     pub struct LocalKey;
 }
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone)]
 pub struct NamedAst
 {
     pub exprs: Vec<NamedExpr>,
-    pub locals: SlotMap<LocalKey, ()>,
+    pub root_namespace: NamespaceKey,
 }
 
 impl Spannable for NamedExpr
@@ -88,8 +87,8 @@ pub enum NamedExpr
     {
         local_key: LocalKey,
         imported_name: Spanned<String>,
+        imported_from: NamespaceKey,
         symbol_imported: ResolvedSymbol,
-        imports_from: SourceKey,
 
         span: Span,
     },
@@ -218,13 +217,13 @@ pub enum ResolvedSymbol
     NamespaceKey(NamespaceKey),
 }
 
-impl From<Export> for ResolvedSymbol
+impl From<Item> for ResolvedSymbol
 {
-    fn from(value: Export) -> Self
+    fn from(value: Item) -> Self
     {
         match value {
-            Export::Local(local_key) => Self::from(local_key),
-            Export::Namespace(namespace_key) => Self::from(namespace_key),
+            Item::Local(local_key) => Self::from(local_key),
+            Item::Namespace(namespace_key) => Self::from(namespace_key),
         }
     }
 }

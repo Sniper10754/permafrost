@@ -1,4 +1,4 @@
-use alloc::{borrow::Cow, boxed::Box, collections::BTreeMap, format, string::String, vec::Vec};
+use alloc::{borrow::Cow, boxed::Box, format, string::String, vec::Vec};
 use derive_more::*;
 
 use permafrost_ast::{
@@ -14,8 +14,8 @@ use permafrost_reports::{
 };
 
 use crate::{
-    context::names::{Export, Namespace, NamespaceKey},
-    ir::named::{Argument, Assignable, LocalKey, NamedAst, NamedExpr, ResolvedSymbol},
+    context::names::{Item, NamespaceKey},
+    ir::named::{Argument, Assignable, LocalKey, NamedExpr, ResolvedSymbol},
     utils::Scopes,
     Compiler, PERMAFROST_FILE_EXTENSION,
 };
@@ -136,40 +136,32 @@ pub fn check_names(
     src_key: SourceKey,
 )
 {
-    compiler
-        .ctx
-        .named_ctx
-        .named_asts
-        .insert(src_key, NamedAst::default());
+    let named_ast = compiler.ctx.named_ctx.new_ast();
 
-    let namespace_key = compiler.ctx.named_ctx.insert_namespace(
-        src_key,
-        Namespace {
-            exports: BTreeMap::new(),
-        },
-    );
+    compiler.ctx.named_ctx.insert_ast(src_key, named_ast);
 
-    compiler
-        .ctx
-        .named_ctx
-        .namespaces_by_src_keys
-        .insert(src_key, namespace_key);
-
-    let mut rnc = NameResolver {
+    let mut resolver = NameResolver {
         compiler,
         scopes: Scopes::new(),
     };
 
-    let ast = rnc.compiler.ctx.asts[src_key].exprs.clone().into_iter();
+    let ast = resolver.compiler.ctx.asts[src_key]
+        .exprs
+        .clone()
+        .into_iter();
 
     for ref expr in ast {
-        let result = rnc.visit_expr(src_key, expr);
+        let result = resolver.visit_expr(src_key, expr);
 
         match result {
-            Ok(named_expr) => rnc.compiler.ctx.named_ctx.named_asts[src_key]
+            Ok(named_expr) => resolver
+                .compiler
+                .ctx
+                .named_ctx
+                .get_ast_mut(src_key)
                 .exprs
                 .push(named_expr),
-            Err(error) => rnc.compiler.ctx.report_ctx.push(error.into_report()),
+            Err(error) => resolver.compiler.ctx.report_ctx.push(error.into_report()),
         }
     }
 }
@@ -332,9 +324,11 @@ impl<'compiler, 'ctx> NameResolver<'compiler, 'ctx>
 
         Ok(NamedExpr::UseDirective {
             span: namespace_path.span(),
+
             local_key,
-            imports_from: todo!(),
+
             imported_name: last_path_element.clone(),
+            imported_from: imported_from_namespace_key,
             symbol_imported: resolved_symbol,
         })
     }
@@ -414,8 +408,8 @@ impl<'compiler, 'ctx> NameResolver<'compiler, 'ctx>
     {
         let namespace = self.compiler.ctx.named_ctx.get_namespace(namespace_key);
 
-        match namespace.exports.get(identifier.value_copied()) {
-            Some(&export) => Ok(ResolvedSymbol::from(export)),
+        match namespace.exported_locals.get(identifier.value_copied()) {
+            Some(&item) => Ok(ResolvedSymbol::from(item)),
             None => Err(NameResolutionError::IdentifierNotFound {
                 source_key,
                 // Spanned<&str> -> Spanned<String>
@@ -480,12 +474,15 @@ impl<'compiler, 'ctx> NameResolver<'compiler, 'ctx>
     #[cfg(feature = "std")]
     fn import_local_namespace(
         &mut self,
-        source_key: SourceKey,
+        importing_file_source_key: SourceKey,
         module_token: ModToken,
         local_namespace_name: Spanned<&str>,
     ) -> Result<(LocalKey, NamespaceKey), MaybePoisoned<NameResolutionError>>
     {
-        let parent_dir: Cow<'_, std::path::Path> = match self.compiler.ctx.src_map[source_key].url {
+        let parent_dir: Cow<'_, std::path::Path> = match self.compiler.ctx.src_map
+            [importing_file_source_key]
+            .url
+        {
             SourceUrl::PathBuf(ref pathbuf) => pathbuf.parent().unwrap().into(),
             SourceUrl::Sparse(..) | SourceUrl::Anonymous => std::env::current_dir().unwrap().into(),
         };
@@ -498,7 +495,7 @@ impl<'compiler, 'ctx> NameResolver<'compiler, 'ctx>
         let source_code = std::fs::read_to_string(namespace_path.as_path()).map_err(|error| {
             NameResolutionError::CouldNotReadNamespaceFile {
                 error,
-                source_key,
+                source_key: importing_file_source_key,
                 span: module_token.span(),
                 file_path: namespace_path.clone(),
             }
@@ -508,13 +505,18 @@ impl<'compiler, 'ctx> NameResolver<'compiler, 'ctx>
             .compiler
             .add_source(SourceUrl::PathBuf(namespace_path), source_code)
         {
-            let &namespace_key = self
+            let namespace_key = self
                 .compiler
                 .ctx
                 .named_ctx
-                .get_namespace_key_by_source_key(namespace_source_key);
+                .get_ast(namespace_source_key)
+                .root_namespace;
 
-            let local_key = self.compiler.ctx.named_ctx.named_asts[source_key]
+            let local_key = self
+                .compiler
+                .ctx
+                .named_ctx
+                .root_namespace_of_ast_mut(importing_file_source_key)
                 .locals
                 .insert(());
 
@@ -524,7 +526,7 @@ impl<'compiler, 'ctx> NameResolver<'compiler, 'ctx>
                     LocalSymbol::LocalNamespace(local_key, namespace_key),
                 )
                 .map_err(|_| NameResolutionError::ClashingIdentifier {
-                    source_key,
+                    source_key: importing_file_source_key,
                     identifier: local_namespace_name.map(Into::into),
                 })?;
 
@@ -585,17 +587,18 @@ impl<'compiler, 'ctx> NameResolver<'compiler, 'ctx>
 
         match (&name, visibility) {
             (Some(Spanned(_, name)), ItemVisibility::Public(_)) => {
-                let namespace_key = *self
+                let namespace_key = self
                     .compiler
                     .ctx
                     .named_ctx
-                    .get_namespace_key_by_source_key(source_key);
+                    .get_ast(source_key)
+                    .root_namespace;
 
                 let namespace = self.compiler.ctx.named_ctx.get_namespace_mut(namespace_key);
 
-                namespace.exports.insert(
+                namespace.exported_locals.insert(
                     String::from(*name),
-                    Export::Local(local_key.expect("This local is Some in case the name is Some")),
+                    Item::Local(local_key.expect("This local is Some in case the name is Some")),
                 );
             }
             (None, ItemVisibility::Public(token)) => {
@@ -713,7 +716,11 @@ impl<'compiler, 'ctx> NameResolver<'compiler, 'ctx>
     ) -> Option<LocalKey>
     {
         if self.scopes.local(name).is_none() {
-            let local_key = self.compiler.ctx.named_ctx.named_asts[source_key]
+            let local_key = self
+                .compiler
+                .ctx
+                .named_ctx
+                .root_namespace_of_ast_mut(source_key)
                 .locals
                 .insert(());
 
@@ -733,7 +740,11 @@ impl<'compiler, 'ctx> NameResolver<'compiler, 'ctx>
         name: &str,
     ) -> LocalKey
     {
-        let local_key = self.compiler.ctx.named_ctx.named_asts[source_key]
+        let local_key = self
+            .compiler
+            .ctx
+            .named_ctx
+            .root_namespace_of_ast_mut(source_key)
             .locals
             .insert(());
 
