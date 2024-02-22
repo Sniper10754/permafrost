@@ -3,9 +3,9 @@ mod ariadne;
 
 use core::fmt::{self, Write};
 
-use derive_more::*;
-
 use crate::{sourcemap::SourceMap, Report};
+
+use derive_more::*;
 
 #[cfg(feature = "ariadne")]
 pub type DefaultPrintBackend = ariadne::AriadnePrintBackend;

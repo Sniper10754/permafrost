@@ -156,16 +156,18 @@ impl Vm
             unreachable!()
         };
 
-        let value: Value = match (lhs, &mut *rhs) {
-            (Value::Int(lhs), Value::Int(rhs)) => Self::do_binary_operation(bok, *lhs, *rhs).into(),
-            (Value::Float(lhs), Value::Float(rhs)) => {
-                Self::do_binary_operation(bok, *lhs, *rhs).into()
+        let value: Value = match (&mut *lhs, &mut *rhs) {
+            (&mut Value::Int(lhs), &mut Value::Int(rhs)) => {
+                Self::do_binary_operation(bok, lhs, rhs).into()
             }
-            (Value::Float(lhs), Value::Int(rhs)) => {
-                Self::do_binary_operation(bok, *lhs, *rhs as f32).into()
+            (&mut Value::Float(lhs), &mut Value::Float(rhs)) => {
+                Self::do_binary_operation(bok, lhs, rhs).into()
             }
-            (Value::Int(lhs), Value::Float(rhs)) => {
-                Self::do_binary_operation(bok, *lhs as f32, *rhs).into()
+            (&mut Value::Float(lhs), &mut Value::Int(rhs)) => {
+                Self::do_binary_operation(bok, lhs, rhs as f32).into()
+            }
+            (&mut Value::Int(lhs), &mut Value::Float(rhs)) => {
+                Self::do_binary_operation(bok, lhs as f32, rhs).into()
             }
 
             (..) => unreachable!(),
@@ -193,7 +195,7 @@ impl Vm
 
     fn compare_top_two_elements(&mut self)
     {
-        let [.., lhs, rhs] = &*self.stack else {
+        let [.., lhs, rhs] = &self.stack[..] else {
             unreachable!()
         };
 

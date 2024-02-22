@@ -30,19 +30,19 @@ struct CliArgs
 #[derive(clap::Subcommand)]
 enum CliSubcommand
 {
-    #[command(about = "Compile a file")]
+    #[clap(about = "Compile a file")]
     Compile
     {
-        #[arg(help = "File to compile")]
+        #[clap(help = "File to compile")]
         file: PathBuf,
 
-        #[arg(short = 'o', long = "output")]
+        #[clap(short = 'o', long = "output")]
         output_file: Option<PathBuf>,
 
-        #[arg(help = "Disassemble once compilation is done", long = "disassemble")]
+        #[clap(help = "Disassemble once compilation is done", long = "disassemble")]
         disassemble: bool,
 
-        #[arg(help = "Codegen backend to use", long, short, value_enum, default_value_t=CodegenOptions::Bytecode)]
+        #[clap(help = "Codegen backend to use", long, short, value_enum, default_value_t=CodegenOptions::Bytecode)]
         codegen_option: CodegenOptions,
     },
 }
@@ -98,7 +98,7 @@ fn setup_logger() -> eyre::Result<()>
 
 fn main() -> eyre::Result<()>
 {
-    let args = CliArgs::try_parse()?;
+    let args = CliArgs::parse();
 
     color_eyre::install()?;
 
