@@ -101,6 +101,11 @@ pub enum TypedExpressionKind
     Bool(Spanned<bool>),
     String(Spanned<String>),
 
+    UseDirective
+    {
+        span: Span,
+    },
+
     NamespaceStatement(Span),
 
     Ident(Spanned<String>),
@@ -150,7 +155,8 @@ impl Spannable for TypedExpressionKind
             | Float(Spanned(span, _))
             | Bool(Spanned(span, _))
             | String(Spanned(span, _))
-            | NamespaceStatement(span) => span.clone(),
+            | NamespaceStatement(span)
+            | UseDirective { span, .. } => span.clone(),
 
             Ident(Spanned(span, _)) => span.clone(),
             BinaryOperation {

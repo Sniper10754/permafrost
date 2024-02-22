@@ -6,6 +6,7 @@ use permafrost_ast::{
     },
     Span, Spannable, Spanned,
 };
+use permafrost_reports::sourcemap::SourceKey;
 use slotmap::{new_key_type, SlotMap};
 
 use crate::context::names::{Export, NamespaceKey};
@@ -36,8 +37,8 @@ impl Spannable for NamedExpr
             }
             | NamedExpr::String(Spanned(span, _))
             | NamedExpr::Bool(Spanned(span, _))
-            | NamedExpr::NamespaceDirective(span)
-            | NamedExpr::UseDirective(span) => span.clone(),
+            | NamedExpr::NamespaceDirective { span, .. }
+            | NamedExpr::UseDirective { span, .. } => span.clone(),
 
             NamedExpr::BinaryOperation {
                 lhs,
@@ -83,8 +84,23 @@ pub enum NamedExpr
     Bool(Spanned<bool>),
     String(Spanned<String>),
 
-    UseDirective(Span),
-    NamespaceDirective(Span),
+    UseDirective
+    {
+        local_key: LocalKey,
+        imported_name: Spanned<String>,
+        symbol_imported: ResolvedSymbol,
+        imports_from: SourceKey,
+
+        span: Span,
+    },
+
+    NamespaceDirective
+    {
+        local_key: LocalKey,
+        namespace_key: NamespaceKey,
+
+        span: Span,
+    },
 
     Ident
     {

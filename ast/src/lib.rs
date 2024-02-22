@@ -419,6 +419,14 @@ impl ItemVisibility
     }
 }
 
+impl From<Option<ItemVisibility>> for ItemVisibility
+{
+    fn from(value: Option<ItemVisibility>) -> Self
+    {
+        value.unwrap_or(ItemVisibility::Unspecified)
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, derive_more::From)]
 pub struct Argument
 {

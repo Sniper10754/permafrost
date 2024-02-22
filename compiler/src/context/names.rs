@@ -21,6 +21,7 @@ pub struct NamedContext
 {
     pub namespaces: SlotMap<NamespaceKey, Namespace>,
     pub namespaces_by_src_keys: SecondaryMap<SourceKey, NamespaceKey>,
+    pub src_keys_by_namespaces: SecondaryMap<NamespaceKey, SourceKey>,
 
     pub named_asts: SecondaryMap<SourceKey, NamedAst>,
 }

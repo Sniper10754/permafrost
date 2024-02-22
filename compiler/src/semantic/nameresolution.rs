@@ -6,7 +6,7 @@ use permafrost_ast::{
         ArrowToken, FunctionToken, LeftBraceToken, LeftParenthesisToken, ModToken, ReturnToken,
         RightBraceToken, RightParenthesisToken, TypeAnnotation,
     },
-    Expr, NamespaceDirectiveKind, NamespacePath, Span, Spannable, Spanned,
+    Expr, ItemVisibility, NamespaceDirectiveKind, NamespacePath, Span, Spannable, Spanned,
 };
 use permafrost_reports::{
     sourcemap::{SourceKey, SourceUrl},
@@ -14,11 +14,19 @@ use permafrost_reports::{
 };
 
 use crate::{
-    context::names::{Namespace, NamespaceKey},
+    context::names::{Export, Namespace, NamespaceKey},
     ir::named::{Argument, Assignable, LocalKey, NamedAst, NamedExpr, ResolvedSymbol},
     utils::Scopes,
     Compiler, PERMAFROST_FILE_EXTENSION,
 };
+
+#[derive(Debug, From)]
+enum MaybePoisoned<T>
+{
+    #[from(ignore)]
+    Poisoned,
+    Value(T),
+}
 
 enum NameResolutionError
 {
@@ -37,6 +45,18 @@ enum NameResolutionError
     {
         source_key: SourceKey,
         identifier: Spanned<String>,
+    },
+
+    PublicItemButNoIdentifier
+    {
+        source_key: SourceKey,
+        public_token_span: Span,
+    },
+
+    ImportFromNonNamespace
+    {
+        source_key: SourceKey,
+        segment_span: Span,
     },
 
     #[cfg(not(feature = "std"))]
@@ -84,6 +104,23 @@ impl IntoReport for NameResolutionError
                 "Identifier already exists",
                 Some(format!("`{identifier}` is already defined elsewhere"))
             ),
+            NameResolutionError::PublicItemButNoIdentifier {
+                source_key,
+                public_token_span
+            } => Report::new(
+                Level::Error,
+                public_token_span,
+                source_key,
+                "Item is public but has no way to be identified",
+                Some("This item is exported, but cant be identified in any way since its missing an identifier")
+            ),
+            NameResolutionError::ImportFromNonNamespace { source_key, segment_span } => Report::new(
+                Level::Error, 
+                segment_span, 
+                source_key, 
+                "Trying to import from a non-namespace", 
+                Some("This segment of the import is not a namespace: this means that it cant contain other items.")
+            ),
             #[cfg(not(feature = "std"))]
             NameResolutionError::NamespaceStatementNotSupported(source_key, span) => {
                 Report::new(Level::Error, span, source_key, "Mod statement not supported", Some("The mod statement requires the std file api: your on a platform which doesnt support std."))
@@ -118,7 +155,7 @@ pub fn check_names(
         .namespaces_by_src_keys
         .insert(src_key, namespace_key);
 
-    let mut rnc = RecursiveNameChecker {
+    let mut rnc = NameResolver {
         compiler,
         scopes: Scopes::new(),
     };
@@ -142,6 +179,7 @@ enum LocalSymbol
 {
     Local(LocalKey),
     Namespace(NamespaceKey),
+    LocalNamespace(LocalKey, NamespaceKey),
 }
 
 impl From<ResolvedSymbol> for LocalSymbol
@@ -156,13 +194,13 @@ impl From<ResolvedSymbol> for LocalSymbol
 }
 
 #[derive(Debug)]
-pub struct RecursiveNameChecker<'compiler, 'ctx>
+pub struct NameResolver<'compiler, 'ctx>
 {
     compiler: &'compiler mut Compiler<'ctx>,
     scopes: Scopes<LocalSymbol>,
 }
 
-impl<'compiler, 'ctx> RecursiveNameChecker<'compiler, 'ctx>
+impl<'compiler, 'ctx> NameResolver<'compiler, 'ctx>
 {
     fn visit_expr(
         &mut self,
@@ -196,7 +234,7 @@ impl<'compiler, 'ctx> RecursiveNameChecker<'compiler, 'ctx>
                 value,
             } => self.visit_assign(source_key, lhs, value),
             Expr::Function {
-                visibility: _,
+                visibility,
                 fn_token,
                 name,
                 lpt: _,
@@ -208,6 +246,7 @@ impl<'compiler, 'ctx> RecursiveNameChecker<'compiler, 'ctx>
                 body,
             } => self.visit_function(
                 source_key,
+                visibility,
                 fn_token.clone(),
                 name.as_ref().map(|name| name.as_deref()),
                 arguments,
@@ -275,28 +314,36 @@ impl<'compiler, 'ctx> RecursiveNameChecker<'compiler, 'ctx>
         namespace_path: Spanned<&NamespacePath>,
     ) -> Result<NamedExpr, NameResolutionError>
     {
-        let resolved_symbol = self.resolve_namespace_path(source_key, namespace_path.value())?;
+        let (
+            // The namespace key which contains the symbol
+            imported_from_namespace_key,
+            // Symbol who was imported
+            resolved_symbol,
+        ) = self.resolve_namespace_path(source_key, namespace_path.value())?;
 
         let last_path_element = namespace_path.last().unwrap();
 
-        self.scopes
-            .try_insert(
-                last_path_element.value(),
-                LocalSymbol::from(resolved_symbol),
-            )
-            .map_err(|_| NameResolutionError::ClashingIdentifier {
+        let local_key = self
+            .insert_clashing(source_key, last_path_element.value())
+            .ok_or_else(|| NameResolutionError::ClashingIdentifier {
                 source_key,
                 identifier: last_path_element.clone(),
             })?;
 
-        Ok(NamedExpr::UseDirective(namespace_path.span()))
+        Ok(NamedExpr::UseDirective {
+            span: namespace_path.span(),
+            local_key,
+            imports_from: imported_from_namespace_key,
+            imported_name: last_path_element.clone(),
+            symbol_imported: resolved_symbol,
+        })
     }
 
     fn resolve_namespace_path(
         &mut self,
         importing_file_source_key: SourceKey,
         namespace_path: &NamespacePath,
-    ) -> Result<ResolvedSymbol, NameResolutionError>
+    ) -> Result<(NamespaceKey, ResolvedSymbol), NameResolutionError>
     {
         let namespace_to_import_from = &namespace_path[0];
 
@@ -313,13 +360,19 @@ impl<'compiler, 'ctx> RecursiveNameChecker<'compiler, 'ctx>
         };
 
         if namespace_path.len() > 1 {
-            self.resolve_namespace_path_import(
-                importing_file_source_key,
+            Ok((
                 namespace_key_to_import_from,
-                &namespace_path[1..],
-            )
+                self.resolve_namespace_path_import(
+                    importing_file_source_key,
+                    namespace_key_to_import_from,
+                    &namespace_path[1..],
+                )?,
+            ))
         } else {
-            Ok(ResolvedSymbol::NamespaceKey(namespace_key_to_import_from))
+            Ok((
+                namespace_key_to_import_from,
+                ResolvedSymbol::NamespaceKey(namespace_key_to_import_from),
+            ))
         }
     }
 
@@ -338,7 +391,12 @@ impl<'compiler, 'ctx> RecursiveNameChecker<'compiler, 'ctx>
             self.resolve_namespace_path_segment(source_key, namespace_key, segment.as_deref())?;
 
         match (resolved_symbol, namespace_path_iter.peek()) {
-            (ResolvedSymbol::LocalKey(..), Some(..)) => todo!("error"),
+            (ResolvedSymbol::LocalKey(..), Some(segment)) => {
+                Err(NameResolutionError::ImportFromNonNamespace {
+                    source_key,
+                    segment_span: segment.span(),
+                })
+            }
             (ResolvedSymbol::LocalKey(..) | ResolvedSymbol::NamespaceKey(..), None) => {
                 Ok(resolved_symbol)
             }
@@ -375,11 +433,21 @@ impl<'compiler, 'ctx> RecursiveNameChecker<'compiler, 'ctx>
     {
         #[cfg(feature = "std")]
         {
-            self.visit_namespace_directive_std(
+            let (local_key, namespace_key) = match self.visit_namespace_directive_std(
                 source_key,
                 namespace_token,
                 namespace_directive_kind,
-            )?;
+            ) {
+                Ok(keys) => keys,
+                Err(MaybePoisoned::Poisoned) => return Ok(NamedExpr::Poisoned),
+                Err(MaybePoisoned::Value(error)) => return Err(error),
+            };
+
+            Ok(NamedExpr::NamespaceDirective {
+                span: namespace_directive_kind.span(),
+                local_key,
+                namespace_key,
+            })
         }
 
         #[cfg(not(feature = "std"))]
@@ -389,10 +457,6 @@ impl<'compiler, 'ctx> RecursiveNameChecker<'compiler, 'ctx>
                 namespace_token.span(),
             ));
         }
-
-        Ok(NamedExpr::NamespaceDirective(
-            namespace_directive_kind.span(),
-        ))
     }
 
     #[cfg(feature = "std")]
@@ -401,19 +465,16 @@ impl<'compiler, 'ctx> RecursiveNameChecker<'compiler, 'ctx>
         source_key: SourceKey,
         namespace_token: ModToken,
         namespace_directive_kind: &NamespaceDirectiveKind,
-    ) -> Result<(), NameResolutionError>
+    ) -> Result<(LocalKey, NamespaceKey), MaybePoisoned<NameResolutionError>>
     {
         match namespace_directive_kind {
-            NamespaceDirectiveKind::ImportLocalNamespace(local_namespace_name) => {
-                self.import_local_namespace(
+            NamespaceDirectiveKind::ImportLocalNamespace(local_namespace_name) => self
+                .import_local_namespace(
                     source_key,
                     namespace_token.clone(),
                     local_namespace_name.as_deref(),
-                )?;
-            }
+                ),
         }
-
-        Ok(())
     }
 
     #[cfg(feature = "std")]
@@ -422,7 +483,7 @@ impl<'compiler, 'ctx> RecursiveNameChecker<'compiler, 'ctx>
         source_key: SourceKey,
         module_token: ModToken,
         local_namespace_name: Spanned<&str>,
-    ) -> Result<(), NameResolutionError>
+    ) -> Result<(LocalKey, NamespaceKey), MaybePoisoned<NameResolutionError>>
     {
         let parent_dir: Cow<'_, std::path::Path> = match self.compiler.ctx.src_map[source_key].url {
             SourceUrl::PathBuf(ref pathbuf) => pathbuf.parent().unwrap().into(),
@@ -453,21 +514,27 @@ impl<'compiler, 'ctx> RecursiveNameChecker<'compiler, 'ctx>
                 .named_ctx
                 .get_namespace_key_by_source_key(namespace_source_key);
 
+            let local_key = self.compiler.ctx.named_ctx.named_asts[source_key]
+                .locals
+                .insert(());
+
             self.scopes
                 .try_insert(
                     local_namespace_name.value_copied(),
-                    LocalSymbol::Namespace(namespace_key),
+                    LocalSymbol::LocalNamespace(local_key, namespace_key),
                 )
                 .map_err(|_| NameResolutionError::ClashingIdentifier {
                     source_key,
                     identifier: local_namespace_name.map(Into::into),
                 })?;
+
+            Ok((local_key, namespace_key))
         } else {
             // Since analyzing the Namespace failed, we cant import it as it may contain false results
             // We can just avoid putting it into scope.
-        }
 
-        Ok(())
+            Err(MaybePoisoned::Poisoned)
+        }
     }
 
     fn visit_assign(
@@ -502,6 +569,7 @@ impl<'compiler, 'ctx> RecursiveNameChecker<'compiler, 'ctx>
     fn visit_function(
         &mut self,
         source_key: SourceKey,
+        visibility: &ItemVisibility,
         fn_token: FunctionToken,
         name: Option<Spanned<&str>>,
         arguments: &[permafrost_ast::Argument],
@@ -510,11 +578,34 @@ impl<'compiler, 'ctx> RecursiveNameChecker<'compiler, 'ctx>
         body: &Expr,
     ) -> Result<NamedExpr, NameResolutionError>
     {
-        let local_key = if let Some(ref spanned_name) = name {
-            self.insert_clashing(source_key, spanned_name)
-        } else {
-            None
+        let local_key = match name {
+            Some(ref spanned_name) => self.insert_clashing(source_key, spanned_name),
+            None => None,
         };
+
+        match (&name, visibility) {
+            (Some(Spanned(_, name)), ItemVisibility::Public(_)) => {
+                let namespace_key = *self
+                    .compiler
+                    .ctx
+                    .named_ctx
+                    .get_namespace_key_by_source_key(source_key);
+
+                let namespace = self.compiler.ctx.named_ctx.get_namespace_mut(namespace_key);
+
+                namespace.exports.insert(
+                    String::from(*name),
+                    Export::Local(local_key.expect("This local is Some in case the name is Some")),
+                );
+            }
+            (None, ItemVisibility::Public(token)) => {
+                return Err(NameResolutionError::PublicItemButNoIdentifier {
+                    source_key,
+                    public_token_span: token.span(),
+                })
+            }
+            (_, ItemVisibility::Unspecified) => (),
+        }
 
         self.scopes.enter_scope();
 

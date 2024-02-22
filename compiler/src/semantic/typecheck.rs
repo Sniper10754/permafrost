@@ -18,8 +18,9 @@ use permafrost_reports::{sourcemap::SourceKey, IntoReport, Label, Level, Report}
 use slotmap::SecondaryMap;
 
 use crate::{
+    context::names::NamespaceKey,
     ir::{
-        named::{Argument, Assignable as NamedAssignable, LocalKey, NamedExpr},
+        named::{Argument, Assignable as NamedAssignable, LocalKey, NamedExpr, ResolvedSymbol},
         typed::{
             display::display_type, Assignable, Callable, FunctionType, Type, TypeKey, TypedAst,
             TypedExpression, TypedExpressionKind, TypedFunction,
@@ -171,7 +172,7 @@ pub fn check_types(
     //     .map(|(name, ty)| (name, *ty))
     //     .for_each(|(name, type_key)| rts.scopes.insert_local(name, RefersTo::Type(type_key)));
 
-    let mut rts = RecursiveTypechecker {
+    let mut rts = Typechecker {
         locals_to_types: SecondaryMap::new(),
         compiler,
     };
@@ -190,13 +191,13 @@ pub fn check_types(
     }
 }
 
-struct RecursiveTypechecker<'compiler, 'ctx>
+struct Typechecker<'compiler, 'ctx>
 {
     pub locals_to_types: SecondaryMap<LocalKey, TypeKey>,
     pub compiler: &'compiler mut Compiler<'ctx>,
 }
 
-impl<'compiler, 'ctx: 'compiler> RecursiveTypechecker<'compiler, 'ctx>
+impl<'compiler, 'ctx: 'compiler> Typechecker<'compiler, 'ctx>
 {
     fn infer_type_annotation(
         &mut self,
@@ -263,7 +264,7 @@ impl<'compiler, 'ctx: 'compiler> RecursiveTypechecker<'compiler, 'ctx>
             NamedExpr::String(_) => Ok(self.insert_type(Type::String)),
             NamedExpr::Bool(_) => Ok(self.insert_type(Type::Bool)),
 
-            NamedExpr::UseDirective(..) | NamedExpr::NamespaceDirective(..) => {
+            NamedExpr::UseDirective { .. } | NamedExpr::NamespaceDirective { .. } => {
                 Ok(self.insert_type(Type::Unit))
             }
 
@@ -461,12 +462,23 @@ impl<'compiler, 'ctx: 'compiler> RecursiveTypechecker<'compiler, 'ctx>
                 type_key: self.infer_type(source_key, expr)?,
                 kind: TypedExpressionKind::String(value.as_ref().map(Clone::clone)),
             }),
-            NamedExpr::UseDirective(span) | NamedExpr::NamespaceDirective(span) => {
-                Ok(TypedExpression {
-                    type_key: self.infer_type(source_key, expr)?,
-                    kind: TypedExpressionKind::NamespaceStatement(span.clone()),
-                })
-            }
+            NamedExpr::UseDirective {
+                span,
+                imported_name,
+                symbol_imported,
+                imports_from,
+                local_key,
+            } => self.visit_use_directive(
+                span.clone(),
+                *local_key,
+                imported_name.value(),
+                *symbol_imported,
+                *imports_from,
+            ),
+            NamedExpr::NamespaceDirective { span, .. } => Ok(TypedExpression {
+                type_key: self.infer_type(source_key, expr)?,
+                kind: TypedExpressionKind::NamespaceStatement(span.clone()),
+            }),
             NamedExpr::Ident {
                 local_key,
                 identifier: Spanned(span, ident),
@@ -513,6 +525,25 @@ impl<'compiler, 'ctx: 'compiler> RecursiveTypechecker<'compiler, 'ctx>
         let typed_expression = typed_expression?;
 
         Ok(typed_expression)
+    }
+
+    fn visit_use_directive(
+        &mut self,
+        span: Span,
+        local_key: LocalKey,
+        imported_name: &str,
+        symbol_imported: ResolvedSymbol,
+        imports_from: SourceKey,
+    ) -> Result<TypedExpression, Box<TypecheckError>>
+    {
+        let type_key_of_imported_symbol = self.compiler.ctx.named_ctx.get_ast(imports_from);
+
+        self.locals_to_types.insert(local_key, todo!());
+
+        Ok(TypedExpression {
+            type_key: self.insert_type(Type::Unit),
+            kind: TypedExpressionKind::UseDirective { span },
+        })
     }
 
     fn visit_ident(
@@ -571,16 +602,16 @@ impl<'compiler, 'ctx: 'compiler> RecursiveTypechecker<'compiler, 'ctx>
             }
         }
 
-        // FIXME(Sniper10754): im pretty sure this clone can be avoided
+        // HACK(Sniper10754): im pretty sure this clone can be avoided
         let typed_lhs = self.visit_expr(source_key, &(lhs.clone().into()))?;
-        let typed_lhs = Assignable::try_from(typed_lhs).unwrap();
+        let assignable_lhs = Assignable::try_from(typed_lhs).unwrap();
 
         let type_key = self.insert_type(Type::Unit);
 
         Ok(TypedExpression {
             type_key,
             kind: TypedExpressionKind::Assign {
-                lhs: typed_lhs,
+                lhs: assignable_lhs,
                 value: Box::new(value),
             },
         })

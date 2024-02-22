@@ -26,11 +26,15 @@ pub enum ErrorKind
     {
         span: Span
     },
+    UnusedVisibilityModifier
+    {
+        span: Span
+    },
 }
 
 impl IntoReport for Error
 {
-    fn into_report(self) -> permafrost_reports::Report
+    fn into_report(self) -> Report
     {
         let source_key = self.source_key;
 
@@ -70,6 +74,13 @@ impl IntoReport for Error
                 None,
                 source_key,
             )),
+            ErrorKind::UnusedVisibilityModifier { span } => Report::new(
+                Level::Error,
+                span,
+                source_key,
+                "Unused visibility modifier",
+                Some("This visibility modifier precedes an item who's visibility cant be modified"),
+            ),
         }
     }
 }

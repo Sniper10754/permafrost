@@ -74,6 +74,8 @@ pub struct Parser<'report_context>
     token_stream: TokenStream,
     report_ctx: &'report_context mut ReportContext,
     source_key: SourceKey,
+
+    current_visibility_token: Option<ItemVisibility>,
 }
 
 impl<'report_context> Parser<'report_context>
@@ -89,6 +91,8 @@ impl<'report_context> Parser<'report_context>
             token_stream,
             report_ctx,
             source_key,
+
+            current_visibility_token: None,
         }
     }
 
@@ -267,7 +271,7 @@ impl<'report_context> Parser<'report_context>
             }
 
             Some(Spanned(fn_token_span, Token::Fn)) => {
-                let visibility = self.parse_visibility()?;
+                let visibility = self.current_visibility_token.take().into();
 
                 let fn_token = FunctionToken(fn_token_span);
 
@@ -446,6 +450,24 @@ impl<'report_context> Parser<'report_context>
                 Some(Expr::Return(ReturnToken(span), value.map(Box::new)))
             }
 
+            Some(Spanned(span, Token::Public)) => {
+                self.current_visibility_token = Some(ItemVisibility::Public(span.clone().into()));
+
+                let result = self.parse_atom_expr();
+
+                if self.current_visibility_token.is_some() {
+                    self.report_ctx.push(
+                        report!(parser: self, ErrorKind::UnusedVisibilityModifier {
+                            span,
+                        }),
+                    );
+
+                    None
+                } else {
+                    result
+                }
+            }
+
             Some(Spanned(span, _)) => {
                 self.report_ctx
                     .push(report!(parser: self, ErrorKind::UnrecognizedToken {
@@ -572,17 +594,5 @@ impl<'report_context> Parser<'report_context>
                 .collect::<Vec<_>>()
                 .into_boxed_slice(),
         ))
-    }
-
-    fn parse_visibility(&mut self) -> Option<ItemVisibility>
-    {
-        match self.token_stream.peek() {
-            Some(Spanned(_, Token::Public)) => {
-                let Spanned(span, _) = self.token_stream.skip_token()?;
-
-                Some(ItemVisibility::Public(span.into()))
-            }
-            Some(_) | None => Some(ItemVisibility::Unspecified),
-        }
     }
 }
