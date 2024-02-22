@@ -21,9 +21,9 @@ permafrost-parser = { path = "../parser" }
 
 derive_more = { workspace = true }
 color-eyre = { workspace = true }
+clap = { workspace = true }
 log = { workspace = true }
 
-clap = { version = "4", features = ["derive", "color"] }
 fern = { version = "0.6", features = ["colored"] }
 
 [lints]

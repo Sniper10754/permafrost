@@ -37,7 +37,6 @@ pub struct CompilerError;
 pub struct Compiler<'ctx>
 {
     ctx: &'ctx mut CompilerContext,
-    state: CompilerState,
 }
 
 #[derive(Debug, Clone, Copy, Default, IsVariant)]
@@ -50,19 +49,9 @@ pub enum CompilerState
 
 impl<'ctx> Compiler<'ctx>
 {
-    pub fn ensure_not_exhausted(&self)
-    {
-        if self.state.is_exhausted() {
-            panic!("Compiler is exhausted (already compiled)")
-        }
-    }
-
     pub fn new(ctx: &'ctx mut CompilerContext) -> Self
     {
-        Self {
-            ctx,
-            state: CompilerState::Ready,
-        }
+        Self { ctx }
     }
 
     pub fn __add_source(
@@ -155,13 +144,7 @@ impl<'ctx> Compiler<'ctx>
         source_key: SourceKey,
     ) -> Result<TokenStream, CompilerError>
     {
-        let source = self
-            .ctx
-            .src_map
-            .get(source_key)
-            .unwrap()
-            .source_code
-            .as_str();
+        let source = self.ctx.src_map[source_key].source_code.as_str();
 
         let token_stream = tokenize(&mut self.ctx.report_ctx, source_key, source);
 
