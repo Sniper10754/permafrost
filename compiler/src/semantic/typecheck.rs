@@ -471,8 +471,13 @@ impl<'compiler, 'ctx: 'compiler> Typechecker<'compiler, 'ctx>
                 local_key,
                 imported_name: _,
                 symbol_imported: _,
-                imported_from,
-            } => self.visit_use_directive(span.clone(), *local_key, *imported_from),
+                imported_from: (imports_from_src_key, imports_from_namespace_key),
+            } => self.visit_use_directive(
+                span.clone(),
+                *local_key,
+                *imports_from_src_key,
+                *imports_from_namespace_key,
+            ),
             NamedExpr::NamespaceDirective { span, .. } => Ok(TypedExpression {
                 type_key: self.infer_type(source_key, expr)?,
                 kind: TypedExpressionKind::NamespaceStatement(span.clone()),
@@ -532,20 +537,16 @@ impl<'compiler, 'ctx: 'compiler> Typechecker<'compiler, 'ctx>
         &mut self,
         span: Span,
         local_key: LocalKey,
-        imported_from: NamespaceKey,
+        imports_from_src_key: SourceKey,
+        _imports_from_namespace_key: NamespaceKey,
     ) -> Result<TypedExpression, Box<TypecheckError>>
     {
-        // Source key of the namespace?
-        // I should write something like an here
-        let source_key = self
+        let type_key_of_imported_symbol: TypeKey = self
             .compiler
             .ctx
-            .named_ctx
-            .source_key_by_ast_root_namespace_key(imported_from)
-            .expect("");
-
-        let type_key_of_imported_symbol: TypeKey =
-            self.compiler.ctx.type_ctx.get_ast(source_key).locals[local_key];
+            .type_ctx
+            .get_ast(imports_from_src_key)
+            .locals[local_key];
 
         self.locals_to_types
             .insert(local_key, type_key_of_imported_symbol);

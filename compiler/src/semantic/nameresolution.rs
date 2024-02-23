@@ -170,8 +170,7 @@ pub fn check_names(
 enum LocalSymbol
 {
     Local(LocalKey),
-    Namespace(NamespaceKey),
-    LocalNamespace(LocalKey, NamespaceKey),
+    Namespace(SourceKey, NamespaceKey),
 }
 
 impl From<ResolvedSymbol> for LocalSymbol
@@ -180,7 +179,7 @@ impl From<ResolvedSymbol> for LocalSymbol
     {
         match value {
             ResolvedSymbol::LocalKey(local) => Self::from(local),
-            ResolvedSymbol::NamespaceKey(namespace) => Self::from(namespace),
+            ResolvedSymbol::NamespaceKey(source_key, namespace) => Self::from((source_key, namespace)),
         }
     }
 }
@@ -307,6 +306,8 @@ impl<'compiler, 'ctx> NameResolver<'compiler, 'ctx>
     ) -> Result<NamedExpr, NameResolutionError>
     {
         let (
+            // The source key of the file the import statement imports from
+            imported_from_source_key,
             // The namespace key which contains the symbol
             imported_from_namespace_key,
             // Symbol who was imported
@@ -328,7 +329,7 @@ impl<'compiler, 'ctx> NameResolver<'compiler, 'ctx>
             local_key,
 
             imported_name: last_path_element.clone(),
-            imported_from: imported_from_namespace_key,
+            imported_from: (imported_from_source_key, imported_from_namespace_key),
             symbol_imported: resolved_symbol,
         })
     }
@@ -337,15 +338,15 @@ impl<'compiler, 'ctx> NameResolver<'compiler, 'ctx>
         &mut self,
         importing_file_source_key: SourceKey,
         namespace_path: &NamespacePath,
-    ) -> Result<(NamespaceKey, ResolvedSymbol), NameResolutionError>
+    ) -> Result<(SourceKey, NamespaceKey, ResolvedSymbol), NameResolutionError>
     {
         let namespace_to_import_from = &namespace_path[0];
 
         // Search the current scope for the module
-        let namespace_key_to_import_from = if let Some(LocalSymbol::Namespace(namespace_key)) =
+        let (namespace_source_key_to_import_from, namespace_key_to_import_from) = if let Some(LocalSymbol::Namespace(source_key, namespace_key)) =
             self.scopes.local(namespace_to_import_from.value())
         {
-            *namespace_key
+            (*source_key, *namespace_key)
         } else {
             return Err(NameResolutionError::IdentifierNotFound {
                 source_key: importing_file_source_key,
@@ -355,6 +356,7 @@ impl<'compiler, 'ctx> NameResolver<'compiler, 'ctx>
 
         if namespace_path.len() > 1 {
             Ok((
+                namespace_source_key_to_import_from,
                 namespace_key_to_import_from,
                 self.resolve_namespace_path_import(
                     importing_file_source_key,
@@ -364,8 +366,9 @@ impl<'compiler, 'ctx> NameResolver<'compiler, 'ctx>
             ))
         } else {
             Ok((
+                namespace_source_key_to_import_from,
                 namespace_key_to_import_from,
-                ResolvedSymbol::NamespaceKey(namespace_key_to_import_from),
+                ResolvedSymbol::NamespaceKey(namespace_source_key_to_import_from, namespace_key_to_import_from),
             ))
         }
     }
@@ -394,7 +397,7 @@ impl<'compiler, 'ctx> NameResolver<'compiler, 'ctx>
             (ResolvedSymbol::LocalKey(..) | ResolvedSymbol::NamespaceKey(..), None) => {
                 Ok(resolved_symbol)
             }
-            (ResolvedSymbol::NamespaceKey(new_namespace_key), Some(..)) => self
+            (ResolvedSymbol::NamespaceKey(_, new_namespace_key), Some(..)) => self
                 .resolve_namespace_path_import(source_key, new_namespace_key, &namespace_path[1..]),
         }
     }
@@ -523,7 +526,7 @@ impl<'compiler, 'ctx> NameResolver<'compiler, 'ctx>
             self.scopes
                 .try_insert(
                     local_namespace_name.value_copied(),
-                    LocalSymbol::LocalNamespace(local_key, namespace_key),
+                    LocalSymbol::Namespace(namespace_source_key, namespace_key),
                 )
                 .map_err(|_| NameResolutionError::ClashingIdentifier {
                     source_key: importing_file_source_key,

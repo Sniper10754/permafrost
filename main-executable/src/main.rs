@@ -20,7 +20,7 @@ fn main() -> eyre::Result<()>
     logging::setup_logger()?;
 
     if args.debug {
-        cli::hand_execution()?;
+        cli::hang_execution()?;
     }
 
     match args.subcommand {
@@ -28,7 +28,7 @@ fn main() -> eyre::Result<()>
             file,
             output_file,
             disassemble,
-            codegen_option,
+            codegen_backend: codegen_option,
         } => compile::compile_file_entry(file, output_file, disassemble, codegen_option),
     }
 }

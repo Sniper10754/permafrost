@@ -168,51 +168,7 @@ impl<'report_context> Parser<'report_context>
                 }
 
                 Some(Spanned(_, Token::LParen)) => {
-                    let lpt = consume_token!(
-                        parser: self,
-                        token: Token::LParen,
-                        description: "Left pharentesis"
-                    )?
-                    .span()
-                    .into();
-
-                    let mut arguments = vec![];
-                    let rpt;
-
-                    loop {
-                        match self.token_stream.peek() {
-                            Some(Spanned(_, Token::Comma)) => {
-                                self.token_stream.skip_token();
-                            }
-                            Some(Spanned(_, Token::RParen)) => {
-                                rpt = consume_token!(
-                                    parser: self,
-                                    token: Token::RParen,
-                                    description: "Right pharentesis"
-                                )?
-                                .span()
-                                .into();
-
-                                break;
-                            }
-                            Some(Spanned(_, _)) => {
-                                arguments.push(self.parse_expr()?);
-                            }
-                            None => self.report_ctx.push(
-                                report!(parser: self, ErrorKind::UnrecognizedEof {
-                                    expected: &["a comma", "an argument"],
-                                    previous_element_span: self.token_stream.previous().unwrap().span().clone()
-                                }),
-                            ),
-                        }
-                    }
-
-                    expression = Expr::Call {
-                        callee: Box::new(expression),
-                        left_paren: lpt,
-                        arguments,
-                        right_paren: rpt,
-                    }
+                    expression = self.parse_call(expression)?;
                 }
 
                 _ => break,
@@ -220,6 +176,71 @@ impl<'report_context> Parser<'report_context>
         }
 
         Some(expression)
+    }
+
+    fn parse_call(
+        &mut self,
+        callee: Expr,
+    ) -> Option<Expr>
+    {
+        let left_paren = consume_token!(
+            parser: self,
+            token: Token::LParen,
+            description: "Left pharenthesis"
+        )?
+        .span()
+        .into();
+
+        let arguments = self.parse_function_call_arguments()?;
+
+        let right_paren = consume_token!(
+            parser: self,
+            token: Token::RParen,
+            description: "Right parenthesis"
+        )?
+        .span()
+        .into();
+
+        Some(Expr::Call {
+            callee: Box::new(callee),
+            left_paren,
+            arguments,
+            right_paren,
+        })
+    }
+
+    fn parse_function_call_arguments(&mut self) -> Option<Vec<Expr>>
+    {
+        let mut arguments = Vec::new();
+
+        loop {
+            match self.token_stream.peek() {
+                Some(Spanned(_, Token::RParen)) => break,
+                Some(Spanned(..)) => {
+                    arguments.push(self.parse_expr()?);
+
+                    match self.token_stream.peek() {
+                        Some(Spanned(_, Token::Comma)) => {
+                            self.token_stream.skip_token();
+                        }
+                        Some(..) => {
+                            let Spanned(span, _) = self.token_stream.next()?;
+
+                            self.report_ctx.push(report!(parser: self, ErrorKind::UnrecognizedToken { span, expected: "A comma" }))
+                        }
+                        None => (),
+                    }
+                }
+                None => self
+                    .report_ctx
+                    .push(report!(parser: self, ErrorKind::UnrecognizedEof {
+                        expected: &["a comma", "an argument"],
+                        previous_element_span: self.token_stream.previous().unwrap().span().clone()
+                    })),
+            }
+        }
+
+        Some(arguments)
     }
 
     fn parse_atom_expr(&mut self) -> Option<Expr>

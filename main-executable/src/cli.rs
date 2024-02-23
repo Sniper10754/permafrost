@@ -13,17 +13,20 @@ pub static LOGO: &str = r#"
 #[derive(clap::Parser)]
 pub struct Arguments
 {
-    #[clap(subcommand)]
-    pub subcommand: Subcommand,
-
-    #[clap(help = "Dont show the permafrost logo")]
+    #[clap(help = "Dont show the permafrost logo", long)]
     pub no_logo: bool,
 
-    #[clap(help = "Hangs the program and prints the PID, resumes execution on user input..")]
+    #[clap(
+        help = "Hangs the program and prints the PID, resumes execution on user input..",
+        long
+    )]
     pub debug: bool,
+
+    #[clap(subcommand)]
+    pub subcommand: Subcommand,
 }
 
-pub fn hand_execution() -> eyre::Result<()>
+pub fn hang_execution() -> eyre::Result<()>
 {
     use std::{io::Read, process};
 
@@ -50,14 +53,15 @@ pub enum Subcommand
         #[clap(help = "Disassemble once compilation is done", long = "disassemble")]
         disassemble: bool,
 
-        #[clap(help = "Codegen backend to use", long, short, value_enum, default_value_t=CodegenKind::Bytecode)]
-        codegen_option: CodegenKind,
+        #[clap(help = "Codegen backend to use", long, short, value_enum, default_value_t=CodegenKind::default())]
+        codegen_backend: CodegenKind,
     },
 }
 
-#[derive(clap::ValueEnum, Clone, Copy, Debug)]
+#[derive(clap::ValueEnum, Clone, Copy, Debug, Default)]
 pub enum CodegenKind
 {
+    #[default]
     Bytecode,
 }
 

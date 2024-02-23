@@ -304,11 +304,11 @@ impl Spannable for Expr
 
             Expr::Function { fn_token, body, .. } => (fn_token.span().start)..(body.span().end),
             Expr::Call {
-                callee: _,
-                left_paren,
+                callee,
+                left_paren: _,
                 arguments: _,
                 right_paren,
-            } => (left_paren.span().start)..(right_paren.span().end),
+            } => (callee.span().start)..(right_paren.span().end),
 
             Expr::Block {
                 left_brace,

@@ -71,17 +71,6 @@ impl NamedContext
         self.get_namespace_mut(namespace_key)
     }
 
-    pub fn source_key_by_ast_root_namespace_key(
-        &self,
-        namespace_key: NamespaceKey,
-    ) -> Option<SourceKey>
-    {
-        self.named_asts
-            .iter()
-            .find(|(_, ir)| ir.root_namespace == namespace_key)
-            .map(|(source_key, _)| source_key)
-    }
-
     delegate! {
         to self.namespaces {
             #[call(get)]
@@ -120,5 +109,5 @@ pub struct Namespace
 pub enum Item
 {
     Local(LocalKey),
-    Namespace(NamespaceKey),
+    Namespace(SourceKey, NamespaceKey),
 }

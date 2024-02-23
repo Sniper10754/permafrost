@@ -6,6 +6,7 @@ use permafrost_ast::{
     },
     Span, Spannable, Spanned,
 };
+use permafrost_reports::sourcemap::SourceKey;
 use slotmap::new_key_type;
 
 use crate::context::names::{Item, NamespaceKey};
@@ -87,7 +88,7 @@ pub enum NamedExpr
     {
         local_key: LocalKey,
         imported_name: Spanned<String>,
-        imported_from: NamespaceKey,
+        imported_from: (SourceKey, NamespaceKey),
         symbol_imported: ResolvedSymbol,
 
         span: Span,
@@ -214,7 +215,7 @@ pub struct NamespacePath
 pub enum ResolvedSymbol
 {
     LocalKey(LocalKey),
-    NamespaceKey(NamespaceKey),
+    NamespaceKey(SourceKey, NamespaceKey),
 }
 
 impl From<Item> for ResolvedSymbol
@@ -223,7 +224,7 @@ impl From<Item> for ResolvedSymbol
     {
         match value {
             Item::Local(local_key) => Self::from(local_key),
-            Item::Namespace(namespace_key) => Self::from(namespace_key),
+            Item::Namespace(source_key, namespace_key) => Self::from((source_key, namespace_key)),
         }
     }
 }
