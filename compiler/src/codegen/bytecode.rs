@@ -39,7 +39,7 @@ impl CodegenBackend for BytecodeCodegenBackend
             body: Vec::new(),
         };
 
-        let t_ast = compiler_ctx.type_ctx.get_ast(source_key);
+        let t_ast = compiler_ctx.type_ctx.get_typed_ast(source_key);
 
         self.compile_program(t_ast, &compiler_ctx.type_ctx, &mut module);
 

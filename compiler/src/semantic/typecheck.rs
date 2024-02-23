@@ -163,7 +163,11 @@ pub fn check_types(
     source_key: SourceKey,
 )
 {
-    compiler.ctx.insert_ast(source_key, TypedAst::default());
+    compiler
+        .ctx
+        .insert_typed_ast(source_key, TypedAst::default());
+
+    let mut locals_to_types = SecondaryMap::new();
 
     // compiler.ctx
     //     .intrinsic_ctx
@@ -172,13 +176,13 @@ pub fn check_types(
     //     .map(|(name, ty)| (name, *ty))
     //     .for_each(|(name, type_key)| rts.scopes.insert_local(name, RefersTo::Type(type_key)));
 
-    let mut rts = Typechecker {
-        locals_to_types: SecondaryMap::new(),
-        compiler,
+    let mut type_checker = Typechecker {
+        locals_to_types,
+        compiler_ref: compiler,
     };
 
-    for expr in rts
-        .compiler
+    for expr in type_checker
+        .compiler_ref
         .ctx
         .named_ctx
         .get_ast(source_key)
@@ -186,19 +190,34 @@ pub fn check_types(
         .clone()
         .iter()
     {
-        let result = rts.visit_expr(source_key, expr);
+        let result = type_checker.visit_expr(source_key, expr);
 
         match result {
-            Ok(t_expr) => rts.compiler.ctx.get_ast_mut(source_key).nodes.push(t_expr),
-            Err(report) => rts.compiler.ctx.report_ctx.push(report.into_report()),
+            Ok(t_expr) => type_checker
+                .compiler_ref
+                .ctx
+                .get_typed_ast_mut(source_key)
+                .nodes
+                .push(t_expr),
+            Err(report) => type_checker
+                .compiler_ref
+                .ctx
+                .report_ctx
+                .push(report.into_report()),
         }
     }
+
+    type_checker
+        .compiler_ref
+        .ctx
+        .get_typed_ast_mut(source_key)
+        .locals = type_checker.locals_to_types;
 }
 
 struct Typechecker<'compiler, 'ctx>
 {
     pub locals_to_types: SecondaryMap<LocalKey, TypeKey>,
-    pub compiler: &'compiler mut Compiler<'ctx>,
+    pub compiler_ref: &'compiler mut Compiler<'ctx>,
 }
 
 impl<'compiler, 'ctx: 'compiler> Typechecker<'compiler, 'ctx>
@@ -234,8 +253,8 @@ impl<'compiler, 'ctx: 'compiler> Typechecker<'compiler, 'ctx>
     ) -> Result<(), ()>
     {
         match (
-            self.compiler.ctx.get_type(a).clone(),
-            self.compiler.ctx.get_type(b).clone(),
+            self.compiler_ref.ctx.get_type(a).clone(),
+            self.compiler_ref.ctx.get_type(b).clone(),
         ) {
             (Type::Function(a), Type::Function(b)) => {
                 Iterator::zip(a.arguments.values().copied(), b.arguments.values().copied())
@@ -340,8 +359,8 @@ impl<'compiler, 'ctx: 'compiler> Typechecker<'compiler, 'ctx>
         match (
             operator.kind,
             (
-                &self.compiler.ctx.get_type(lhs_type_key),
-                &self.compiler.ctx.get_type(rhs_type_key),
+                &self.compiler_ref.ctx.get_type(lhs_type_key),
+                &self.compiler_ref.ctx.get_type(rhs_type_key),
             ),
         ) {
             (Add | Sub | Mul, (Type::Int, Type::Int)) => Ok(self.insert_type(Type::Int)),
@@ -357,8 +376,8 @@ impl<'compiler, 'ctx: 'compiler> Typechecker<'compiler, 'ctx>
                     Err(TypecheckError::TypeMismatch {
                         source_key,
                         span,
-                        expected: display_type(lhs_type_key, &self.compiler.ctx.type_ctx),
-                        found: display_type(rhs_type_key, &self.compiler.ctx.type_ctx),
+                        expected: display_type(lhs_type_key, &self.compiler_ref.ctx.type_ctx),
+                        found: display_type(rhs_type_key, &self.compiler_ref.ctx.type_ctx),
                     }
                     .into())
                 }
@@ -367,8 +386,8 @@ impl<'compiler, 'ctx: 'compiler> Typechecker<'compiler, 'ctx>
             _ => Err(TypecheckError::IncompatibleOperands {
                 source_key,
                 span,
-                left: display_type(lhs_type_key, &self.compiler.ctx.type_ctx),
-                right: display_type(rhs_type_key, &self.compiler.ctx.type_ctx),
+                left: display_type(lhs_type_key, &self.compiler_ref.ctx.type_ctx),
+                right: display_type(rhs_type_key, &self.compiler_ref.ctx.type_ctx),
             }
             .into()),
         }
@@ -431,7 +450,7 @@ impl<'compiler, 'ctx: 'compiler> Typechecker<'compiler, 'ctx>
                 if let Type::Function(FunctionType {
                     arguments: _,
                     return_type,
-                }) = self.compiler.ctx.get_type(type_key)
+                }) = self.compiler_ref.ctx.get_type(type_key)
                 {
                     Ok(*return_type)
                 } else {
@@ -541,11 +560,15 @@ impl<'compiler, 'ctx: 'compiler> Typechecker<'compiler, 'ctx>
         _imports_from_namespace_key: NamespaceKey,
     ) -> Result<TypedExpression, Box<TypecheckError>>
     {
+        extern crate std;
+        use std::dbg;
+        dbg!(&self.compiler_ref.ctx);
+
         let type_key_of_imported_symbol: TypeKey = self
-            .compiler
+            .compiler_ref
             .ctx
             .type_ctx
-            .get_ast(imports_from_src_key)
+            .get_typed_ast(imports_from_src_key)
             .locals[local_key];
 
         self.locals_to_types
@@ -648,7 +671,7 @@ impl<'compiler, 'ctx: 'compiler> Typechecker<'compiler, 'ctx>
         let Type::Function(FunctionType {
             arguments: typed_arguments,
             return_type,
-        }) = self.compiler.ctx.get_type(type_key).clone()
+        }) = self.compiler_ref.ctx.get_type(type_key).clone()
         else {
             unreachable!()
         };
@@ -686,8 +709,8 @@ impl<'compiler, 'ctx: 'compiler> Typechecker<'compiler, 'ctx>
                 .map_err(|_| TypecheckError::TypeMismatch {
                     source_key,
                     span: body.span(),
-                    expected: display_type(function.return_type, &self.compiler.ctx.type_ctx),
-                    found: display_type(function.body.type_key, &self.compiler.ctx.type_ctx),
+                    expected: display_type(function.return_type, &self.compiler_ref.ctx.type_ctx),
+                    found: display_type(function.body.type_key, &self.compiler_ref.ctx.type_ctx),
                 })?;
         }
 
@@ -706,7 +729,10 @@ impl<'compiler, 'ctx: 'compiler> Typechecker<'compiler, 'ctx>
         function: &TypedFunction,
     ) -> Result<(), Box<TypecheckError>>
     {
-        if !matches!(self.compiler.ctx.get_type(function.return_type), Type::Unit) {
+        if !matches!(
+            self.compiler_ref.ctx.get_type(function.return_type),
+            Type::Unit
+        ) {
             self.check_fn_body_branches(source_key, &function.body)?;
         }
 
@@ -734,8 +760,8 @@ impl<'compiler, 'ctx: 'compiler> Typechecker<'compiler, 'ctx>
                             .as_ref()
                             .map(|expr| expr.kind.span())
                             .unwrap_or(return_token.span()),
-                        expected: display_type(expected_type, &self.compiler.ctx.type_ctx),
-                        found: display_type(*return_type_index, &self.compiler.ctx.type_ctx),
+                        expected: display_type(expected_type, &self.compiler_ref.ctx.type_ctx),
+                        found: display_type(*return_type_index, &self.compiler_ref.ctx.type_ctx),
                     }
                     .into()),
                 }
@@ -811,7 +837,8 @@ impl<'compiler, 'ctx: 'compiler> Typechecker<'compiler, 'ctx>
             } => {
                 let type_key = self.locals_to_types[*local_key];
 
-                let Type::Function(function) = self.compiler.ctx.get_type(type_key).clone() else {
+                let Type::Function(function) = self.compiler_ref.ctx.get_type(type_key).clone()
+                else {
                     return Err(
                         TypecheckError::CannotCallNonFunction(source_key, callee.span()).into(),
                     );
@@ -859,8 +886,8 @@ impl<'compiler, 'ctx: 'compiler> Typechecker<'compiler, 'ctx>
                             return Err(TypecheckError::TypeMismatch {
                                 source_key,
                                 span: call_arg_span,
-                                expected: display_type(func_arg, &self.compiler.ctx.type_ctx),
-                                found: display_type(call_arg, &self.compiler.ctx.type_ctx),
+                                expected: display_type(func_arg, &self.compiler_ref.ctx.type_ctx),
+                                found: display_type(call_arg, &self.compiler_ref.ctx.type_ctx),
                             }
                             .into())
                         }
@@ -952,6 +979,6 @@ impl<'compiler, 'ctx: 'compiler> Typechecker<'compiler, 'ctx>
         ty: Type,
     ) -> TypeKey
     {
-        self.compiler.ctx.insert_type(ty)
+        self.compiler_ref.ctx.insert_type(ty)
     }
 }

@@ -23,20 +23,20 @@ impl TypeContext
         to self.t_asts {
             #[call(get)]
             #[unwrap]
-            pub fn get_ast(
+            pub fn get_typed_ast(
                 &self,
                 source_key: SourceKey,
             ) -> &TypedAst;
 
             #[call(get_mut)]
             #[unwrap]
-            pub fn get_ast_mut(
+            pub fn get_typed_ast_mut(
                 &mut self,
                 source_key: SourceKey,
             ) -> &mut TypedAst;
 
             #[call(insert)]
-            pub fn insert_ast(
+            pub fn insert_typed_ast(
                 &mut self,
                 source_key: SourceKey,
                 ast: TypedAst,

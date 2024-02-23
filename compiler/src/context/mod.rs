@@ -29,12 +29,14 @@ impl CompilerContext
 {
     delegate! {
         to self.type_ctx {
-            pub fn get_ast(
+            #[call(get_typed_ast)]
+            pub fn get_typed_ast(
                 &self,
                 source_key: SourceKey,
             ) -> &TypedAst;
 
-            pub fn get_ast_mut(
+            #[call(get_typed_ast_mut)]
+            pub fn get_typed_ast_mut(
                 &mut self,
                 source_key: SourceKey,
             ) -> &mut TypedAst;
@@ -54,7 +56,7 @@ impl CompilerContext
                 ty: Type,
             ) -> TypeKey;
 
-            pub fn insert_ast(
+            pub fn insert_typed_ast(
                 &mut self,
                 source_key: SourceKey,
                 ast: TypedAst,
